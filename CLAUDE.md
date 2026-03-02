@@ -72,4 +72,17 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 
 ## Product Direction
 
-`docs/product/` holds long-term product management initiatives. Check there for upcoming feature work.
+`docs/product/` holds the long-term product roadmap and PRD.
+
+| Document | What it covers |
+|----------|---------------|
+| `docs/product/roadmap.md` | v1 milestone breakdown — every task, SDK method, and exit criteria |
+| `docs/product/prd.md` | Product requirements — vision, target users, feature surface, non-functional requirements |
+
+**When creating a new plan (`docs/plans/`):**
+1. Read `docs/product/roadmap.md` first.
+2. Identify which roadmap milestone(s) and checklist items the plan addresses.
+3. Reference the milestone in the plan's frontmatter or overview (e.g., "Implements Milestone 3: CLI — Playback Commands").
+4. After completing work, check off the corresponding `- [ ]` items in the roadmap so it stays current.
+
+The roadmap is the source of truth for what needs to be built. Plans should be driven by roadmap priorities — don't start work that isn't traceable back to a milestone.
