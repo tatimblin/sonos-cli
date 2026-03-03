@@ -1,0 +1,38 @@
+[package]
+name = "sonos-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI/TUI application for controlling Sonos speakers"
+
+[[bin]]
+name = "sonos"
+path = "src/main.rs"
+
+[dependencies]
+# Sonos SDK
+sonos-sdk = { path = "../sonos-sdk/sonos-sdk" }
+
+# CLI parsing
+clap = { version = "4", features = ["derive"] }
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+ratatui-image = "3"
+image = "0.25"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Config directory
+dirs = "5"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+[dev-dependencies]
+proptest = "1"
+tempfile = "3"

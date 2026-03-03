@@ -409,19 +409,31 @@ Rounds out the full SDK surface for v1.
 
 The TUI event loop, state management, and navigation skeleton — no real data yet, just the shell.
 
+### TUI State Management Architecture
+
+**Core principle:** The TUI is a stateless wrapper over `SonosSystem`. All speaker and group data lives in `SonosSystem` and is queried on-demand during rendering. The TUI only stores UI state (navigation, selection, scroll position).
+
+**State ownership:**
+- `SonosSystem` stores all speaker/group data (single source of truth)
+- TUI stores only UI concerns: current view, selected index, scroll offset
+- Change events trigger re-renders, which query fresh data from `SonosSystem`
+- No duplication of speaker/group state in TUI structs
+
 ### App State — `src/tui/app.rs`
 
 - [ ] `App` struct holding state:
 ```rust
 pub struct App {
-    pub system: SonosSystem,
-    pub navigation: Navigation,
+    pub system: SonosSystem,      // Single source of truth for speaker/group data
+    pub navigation: Navigation,   // UI state only
     pub should_quit: bool,
     pub config: Config,
 }
 
 pub struct Navigation {
-    pub stack: Vec<Screen>,  // back-stack for Esc navigation
+    pub stack: Vec<Screen>,       // back-stack for Esc navigation
+    pub selected_index: usize,    // UI state: which item is selected
+    pub scroll_offset: usize,     // UI state: scroll position
 }
 
 pub enum Screen {
