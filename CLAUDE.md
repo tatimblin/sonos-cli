@@ -62,6 +62,7 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 | `docs/goals.md` | Project vision, TUI screen designs, CLI command reference, v1 scope |
 | `docs/references/sonos-sdk.md` | Complete SDK API — every type, method, and example |
 | `docs/references/cli-guidelines.md` | clig.dev rules applied to this project |
+| `docs/references/cli-commands.md` | Per-command reference — syntax, flags, examples, output, errors for all 27 commands |
 
 ## Brainstorm Sources
 
