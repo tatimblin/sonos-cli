@@ -9,8 +9,6 @@ use std::path::PathBuf;
 pub struct Config {
     /// Default group to target when --speaker/--group not specified
     pub default_group: Option<String>,
-    /// Hours before cache is considered stale
-    pub cache_ttl_hours: u64,
     /// TUI color theme: "dark" or "light"
     pub theme: String,
 }
@@ -19,7 +17,6 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             default_group: None,
-            cache_ttl_hours: 24,
             theme: "dark".to_string(),
         }
     }
@@ -29,15 +26,15 @@ impl Config {
     /// Load from config file with environment variable overrides.
     pub fn load() -> Self {
         let config_dir = std::env::var("SONOS_CONFIG_DIR")
+            .ok()
+            .filter(|s| !s.is_empty())
             .map(PathBuf::from)
-            .ok()
-            .or_else(|| dirs::config_dir().map(|p| p.join("sonos")))
-            .unwrap_or_else(|| PathBuf::from("."));
+            .filter(|p| p.is_absolute())
+            .or_else(|| dirs::config_dir().map(|p| p.join("sonos")));
 
-        let config_path = config_dir.join("config.toml");
-
-        let mut config: Config = std::fs::read_to_string(&config_path)
-            .ok()
+        let mut config: Config = config_dir
+            .map(|d| d.join("config.toml"))
+            .and_then(|p| std::fs::read_to_string(p).ok())
             .and_then(|s| toml::from_str(&s).ok())
             .unwrap_or_default();
 

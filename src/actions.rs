@@ -27,9 +27,6 @@ pub enum PlayMode {
 /// All operations the CLI/TUI can perform.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    // Discovery
-    Discover,
-
     // Queries
     ListSpeakers,
     ListGroups,

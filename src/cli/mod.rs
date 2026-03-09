@@ -9,9 +9,6 @@ use crate::actions::{Action, Target};
 /// CLI subcommands.
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Refresh speaker discovery cache
-    Discover,
-
     /// List all speakers
     Speakers,
 
@@ -97,7 +94,6 @@ impl Commands {
     /// Convert CLI command to Action.
     pub fn into_action(self) -> Action {
         match self {
-            Self::Discover => Action::Discover,
             Self::Speakers => Action::ListSpeakers,
             Self::Groups => Action::ListGroups,
             Self::Status { speaker, group } => Action::Status {
@@ -169,12 +165,6 @@ mod tests {
     fn default_when_neither_specified() {
         let target = resolve_target_args(None, None);
         assert!(matches!(target, Target::Default));
-    }
-
-    #[test]
-    fn discover_command_maps_correctly() {
-        let cmd = Commands::Discover;
-        assert!(matches!(cmd.into_action(), Action::Discover));
     }
 
     #[test]

@@ -18,9 +18,6 @@ pub enum CliError {
     #[error("configuration error: {0}")]
     Config(String),
 
-    #[error("cache error: {0}")]
-    Cache(String),
-
     #[error("validation error: {0}")]
     Validation(String),
 }
@@ -30,10 +27,9 @@ impl CliError {
     pub fn recovery_hint(&self) -> Option<&str> {
         match self {
             Self::SpeakerNotFound(_) | Self::GroupNotFound(_) => {
-                Some("Run 'sonos discover' to refresh the speaker list.")
+                Some("Check that your speakers are on the same network, then retry.")
             }
             Self::Sdk(_) => Some("Check network connectivity and speaker power."),
-            Self::Cache(_) => Some("Try 'sonos discover' to rebuild the cache."),
             Self::Config(_) | Self::Validation(_) => None,
         }
     }
@@ -56,7 +52,7 @@ mod tests {
     fn speaker_not_found_has_recovery_hint() {
         let err = CliError::SpeakerNotFound("Kitchen".to_string());
         assert!(err.recovery_hint().is_some());
-        assert!(err.recovery_hint().unwrap().contains("discover"));
+        assert!(err.recovery_hint().unwrap().contains("same network"));
     }
 
     #[test]
@@ -80,9 +76,6 @@ mod tests {
     #[test]
     fn runtime_errors_return_exit_code_1() {
         let err = CliError::SpeakerNotFound("x".to_string());
-        assert_eq!(err.exit_code(), ExitCode::from(1));
-
-        let err = CliError::Cache("io error".to_string());
         assert_eq!(err.exit_code(), ExitCode::from(1));
     }
 }

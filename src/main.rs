@@ -8,7 +8,6 @@ use std::io::IsTerminal;
 use std::process::ExitCode;
 
 mod actions;
-mod cache;
 mod cli;
 mod config;
 mod errors;
@@ -40,7 +39,16 @@ fn main() -> ExitCode {
         Some(cmd) => {
             let action = cmd.into_action();
 
-            match executor::execute(action, &config) {
+            let system = match sonos_sdk::SonosSystem::new() {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("error: {}", e);
+                    eprintln!("Check that your speakers are on the same network, then retry.");
+                    return ExitCode::from(1);
+                }
+            };
+
+            match executor::execute(action, &system, &config) {
                 Ok(msg) => {
                     println!("{}", msg);
                     ExitCode::SUCCESS
