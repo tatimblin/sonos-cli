@@ -165,14 +165,14 @@ pub enum CliError {
 - [x] `CliError::recovery_hint(&self) -> Option<&str>` — returns actionable follow-up text
 - [x] `CliError::exit_code(&self) -> ExitCode` — `1` for runtime, `2` for validation/usage
 
-### Cache — `src/cache.rs`
+### ~~Cache — `src/cache.rs`~~ (Superseded)
 
-- [x] `CachedSystem` struct: speakers list + groups list + `cached_at: SystemTime`
-- [x] `load() -> Option<CachedSystem>` — reads `~/.config/sonos/cache.json`, returns `None` if missing or parse error
-- [x] `save(system: &SonosSystem) -> Result<()>` — atomic write (write to `.tmp`, then `fs::rename`)
-- [x] `is_stale(cache: &CachedSystem, ttl_hours: u64) -> bool` — check `cached_at + ttl`
-- [x] Use `dirs::config_dir()` for `~/.config/sonos/`
-- [x] Cache stores: `Vec<CachedSpeaker>` with `{ name, id, ip, model_name }` and `Vec<CachedGroup>` with `{ id, coordinator_id, member_ids }`
+> **Superseded by SDK-level caching.** Cache now lives in `sonos-sdk/src/cache.rs`
+> using `~/.cache/sonos/cache.json` (XDG cache_dir). CLI `src/cache.rs` deleted.
+
+- ~~`CachedSystem` struct~~
+- ~~`load()`, `save()`, `is_stale()` functions~~
+- ~~`dirs::config_dir()` for cache path~~
 
 ### Config — `src/config.rs`
 
@@ -227,17 +227,18 @@ pub struct GlobalFlags {
 - [x] `Commands` enum with `Discover`, `Speakers`, `Groups`, `Status` variants
 - [x] `Commands::into_action(self, global: &GlobalFlags) -> Action` pure conversion
 
-### Discovery Command
+### ~~Discovery Command~~ (Superseded)
 
-- [ ] `sonos discover` — calls `sonos_discovery::get_with_timeout(Duration::from_secs(3))`
-- [ ] On TTY: show spinner to stderr during 3s scan
-- [ ] Build `SonosSystem::from_discovered_devices(devices)`
-- [ ] Write cache via `cache::save()`
-- [ ] Print discovered speakers: name, model, IP (one per line)
+> **Superseded by SDK-level caching.** `SonosSystem::new()` now handles discovery and
+> caching transparently. There is no `sonos discover` command — the SDK auto-discovers
+> on first run and auto-rediscovers on speaker miss. See
+> `docs/plans/2026-03-08-feat-sdk-level-discovery-caching-plan.md`.
 
-**SDK methods used:**
-- `sonos_discovery::get_with_timeout()`
-- `SonosSystem::from_discovered_devices()`
+- ~~`sonos discover` — calls `sonos_discovery::get_with_timeout(Duration::from_secs(3))`~~
+- ~~On TTY: show spinner to stderr during 3s scan~~
+- ~~Build `SonosSystem::from_discovered_devices(devices)`~~
+- ~~Write cache via `cache::save()`~~
+- ~~Print discovered speakers: name, model, IP (one per line)~~
 
 ### Speakers Command
 
@@ -278,9 +279,9 @@ pub struct GlobalFlags {
 
 ### Auto-Rediscovery & Error Handling
 
-- [ ] Auto-rediscovery on cache miss: if a targeted speaker/group isn't in cache, rediscover once before failing
-- [ ] Error format: `error: speaker "X" not found.\nRun 'sonos discover' to refresh.`
-- [ ] Exit code 1 for runtime errors (speaker not found, network failure)
+- [x] Auto-rediscovery on cache miss: SDK `get_speaker_by_name()` triggers one-shot SSDP rediscovery per session
+- [x] Error format: `error: speaker "X" not found.\nCheck that your speakers are on the same network, then retry.`
+- [x] Exit code 1 for runtime errors (speaker not found, network failure)
 
 **Exit criteria:** A user with no config file can run `sonos discover` and then `sonos groups` and see their actual Sonos system state.
 

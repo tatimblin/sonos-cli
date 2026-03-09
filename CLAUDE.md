@@ -34,8 +34,7 @@ The `sonos-sdk` source lives at `../sonos-sdk` (repo root) with the crate at `..
 src/
   main.rs           ← arg parse; no args → TUI, else → CLI dispatch
   actions.rs        ← Action enum covering all SDK operations
-  executor.rs       ← execute(Action, &SonosSystem) → Result<(), anyhow::Error>
-  cache.rs          ← read/write ~/.config/sonos/cache.json (24h TTL)
+  executor.rs       ← execute(Action, &SonosSystem, &Config) → Result<String, CliError>
   config.rs         ← read ~/.config/sonos/config.toml
   cli/
     mod.rs          ← clap Commands enum → maps args to Action values
@@ -48,7 +47,7 @@ src/
 
 1. **Action dispatch only.** Both `cli/` and `tui/` emit `Action` values. `executor.rs` is the only place SDK methods are called. No exceptions.
 2. **Errors to stderr.** `stdout` is for command output only. Use `eprintln!` / `anyhow` for all errors.
-3. **Discovery is cached.** Never run SSDP on every command. Load `~/.config/sonos/cache.json`; rediscover only on miss or TTL expiry. `sonos discover` refreshes manually.
+3. **Discovery is cached by the SDK.** `SonosSystem::new()` handles caching transparently — loads from `~/.cache/sonos/cache.json` with 24h TTL, falls back to SSDP on miss or expiry. Auto-rediscovers once per session when a speaker isn't found.
 4. **`--group` wins over `--speaker`.** If both flags are given, target the group. Default to the configured/first group when neither is given.
 
 ## CLI Conventions
@@ -57,7 +56,7 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 - Flat subcommands: `sonos <verb>`, never `sonos <domain> <verb>`
 - Flags over positional args: `--speaker "Kitchen"` not `sonos play Kitchen`
 - Exit code 0 = success, 1 = runtime error, 2 = usage error
-- Error format: `error: <description>\nRun 'sonos discover' to refresh.`
+- Error format: `error: <description>\nCheck that your speakers are on the same network, then retry.`
 
 ## Reference Documentation
 
