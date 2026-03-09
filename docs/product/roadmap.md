@@ -43,7 +43,7 @@ The scaffolding that everything else builds on. No user-visible features yet, bu
 
 ### Cargo.toml & Dependencies
 
-- [ ] `Cargo.toml` with all dependencies:
+- [x] `Cargo.toml` with all dependencies:
   - `sonos-sdk` (path = `"../sonos-sdk/sonos-sdk"`)
   - `clap` v4 with `derive` feature
   - `ratatui` + `crossterm`
@@ -51,15 +51,15 @@ The scaffolding that everything else builds on. No user-visible features yet, bu
   - `dirs` (for `~/.config/sonos/`)
   - `anyhow` (error propagation)
   - `thiserror` (domain error types)
-  - `ratatui-image` (album art rendering)
-  - `image` (image decoding for album art)
+  - `ratatui-image` (album art rendering) *(not yet added)*
+  - `image` (image decoding for album art) *(not yet added)*
 
 ### Entry Point — `src/main.rs`
 
-- [ ] `main()` returns `ExitCode` (not `Result`) for proper exit code control
-- [ ] Parse `Cli` struct via clap derive — `Option<Commands>` subcommand field
-- [ ] No args (`None`) → launch TUI (only if `std::io::stdout().is_terminal()`)
-- [ ] Subcommand present (`Some(cmd)`) → convert to `Action`, execute, print result
+- [x] `main()` returns `ExitCode` (not `Result`) for proper exit code control
+- [x] Parse `Cli` struct via clap derive — `Option<Commands>` subcommand field
+- [x] No args (`None`) → launch TUI (only if `std::io::stdout().is_terminal()`)
+- [x] Subcommand present (`Some(cmd)`) → convert to `Action`, execute, print result
 
 ```rust
 // Pattern: main.rs skeleton
@@ -90,7 +90,7 @@ fn main() -> ExitCode {
 
 ### Action Enum — `src/actions.rs`
 
-- [ ] Define `Action` enum covering all SDK operations with these variant groups:
+- [x] Define `Action` enum covering all SDK operations with these variant groups:
 
 **System actions:**
 - `Discover` — run SSDP, write cache
@@ -123,7 +123,7 @@ fn main() -> ExitCode {
 - `SetSleepTimer { duration: String, target: Target }` — e.g. `"01:00:00"`
 - `CancelSleepTimer { target: Target }`
 
-- [ ] Define `Target` enum:
+- [x] Define `Target` enum:
 ```rust
 pub enum Target {
     Speaker(String),  // friendly name
@@ -134,17 +134,17 @@ pub enum Target {
 
 ### Executor — `src/executor.rs`
 
-- [ ] `pub fn execute(action: Action, system: &SonosSystem) -> Result<String, CliError>`
+- [x] `pub fn execute(action: Action, system: &SonosSystem) -> Result<String, CliError>` *(stub — compiles but returns mock strings, no real SDK calls)*
 - [ ] Match on `Action` variants, call corresponding SDK methods
-- [ ] Return human-readable success messages (e.g., `"Volume set to 50 (Living Room)"`)
-- [ ] `resolve_target()` helper: `Target` → `Speaker` or `Group` handle from `SonosSystem`
+- [x] Return human-readable success messages (e.g., `"Volume set to 50 (Living Room)"`) *(mock only)*
+- [x] `resolve_target()` helper: `Target` → `Speaker` or `Group` handle from `SonosSystem` *(name-only resolution, no real SDK lookup)*
   - `Target::Speaker(name)` → `system.get_speaker_by_name(&name)`
   - `Target::Group(name)` → find group by coordinator name in `system.groups()`
   - `Target::Default` → load from config, fall back to first group
 
-### Error Types — `src/error.rs`
+### Error Types — `src/errors.rs`
 
-- [ ] `CliError` enum using `thiserror`:
+- [x] `CliError` enum using `thiserror`:
 ```rust
 #[derive(thiserror::Error, Debug)]
 pub enum CliError {
@@ -162,21 +162,21 @@ pub enum CliError {
     Validation(String),
 }
 ```
-- [ ] `CliError::recovery_hint(&self) -> Option<&str>` — returns actionable follow-up text
-- [ ] `CliError::exit_code(&self) -> ExitCode` — `1` for runtime, `2` for validation/usage
+- [x] `CliError::recovery_hint(&self) -> Option<&str>` — returns actionable follow-up text
+- [x] `CliError::exit_code(&self) -> ExitCode` — `1` for runtime, `2` for validation/usage
 
 ### Cache — `src/cache.rs`
 
-- [ ] `CachedSystem` struct: speakers list + groups list + `cached_at: SystemTime`
-- [ ] `load() -> Option<CachedSystem>` — reads `~/.config/sonos/cache.json`, returns `None` if missing or parse error
-- [ ] `save(system: &SonosSystem) -> Result<()>` — atomic write (write to `.tmp`, then `fs::rename`)
-- [ ] `is_stale(cache: &CachedSystem, ttl_hours: u64) -> bool` — check `cached_at + ttl`
-- [ ] Use `dirs::config_dir()` for `~/.config/sonos/`
-- [ ] Cache stores: `Vec<CachedSpeaker>` with `{ name, id, ip, model_name }` and `Vec<CachedGroup>` with `{ id, coordinator_id, member_ids }`
+- [x] `CachedSystem` struct: speakers list + groups list + `cached_at: SystemTime`
+- [x] `load() -> Option<CachedSystem>` — reads `~/.config/sonos/cache.json`, returns `None` if missing or parse error
+- [x] `save(system: &SonosSystem) -> Result<()>` — atomic write (write to `.tmp`, then `fs::rename`)
+- [x] `is_stale(cache: &CachedSystem, ttl_hours: u64) -> bool` — check `cached_at + ttl`
+- [x] Use `dirs::config_dir()` for `~/.config/sonos/`
+- [x] Cache stores: `Vec<CachedSpeaker>` with `{ name, id, ip, model_name }` and `Vec<CachedGroup>` with `{ id, coordinator_id, member_ids }`
 
 ### Config — `src/config.rs`
 
-- [ ] `Config` struct with `#[serde(default)]`:
+- [x] `Config` struct with `#[serde(default)]`:
 ```rust
 #[derive(Deserialize)]
 pub struct Config {
@@ -188,8 +188,8 @@ pub struct Config {
     pub theme: String,  // default: "dark"
 }
 ```
-- [ ] `Config::load() -> Config` — reads `~/.config/sonos/config.toml`, falls back to defaults on any error
-- [ ] Environment variable overrides: `SONOS_DEFAULT_GROUP`, `SONOS_CONFIG_DIR`
+- [x] `Config::load() -> Config` — reads `~/.config/sonos/config.toml`, falls back to defaults on any error
+- [x] Environment variable overrides: `SONOS_DEFAULT_GROUP`, `SONOS_CONFIG_DIR`
 
 **Exit criteria:** `cargo build` succeeds. `Action` enum and `executor` stub compile cleanly. Cache round-trips correctly in a unit test. Config loads defaults when no file exists.
 
@@ -201,7 +201,7 @@ The first commands a new user will run. Must work reliably before any playback c
 
 ### Clap Definitions — `src/cli/mod.rs`
 
-- [ ] `Cli` struct with `#[command(flatten)] GlobalFlags` and `Option<Commands>`:
+- [x] `Cli` struct with `#[command(flatten)] GlobalFlags` and `Option<Commands>`:
 ```rust
 #[derive(Parser)]
 #[command(name = "sonos", about = "Control Sonos speakers from the terminal")]
@@ -224,8 +224,8 @@ pub struct GlobalFlags {
     pub verbose: bool,
 }
 ```
-- [ ] `Commands` enum with `Discover`, `Speakers`, `Groups`, `Status` variants
-- [ ] `Commands::into_action(self, global: &GlobalFlags) -> Action` pure conversion
+- [x] `Commands` enum with `Discover`, `Speakers`, `Groups`, `Status` variants
+- [x] `Commands::into_action(self, global: &GlobalFlags) -> Action` pure conversion
 
 ### Discovery Command
 
@@ -317,8 +317,10 @@ The commands used dozens of times a day.
 
 ### Clap Additions
 
-- [ ] Add `Play`, `Pause`, `Stop`, `Next`, `Prev`, `Seek { position: String }`, `Mode { mode: String }` to `Commands` enum
-- [ ] Wire `into_action()` for each new variant
+- [x] Add `Play`, `Pause`, `Stop`, `Next`, `Prev` to `Commands` enum
+- [ ] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands` enum
+- [x] Wire `into_action()` for play/pause/stop/next/prev
+- [ ] Wire `into_action()` for seek/mode
 
 **Exit criteria:** All playback commands work against a live Sonos system. `--group` and `--speaker` targeting tested. Default fallback works.
 
@@ -366,7 +368,8 @@ Gives users precise per-speaker and per-group control.
 
 ### Clap Additions
 
-- [ ] Add `Volume`, `Mute`, `Unmute`, `Bass`, `Treble`, `Loudness`, `Join`, `Leave`, `Sleep` to `Commands`
+- [x] Add `Volume`, `Mute`, `Unmute` to `Commands`
+- [ ] Add `Bass`, `Treble`, `Loudness`, `Join`, `Leave`, `Sleep` to `Commands`
 - [ ] `Sleep` has a subcommand: positional duration or `cancel` keyword
 - [ ] Speaker-only commands (`bass`, `treble`, `loudness`) validate that `--group` is not present
 

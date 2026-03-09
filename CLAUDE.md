@@ -24,6 +24,10 @@ Both modes go through the same `Action` enum + `executor` module — never call 
 
 **Language:** Rust, edition 2021. The SDK is **sync** — no `async`/`await` anywhere.
 
+## SDK Development
+
+The `sonos-sdk` source lives at `../sonos-sdk` (repo root) with the crate at `../sonos-sdk/sonos-sdk`. If a feature or fix requires SDK changes, make them there directly — don't work around SDK limitations in `sonos-cli`. The SDK API reference is at `docs/references/sonos-sdk.md`.
+
 ## Module Structure
 
 ```
