@@ -35,38 +35,6 @@ EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers only a
 
 ## Discovery & System
 
-### discover
-
-Run SSDP discovery on the local network and refresh the speaker cache.
-
-```
-sonos discover
-```
-
-This is the only command that performs network discovery. All other commands read from the cache at `~/.config/sonos/cache.json`. Run `sonos discover` when speakers appear to be missing or after changing your network.
-
-**Flags:** none
-
-**Example:**
-
-```bash
-$ sonos discover
-Discovering speakers...
-Found: Living Room (192.168.1.10)
-Found: Kitchen (192.168.1.11)
-Found: Bedroom (192.168.1.12)
-Discovery complete. 3 speakers in 2 groups.
-```
-
-**Errors:**
-
-```
-error: discovery timed out — no speakers found
-Check that your Sonos speakers are on and connected to the same network.
-```
-
----
-
 ### speakers
 
 List all speakers in the cache with their current state and volume.
@@ -90,7 +58,7 @@ Kitchen One       ⏸ Paused    vol:50   (Kitchen)
 
 ```
 error: no speakers in cache
-Run 'sonos discover' to find speakers on your network.
+Check that your speakers are on the same network, then retry.
 ```
 
 ---
@@ -117,7 +85,7 @@ Kitchen       ⏸ Paused    Hotel California — Eagles    vol:50
 
 ```
 error: no groups in cache
-Run 'sonos discover' to find speakers on your network.
+Check that your speakers are on the same network, then retry.
 ```
 
 ---
@@ -151,7 +119,7 @@ Kitchen  ⏸ Paused  Hotel California — Eagles  4:12/6:30  vol:50
 
 ```
 error: group "Office" not found
-Run 'sonos discover' to refresh the speaker list.
+Check that your speakers are on the same network, then retry.
 
 error: no default group configured
 Set 'default_group' in ~/.config/sonos/config.toml or use --group NAME.
@@ -192,7 +160,7 @@ Playing (Kitchen)
 
 ```
 error: group "Kitchen" not found
-Run 'sonos discover' to refresh the speaker list.
+Check that your speakers are on the same network, then retry.
 ```
 
 ---
@@ -747,10 +715,10 @@ Bedroom One joined Living Room
 
 ```
 error: speaker "Bedroom One" not found
-Run 'sonos discover' to refresh the speaker list.
+Check that your speakers are on the same network, then retry.
 
 error: group "Living Room" not found
-Run 'sonos discover' to refresh the speaker list.
+Check that your speakers are on the same network, then retry.
 ```
 
 ---
@@ -780,7 +748,7 @@ Bedroom One left Living Room
 
 ```
 error: speaker "Bedroom One" not found
-Run 'sonos discover' to refresh the speaker list.
+Check that your speakers are on the same network, then retry.
 
 error: --speaker is required for leave
 [exits 2]
