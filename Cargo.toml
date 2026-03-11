@@ -34,5 +34,6 @@ anyhow = "1"
 thiserror = "2"
 
 [dev-dependencies]
+sonos-sdk = { path = "../sonos-sdk/sonos-sdk", features = ["test-support"] }
 proptest = "1"
 tempfile = "3"

@@ -7,11 +7,9 @@ use clap::Parser;
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
-mod actions;
 mod cli;
 mod config;
 mod errors;
-mod executor;
 
 /// Control Sonos speakers from the command line.
 #[derive(Parser)]
@@ -37,8 +35,6 @@ fn main() -> ExitCode {
             }
         }
         Some(cmd) => {
-            let action = cmd.into_action();
-
             let system = match sonos_sdk::SonosSystem::new() {
                 Ok(s) => s,
                 Err(e) => {
@@ -48,7 +44,7 @@ fn main() -> ExitCode {
                 }
             };
 
-            match executor::execute(action, &system, &config) {
+            match cmd.run(&system, &config) {
                 Ok(msg) => {
                     println!("{}", msg);
                     ExitCode::SUCCESS
