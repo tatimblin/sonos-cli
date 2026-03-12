@@ -10,7 +10,7 @@ Steering document for Claude Code working on `sonos-cli`. Read this first.
 - **Default (no args):** launches an interactive TUI built with `ratatui`
 - **One-off commands:** flat subcommands like `sonos play`, `sonos volume 50 --group "Kitchen"`
 
-Both modes go through the same `Action` enum + `executor` module — never call the SDK directly from `main.rs`, `cli/`, or `tui/`.
+SDK methods are called directly from CLI command handlers and TUI event handlers. The SDK is the shared API layer — no intermediate dispatch layer.
 
 ## Technology Stack
 
@@ -32,23 +32,21 @@ The `sonos-sdk` source lives at `../sonos-sdk` (repo root) with the crate at `..
 
 ```
 src/
-  main.rs           ← arg parse; no args → TUI, else → CLI dispatch
-  actions.rs        ← Action enum covering all SDK operations
-  executor.rs       ← execute(Action, &SonosSystem) → Result<(), anyhow::Error>
-  cache.rs          ← read/write ~/.config/sonos/cache.json (24h TTL)
+  main.rs           ← arg parse; no args → TUI, else → cmd.run()
   config.rs         ← read ~/.config/sonos/config.toml
+  errors.rs         ← CliError with recovery hints and exit codes
   cli/
-    mod.rs          ← clap Commands enum → maps args to Action values
+    mod.rs          ← clap Commands enum + run() → calls SDK methods directly
   tui/
-    app.rs          ← App state; crossterm event loop; keypress → Action → executor
+    app.rs          ← App state; crossterm event loop; keypress → SDK calls
     screens/        ← ratatui components: Home, Group, Speaker screens
 ```
 
 ## Non-Negotiable Architectural Rules
 
-1. **Action dispatch only.** Both `cli/` and `tui/` emit `Action` values. `executor.rs` is the only place SDK methods are called. No exceptions.
+1. **Direct SDK calls.** CLI command handlers and TUI event handlers call SDK methods directly. The SDK (`sonos-sdk`) is the shared API layer — no intermediate Action enum or executor dispatch.
 2. **Errors to stderr.** `stdout` is for command output only. Use `eprintln!` / `anyhow` for all errors.
-3. **Discovery is cached.** Never run SSDP on every command. Load `~/.config/sonos/cache.json`; rediscover only on miss or TTL expiry. `sonos discover` refreshes manually.
+3. **Discovery is cached by the SDK.** `SonosSystem::new()` handles caching transparently — loads from `~/.cache/sonos/cache.json` with 24h TTL, falls back to SSDP on miss or expiry. Auto-rediscovers once per session when a speaker isn't found.
 4. **`--group` wins over `--speaker`.** If both flags are given, target the group. Default to the configured/first group when neither is given.
 
 ## CLI Conventions
@@ -57,7 +55,7 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 - Flat subcommands: `sonos <verb>`, never `sonos <domain> <verb>`
 - Flags over positional args: `--speaker "Kitchen"` not `sonos play Kitchen`
 - Exit code 0 = success, 1 = runtime error, 2 = usage error
-- Error format: `error: <description>\nRun 'sonos discover' to refresh.`
+- Error format: `error: <description>\nCheck that your speakers are on the same network, then retry.`
 
 ## Reference Documentation
 
@@ -73,7 +71,8 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 | File | What was decided |
 |------|-----------------|
 | `docs/brainstorm/2026-02-26-sonos-tui-brainstorm.md` | TUI screen architecture, navigation model, album art, theming, keyboard layout |
-| `docs/brainstorm/2026-03-01-sonos-cli-architecture-brainstorm.md` | CLI architecture, Action dispatch pattern, discovery cache, command reference |
+| `docs/brainstorm/2026-03-01-sonos-cli-architecture-brainstorm.md` | CLI architecture, discovery cache, command reference (Action dispatch superseded) |
+| `docs/brainstorms/2026-03-10-cli-architecture-simplification-brainstorm.md` | Removed Action/executor, SDK is the shared layer, direct SDK calls from handlers |
 
 ## Product Direction
 

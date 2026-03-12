@@ -187,7 +187,6 @@ If neither is given, the default group is used.
 
 | Command | Description |
 |---------|-------------|
-| `sonos discover` | Run SSDP, refresh cache |
 | `sonos speakers` | List all speakers with state and volume |
 | `sonos groups` | List all groups with state and volume |
 | `sonos status` | Current track, playback state, volume for the default/targeted group |

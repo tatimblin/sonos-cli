@@ -61,7 +61,7 @@ One-off commands executed and exited. Designed for scripts, keyboard shortcuts, 
 
 | Category | Commands |
 |----------|----------|
-| Discovery | `discover`, `speakers`, `groups`, `status` |
+| Discovery | `speakers`, `groups`, `status` |
 | Playback | `play`, `pause`, `stop`, `next`, `prev`, `seek`, `mode` |
 | Volume & EQ | `volume`, `mute`, `unmute`, `bass`, `treble`, `loudness` |
 | Queue | `queue`, `queue add`, `queue clear` |
@@ -70,7 +70,7 @@ One-off commands executed and exited. Designed for scripts, keyboard shortcuts, 
 
 **Targeting:** Every command accepts `--speaker NAME` and/or `--group NAME`. Default target is the configured default group (falls back to first discovered group).
 
-**Discovery cache:** Results cached to `~/.config/sonos/cache.json` with 24h TTL. Auto-rediscovers on miss. `sonos discover` for manual refresh.
+**Discovery cache:** Results cached to `~/.config/sonos/cache.json` with 24h TTL. Auto-rediscovers on cache miss or TTL expiry.
 
 ---
 

@@ -37,7 +37,7 @@ $ sonos volume 50
 Volume set to 50 (Living Room)
 
 $ sonos play --group "Nonexistent"
-error: group "Nonexistent" not found. Run 'sonos discover' to refresh.
+error: group "Nonexistent" not found. Check that your speakers are on the same network, then retry.
 [exits 1]
 
 # Good — no color/spinner when piped
@@ -106,7 +106,6 @@ sonos play
 sonos pause
 sonos volume 70 --group "Living Room"
 sonos mute --speaker "Bedroom One"
-sonos discover
 sonos groups
 ```
 
@@ -156,7 +155,7 @@ theme = "dark"
 
 ### Discovery Cache: `~/.config/sonos/cache.json`
 
-Separate from the config file. Written by `sonos discover` and auto-refreshed on TTL expiry. Contains discovered speaker IPs, names, and IDs. Never edit manually.
+Separate from the config file. Auto-populated by SSDP discovery and refreshed on TTL expiry. Contains discovered speaker IPs, names, and IDs. Never edit manually.
 
 ---
 
@@ -185,7 +184,7 @@ error: <human-readable description>
 
 ```
 error: speaker "Office Move" not found.
-Run 'sonos discover' to refresh the speaker list.
+Check that your speakers are on the same network, then retry.
 
 error: failed to connect to Living Room (192.168.1.42): connection refused
 Check that your Sonos speakers are online.

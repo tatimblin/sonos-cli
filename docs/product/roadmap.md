@@ -59,7 +59,7 @@ The scaffolding that everything else builds on. No user-visible features yet, bu
 - [x] `main()` returns `ExitCode` (not `Result`) for proper exit code control
 - [x] Parse `Cli` struct via clap derive — `Option<Commands>` subcommand field
 - [x] No args (`None`) → launch TUI (only if `std::io::stdout().is_terminal()`)
-- [x] Subcommand present (`Some(cmd)`) → convert to `Action`, execute, print result
+- [x] Subcommand present (`Some(cmd)`) → call `cmd.run(&system, &config)`, print result
 
 ```rust
 // Pattern: main.rs skeleton
@@ -88,59 +88,17 @@ fn main() -> ExitCode {
 }
 ```
 
-### Action Enum — `src/actions.rs`
+### ~~Action Enum — `src/actions.rs`~~ (Superseded)
 
-- [x] Define `Action` enum covering all SDK operations with these variant groups:
+> **Superseded by direct SDK calls.** CLI commands call SDK methods directly from
+> `Commands::run()` in `cli/mod.rs`. No intermediate Action enum. See
+> `docs/plans/2026-03-10-refactor-cli-architecture-simplification-plan.md`.
 
-**System actions:**
-- `Discover` — run SSDP, write cache
-- `ListSpeakers` — print all speakers
-- `ListGroups` — print all groups
-- `Status { target: Target }` — current state for target
+### ~~Executor — `src/executor.rs`~~ (Superseded)
 
-**Playback actions (all take `Target`):**
-- `Play`, `Pause`, `Stop`, `Next`, `Previous`
-- `Seek { position: String }` — absolute position `"HH:MM:SS"`
-- `SetPlayMode { mode: PlayMode }`
-
-**Volume & EQ actions:**
-- `SetVolume { level: u8, target: Target }` — 0–100, works on speaker or group
-- `Mute { target: Target }`, `Unmute { target: Target }`
-- `SetBass { level: i8, speaker: String }` — speaker-only, −10 to +10
-- `SetTreble { level: i8, speaker: String }` — speaker-only, −10 to +10
-- `SetLoudness { enabled: bool, speaker: String }` — speaker-only
-
-**Queue actions:**
-- `ShowQueue { target: Target }`
-- `AddToQueue { uri: String, target: Target }`
-- `ClearQueue { target: Target }`
-
-**Grouping actions:**
-- `JoinGroup { speaker: String, group: String }`
-- `LeaveGroup { speaker: String }`
-
-**Sleep timer actions:**
-- `SetSleepTimer { duration: String, target: Target }` — e.g. `"01:00:00"`
-- `CancelSleepTimer { target: Target }`
-
-- [x] Define `Target` enum:
-```rust
-pub enum Target {
-    Speaker(String),  // friendly name
-    Group(String),    // group name
-    Default,          // config.default_group or first discovered
-}
-```
-
-### Executor — `src/executor.rs`
-
-- [x] `pub fn execute(action: Action, system: &SonosSystem) -> Result<String, CliError>` *(stub — compiles but returns mock strings, no real SDK calls)*
-- [ ] Match on `Action` variants, call corresponding SDK methods
-- [x] Return human-readable success messages (e.g., `"Volume set to 50 (Living Room)"`) *(mock only)*
-- [x] `resolve_target()` helper: `Target` → `Speaker` or `Group` handle from `SonosSystem` *(name-only resolution, no real SDK lookup)*
-  - `Target::Speaker(name)` → `system.get_speaker_by_name(&name)`
-  - `Target::Group(name)` → find group by coordinator name in `system.groups()`
-  - `Target::Default` → load from config, fall back to first group
+> **Superseded by direct SDK calls.** Target resolution lives in `cli/mod.rs` as
+> `resolve_speaker()`. The SDK is the shared API layer — both CLI and TUI call
+> SDK methods directly.
 
 ### Error Types — `src/errors.rs`
 
@@ -165,14 +123,14 @@ pub enum CliError {
 - [x] `CliError::recovery_hint(&self) -> Option<&str>` — returns actionable follow-up text
 - [x] `CliError::exit_code(&self) -> ExitCode` — `1` for runtime, `2` for validation/usage
 
-### Cache — `src/cache.rs`
+### ~~Cache — `src/cache.rs`~~ (Superseded)
 
-- [x] `CachedSystem` struct: speakers list + groups list + `cached_at: SystemTime`
-- [x] `load() -> Option<CachedSystem>` — reads `~/.config/sonos/cache.json`, returns `None` if missing or parse error
-- [x] `save(system: &SonosSystem) -> Result<()>` — atomic write (write to `.tmp`, then `fs::rename`)
-- [x] `is_stale(cache: &CachedSystem, ttl_hours: u64) -> bool` — check `cached_at + ttl`
-- [x] Use `dirs::config_dir()` for `~/.config/sonos/`
-- [x] Cache stores: `Vec<CachedSpeaker>` with `{ name, id, ip, model_name }` and `Vec<CachedGroup>` with `{ id, coordinator_id, member_ids }`
+> **Superseded by SDK-level caching.** Cache now lives in `sonos-sdk/src/cache.rs`
+> using `~/.cache/sonos/cache.json` (XDG cache_dir). CLI `src/cache.rs` deleted.
+
+- ~~`CachedSystem` struct~~
+- ~~`load()`, `save()`, `is_stale()` functions~~
+- ~~`dirs::config_dir()` for cache path~~
 
 ### Config — `src/config.rs`
 
@@ -191,7 +149,7 @@ pub struct Config {
 - [x] `Config::load() -> Config` — reads `~/.config/sonos/config.toml`, falls back to defaults on any error
 - [x] Environment variable overrides: `SONOS_DEFAULT_GROUP`, `SONOS_CONFIG_DIR`
 
-**Exit criteria:** `cargo build` succeeds. `Action` enum and `executor` stub compile cleanly. Cache round-trips correctly in a unit test. Config loads defaults when no file exists.
+**Exit criteria:** `cargo build` succeeds. `Commands::run()` calls SDK directly — no Action enum or executor. Config loads defaults when no file exists.
 
 ---
 
@@ -224,20 +182,21 @@ pub struct GlobalFlags {
     pub verbose: bool,
 }
 ```
-- [x] `Commands` enum with `Discover`, `Speakers`, `Groups`, `Status` variants
-- [x] `Commands::into_action(self, global: &GlobalFlags) -> Action` pure conversion
+- [x] `Commands` enum with `Speakers`, `Groups`, `Status` variants (and playback commands)
+- [x] `Commands::run(&self, system, config) -> Result<String, CliError>` — calls SDK methods directly
 
-### Discovery Command
+### ~~Discovery Command~~ (Superseded)
 
-- [ ] `sonos discover` — calls `sonos_discovery::get_with_timeout(Duration::from_secs(3))`
-- [ ] On TTY: show spinner to stderr during 3s scan
-- [ ] Build `SonosSystem::from_discovered_devices(devices)`
-- [ ] Write cache via `cache::save()`
-- [ ] Print discovered speakers: name, model, IP (one per line)
+> **Superseded by SDK-level caching.** `SonosSystem::new()` now handles discovery and
+> caching transparently. There is no `sonos discover` command — the SDK auto-discovers
+> on first run and auto-rediscovers on speaker miss. See
+> `docs/plans/2026-03-08-feat-sdk-level-discovery-caching-plan.md`.
 
-**SDK methods used:**
-- `sonos_discovery::get_with_timeout()`
-- `SonosSystem::from_discovered_devices()`
+- ~~`sonos discover` — calls `sonos_discovery::get_with_timeout(Duration::from_secs(3))`~~
+- ~~On TTY: show spinner to stderr during 3s scan~~
+- ~~Build `SonosSystem::from_discovered_devices(devices)`~~
+- ~~Write cache via `cache::save()`~~
+- ~~Print discovered speakers: name, model, IP (one per line)~~
 
 ### Speakers Command
 
@@ -278,9 +237,9 @@ pub struct GlobalFlags {
 
 ### Auto-Rediscovery & Error Handling
 
-- [ ] Auto-rediscovery on cache miss: if a targeted speaker/group isn't in cache, rediscover once before failing
-- [ ] Error format: `error: speaker "X" not found.\nRun 'sonos discover' to refresh.`
-- [ ] Exit code 1 for runtime errors (speaker not found, network failure)
+- [x] Auto-rediscovery on cache miss: SDK `get_speaker_by_name()` triggers one-shot SSDP rediscovery per session
+- [x] Error format: `error: speaker "X" not found.\nCheck that your speakers are on the same network, then retry.`
+- [x] Exit code 1 for runtime errors (speaker not found, network failure)
 
 **Exit criteria:** A user with no config file can run `sonos discover` and then `sonos groups` and see their actual Sonos system state.
 
@@ -311,7 +270,7 @@ The commands used dozens of times a day.
 
 ### Targeting & Defaults
 
-- [ ] All commands resolve target via `resolve_target()` in executor
+- [ ] All commands resolve target via `resolve_speaker()` in `cli/mod.rs`
 - [ ] When targeting a group: find coordinator via `group.coordinator()`, call playback method on coordinator speaker
 - [ ] Default group fallback: `config.default_group` → first discovered group (alphabetical by name)
 
@@ -319,8 +278,8 @@ The commands used dozens of times a day.
 
 - [x] Add `Play`, `Pause`, `Stop`, `Next`, `Prev` to `Commands` enum
 - [ ] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands` enum
-- [x] Wire `into_action()` for play/pause/stop/next/prev
-- [ ] Wire `into_action()` for seek/mode
+- [x] `Commands::run()` handles play/pause/stop/next/prev directly
+- [ ] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands::run()`
 
 **Exit criteria:** All playback commands work against a live Sonos system. `--group` and `--speaker` targeting tested. Default fallback works.
 

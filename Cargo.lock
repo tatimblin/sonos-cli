@@ -2579,6 +2579,9 @@ dependencies = [
 name = "sonos-sdk"
 version = "0.1.0"
 dependencies = [
+ "dirs",
+ "serde",
+ "serde_json",
  "sonos-api",
  "sonos-sdk-discovery",
  "sonos-sdk-event-manager",
