@@ -40,13 +40,19 @@ types contain and how they behave.
 
 ## 1. Initialising `SonosSystem`
 
-`SonosSystem` is the single entry point. Both constructors are **blocking** (they run
-SSDP discovery and spin up internal threads synchronously).
+`SonosSystem` is the single entry point. Construction is **blocking** (it runs
+discovery synchronously) but **cheap** — the event manager is lazily initialized on
+the first `watch()` call, not at construction time.
 
 ### `SonosSystem::new() -> Result<SonosSystem, SdkError>`
 
-Performs automatic SSDP discovery with a 3-second timeout, then wires up the internal
-event manager and state manager.
+Cache-first device discovery:
+
+1. Try loading cached devices from `~/.cache/sonos/cache.json`
+2. If cache is fresh (< 24 h), use cached devices directly
+3. If cache is stale, run SSDP (3 s timeout); fall back to stale cache if SSDP finds nothing
+4. If no cache exists, run SSDP discovery
+5. If no devices found anywhere, return `Err(SdkError::DiscoveryFailed(...))`
 
 ```rust
 use sonos_sdk::SonosSystem;
@@ -58,28 +64,37 @@ fn main() -> Result<(), sonos_sdk::SdkError> {
 }
 ```
 
-### `SonosSystem::from_discovered_devices(devices: Vec<Device>) -> Result<SonosSystem, SdkError>`
+### `SonosSystem::from_discovered_devices(devices: Vec<Device>)` (test-support only)
 
-Use this when you have already called `sonos_discovery::get()` yourself (for example to
-apply a custom timeout or to reuse the device list for other purposes).
+Available when the `test-support` Cargo feature is enabled. Use this in integration
+tests when you have already called `sonos_discovery::get()` yourself.
 
 ```rust
 use sonos_sdk::SonosSystem;
-use sonos_discovery;
 
-fn main() -> Result<(), sonos_sdk::SdkError> {
-    let devices = sonos_discovery::get_with_timeout(std::time::Duration::from_secs(5));
-    let system = SonosSystem::from_discovered_devices(devices)?;
-    Ok(())
-}
+// Only available with `test-support` feature
+let devices = sonos_discovery::get_with_timeout(std::time::Duration::from_secs(5));
+let system = SonosSystem::from_discovered_devices(devices)?;
 ```
 
-Both constructors:
+### `SonosSystem::with_speakers(names: &[&str]) -> SonosSystem` (test-support only)
 
-1. Create a `SonosEventManager` (manages UPnP subscriptions).
-2. Create a `StateManager` wired to the event manager.
-3. Register all discovered `Device` objects with the state manager.
-4. Create a `Speaker` handle for every device keyed by friendly name.
+Creates an in-memory system with synthetic speaker data — no SSDP, no event manager,
+no cache reads. Speakers get sequential IPs starting at `192.168.1.100`.
+
+```rust
+// Only available with `test-support` feature
+let system = SonosSystem::with_speakers(&["Kitchen", "Bedroom"]);
+assert_eq!(system.speakers().len(), 2);
+assert!(system.speaker("Kitchen").is_some());
+```
+
+Construction:
+
+1. Create a `StateManager` (property cache).
+2. Register all discovered `Device` objects with the state manager.
+3. Create a `Speaker` handle for every device, keyed by friendly name.
+4. Event manager is **not** created — it initializes lazily on the first `watch()` call.
 
 ---
 
@@ -91,13 +106,17 @@ Both constructors:
 |---|---|---|
 | `speakers()` | `&self -> Vec<Speaker>` | All speaker handles |
 | `speaker_names()` | `&self -> Vec<String>` | All friendly names |
-| `get_speaker_by_name` | `(&self, name: &str) -> Option<Speaker>` | `None` if not found |
-| `get_speaker_by_id` | `(&self, id: &SpeakerId) -> Option<Speaker>` | `None` if not found |
+| `speaker(name)` | `(&self, name: &str) -> Option<Speaker>` | By name; auto-rediscovers on miss |
+| `speaker_by_id(id)` | `(&self, id: &SpeakerId) -> Option<Speaker>` | By ID; `None` if not found |
 | `state_manager()` | `(&self) -> &Arc<StateManager>` | Low-level state access |
+
+`speaker()` triggers an SSDP auto-rediscovery (rate-limited to once per 30 s) when the
+name isn't found in the current map. This handles speakers that came online after the
+initial discovery.
 
 ```rust
 let speaker = system
-    .get_speaker_by_name("Living Room")
+    .speaker("Living Room")
     .ok_or_else(|| SdkError::SpeakerNotFound("Living Room".to_string()))?;
 
 println!("{} — {} at {}", speaker.name, speaker.model_name, speaker.ip);
@@ -105,15 +124,19 @@ println!("{} — {} at {}", speaker.name, speaker.model_name, speaker.ip);
 
 ### Group lookups
 
-Groups are populated from the ZoneGroupTopology UPnP service. To ensure they are present
-before querying, watch `speaker.group_membership` on at least one speaker first (this
-triggers the initial topology subscription).
+Groups are populated from the ZoneGroupTopology UPnP service. The first call to any
+group method automatically fetches topology on-demand (via `GetZoneGroupState`) if it
+hasn't been loaded yet — no need to watch `group_membership` first.
 
 | Method | Signature | Returns |
 |---|---|---|
 | `groups()` | `&self -> Vec<Group>` | All current groups |
-| `get_group_by_id` | `(&self, id: &GroupId) -> Option<Group>` | `None` if not found |
-| `get_group_for_speaker` | `(&self, id: &SpeakerId) -> Option<Group>` | Group the speaker belongs to |
+| `group(name)` | `(&self, name: &str) -> Option<Group>` | By coordinator speaker name |
+| `group_by_id(id)` | `(&self, id: &GroupId) -> Option<Group>` | By group ID |
+| `group_for_speaker(id)` | `(&self, id: &SpeakerId) -> Option<Group>` | Group the speaker belongs to |
+
+Sonos groups don't have independent names — `group(name)` matches by the coordinator
+speaker's friendly name.
 
 ```rust
 for group in system.groups() {
@@ -122,13 +145,31 @@ for group in system.groups() {
         println!("  coordinator: {}", coord.name);
     }
 }
+
+// Look up by coordinator name
+let living_room_group = system.group("Living Room");
+```
+
+### Fluent navigation
+
+Speakers and groups link to each other for ergonomic traversal:
+
+```rust
+// Speaker → Group
+let kitchen = system.speaker("Kitchen").unwrap();
+let group = kitchen.group().unwrap();      // group this speaker belongs to
+
+// Group → Speaker
+let coord = group.coordinator().unwrap();  // coordinator speaker
+let member = group.speaker("Kitchen");     // member by name
+let all = group.members();                 // all members
 ```
 
 ### Creating groups from the system level
 
 ```rust
-let coordinator = system.get_speaker_by_name("Living Room").unwrap();
-let member      = system.get_speaker_by_name("Kitchen").unwrap();
+let coordinator = system.speaker("Living Room").unwrap();
+let member      = system.speaker("Kitchen").unwrap();
 
 let result = system.create_group(&coordinator, &[&member])?;
 if !result.is_success() {
@@ -395,7 +436,23 @@ Out-of-range values are caught before the network call and return
 |---|---|---|
 | `new_volume` | `u8` | Absolute volume after the adjustment |
 
-### 3.10 Group membership (speaker-level)
+### 3.10 Navigation
+
+| Method | Return | Description |
+|---|---|---|
+| `group()` | `Option<Group>` | The group this speaker belongs to (no network call) |
+
+```rust
+let kitchen = system.speaker("Kitchen").unwrap();
+if let Some(group) = kitchen.group() {
+    println!("Kitchen is in group {} ({} members)", group.id, group.member_count());
+}
+```
+
+Returns `None` only if topology hasn't been loaded yet (e.g. no group methods or
+`watch(group_membership)` have been called).
+
+### 3.11 Group membership (speaker-level)
 
 These are convenience methods that wrap the lower-level group and AVTransport calls.
 
@@ -440,6 +497,7 @@ pub struct Group {
 |---|---|---|
 | `coordinator()` | `Option<Speaker>` | Returns the coordinator's `Speaker` handle |
 | `members()` | `Vec<Speaker>` | All members including coordinator |
+| `speaker(name)` | `Option<Speaker>` | Get a member by friendly name |
 | `is_coordinator(id)` | `bool` | Check if a speaker ID is the coordinator |
 | `member_count()` | `usize` | Number of members |
 | `is_standalone()` | `bool` | `true` when only one member |
@@ -450,6 +508,11 @@ if let Some(coord) = group.coordinator() {
         let role = if group.is_coordinator(&member.id) { "coordinator" } else { "member" };
         println!("  {} ({})", member.name, role);
     }
+}
+
+// Look up a specific member
+if let Some(kitchen) = group.speaker("Kitchen") {
+    println!("Kitchen volume: {:?}", kitchen.volume.get());
 }
 ```
 
@@ -787,6 +850,8 @@ pub enum SdkError {
     FetchFailed(String),             // fetch() could not get a value
     ValidationFailed(ValidationError), // Parameter out of range
     InvalidOperation(String),        // Logical constraint violation (e.g. add coordinator to itself)
+    DiscoveryFailed(String),         // No devices found during SSDP discovery
+    LockPoisoned,                    // Internal RwLock/Mutex was poisoned
 }
 ```
 
@@ -1025,14 +1090,14 @@ Service: `GroupRenderingControl`.
 ## Complete example: CLI-style polling loop
 
 ```rust
-use sonos_sdk::{PlayMode, SdkError, SeekTarget, SonosSystem};
+use sonos_sdk::{SdkError, SonosSystem};
 use std::time::Duration;
 
 fn main() -> Result<(), SdkError> {
     let system = SonosSystem::new()?;
 
     let speaker = system
-        .get_speaker_by_name("Living Room")
+        .speaker("Living Room")
         .ok_or_else(|| SdkError::SpeakerNotFound("Living Room".to_string()))?;
 
     // Fetch current state eagerly
@@ -1043,6 +1108,11 @@ fn main() -> Result<(), SdkError> {
     println!("Volume: {}%", volume.0);
     println!("State:  {:?}", state);
     println!("Track:  {}", track.display());
+
+    // Navigate to group
+    if let Some(group) = speaker.group() {
+        println!("Group: {} ({} members)", group.id, group.member_count());
+    }
 
     // Start watching for real-time updates
     let vol_status = speaker.volume.watch()?;
