@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Checkout sonos-sdk (path dependency)
-        run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
