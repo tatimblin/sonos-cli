@@ -5,6 +5,7 @@ edition = "2021"
 description = "CLI and TUI for controlling Sonos speakers"
 license = "MIT"
 repository = "https://github.com/tatimblin/sonos-cli"
+homepage = "https://github.com/tatimblin/sonos-cli"
 readme = "README.md"
 keywords = ["sonos", "cli", "tui", "audio", "speakers"]
 categories = ["command-line-utilities", "multimedia::audio"]

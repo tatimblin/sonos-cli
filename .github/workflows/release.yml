@@ -25,7 +25,7 @@ jobs:
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
       - name: Install dist
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.27.0/cargo-dist-installer.sh | sh
       - name: Plan
         run: dist plan --output-format=json --no-local-paths > manifest.json
       - name: Upload plan
@@ -56,7 +56,7 @@ jobs:
       - name: Install dist
         shell: bash
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.27.0/cargo-dist-installer.sh | sh
       - name: Build
         run: dist build --target=${{ matrix.target }} --artifacts=local --output-format=json > dist-manifest.json
       - name: Upload artifacts
@@ -74,7 +74,7 @@ jobs:
         run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
       - name: Install dist
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.27.0/cargo-dist-installer.sh | sh
       - name: Build global artifacts
         run: dist build --artifacts=global --output-format=json > dist-manifest.json
       - name: Upload artifacts
@@ -116,7 +116,7 @@ jobs:
         run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
       - name: Install dist
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.27.0/cargo-dist-installer.sh | sh
       - name: Generate Homebrew formula
         run: dist plan --output-format=json > manifest.json
       - name: Push to Homebrew tap
