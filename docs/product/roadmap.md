@@ -200,9 +200,9 @@ pub struct GlobalFlags {
 
 ### Speakers Command
 
-- [ ] `sonos speakers` — loads from cache (or rediscovers if stale)
-- [ ] For each speaker: fetch `volume`, `playback_state` via property handles
-- [ ] Print table: name, model, IP, volume, playback state
+- [x] `sonos speakers` — loads from cache (or rediscovers if stale)
+- [x] For each speaker: fetch `volume`, `playback_state` via property handles
+- [x] Print table: name, model, IP, volume, playback state
 
 **SDK methods used:**
 - `system.speakers()` — `Vec<Speaker>`
@@ -211,9 +211,9 @@ pub struct GlobalFlags {
 
 ### Groups Command
 
-- [ ] `sonos groups` — loads from cache (or rediscovers)
-- [ ] Watch `group_membership` on at least one speaker to trigger topology subscription
-- [ ] For each group: coordinator name, member count, current track, volume, state
+- [x] `sonos groups` — loads from cache (or rediscovers)
+- [x] Watch `group_membership` on at least one speaker to trigger topology subscription
+- [x] For each group: coordinator name, member count, current track, volume, state
 
 **SDK methods used:**
 - `system.groups()` — `Vec<Group>`
@@ -225,9 +225,9 @@ pub struct GlobalFlags {
 
 ### Status Command
 
-- [ ] `sonos status [--group NAME | --speaker NAME]`
-- [ ] Resolve target (default group if neither flag given)
-- [ ] Fetch and display: current track (title, artist, album), playback state, position, volume
+- [x] `sonos status [--group NAME | --speaker NAME]`
+- [x] Resolve target (default group if neither flag given)
+- [x] Fetch and display: current track (title, artist, album), playback state, position, volume
 
 **SDK methods used:**
 - `speaker.current_track.fetch()` — `CurrentTrack { title, artist, album, album_art_uri, uri }`
@@ -251,35 +251,35 @@ The commands used dozens of times a day.
 
 ### Commands
 
-- [ ] `sonos play [--group NAME | --speaker NAME]`
+- [x] `sonos play [--group NAME | --speaker NAME]`
   - SDK: `speaker.play()` → `Result<(), SdkError>`
-- [ ] `sonos pause [--group NAME | --speaker NAME]`
+- [x] `sonos pause [--group NAME | --speaker NAME]`
   - SDK: `speaker.pause()` → `Result<(), SdkError>`
-- [ ] `sonos stop [--group NAME | --speaker NAME]`
+- [x] `sonos stop [--group NAME | --speaker NAME]`
   - SDK: `speaker.stop()` → `Result<(), SdkError>`
-- [ ] `sonos next [--group NAME | --speaker NAME]`
+- [x] `sonos next [--group NAME | --speaker NAME]`
   - SDK: `speaker.next()` → `Result<(), SdkError>`
-- [ ] `sonos prev [--group NAME | --speaker NAME]`
+- [x] `sonos prev [--group NAME | --speaker NAME]`
   - SDK: `speaker.previous()` → `Result<(), SdkError>`
-- [ ] `sonos seek <HH:MM:SS> [--group NAME | --speaker NAME]`
+- [x] `sonos seek <HH:MM:SS> [--group NAME | --speaker NAME]`
   - SDK: `speaker.seek(SeekTarget::Time(position))` → `Result<(), SdkError>`
   - Validate `HH:MM:SS` format before calling SDK
-- [ ] `sonos mode <normal|repeat|repeat-one|shuffle|shuffle-no-repeat> [--group NAME | --speaker NAME]`
+- [x] `sonos mode <normal|repeat|repeat-one|shuffle|shuffle-no-repeat> [--group NAME | --speaker NAME]`
   - SDK: `speaker.set_play_mode(mode)` → `Result<(), SdkError>`
   - Map CLI string to `PlayMode` enum: `normal` → `PlayMode::Normal`, `repeat` → `PlayMode::RepeatAll`, `repeat-one` → `PlayMode::RepeatOne`, `shuffle` → `PlayMode::Shuffle`, `shuffle-no-repeat` → `PlayMode::ShuffleNoRepeat`
 
 ### Targeting & Defaults
 
-- [ ] All commands resolve target via `resolve_speaker()` in `cli/mod.rs`
-- [ ] When targeting a group: find coordinator via `group.coordinator()`, call playback method on coordinator speaker
-- [ ] Default group fallback: `config.default_group` → first discovered group (alphabetical by name)
+- [x] All commands resolve target via `resolve_speaker()` in `cli/mod.rs`
+- [x] When targeting a group: find coordinator via `group.coordinator()`, call playback method on coordinator speaker
+- [x] Default group fallback: `config.default_group` → first discovered group (alphabetical by name)
 
 ### Clap Additions
 
 - [x] Add `Play`, `Pause`, `Stop`, `Next`, `Prev` to `Commands` enum
-- [ ] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands` enum
+- [x] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands` enum
 - [x] `Commands::run()` handles play/pause/stop/next/prev directly
-- [ ] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands::run()`
+- [x] Add `Seek { position: String }`, `Mode { mode: String }` to `Commands::run()`
 
 **Exit criteria:** All playback commands work against a live Sonos system. `--group` and `--speaker` targeting tested. Default fallback works.
 
@@ -291,46 +291,46 @@ Gives users precise per-speaker and per-group control.
 
 ### Volume & EQ Commands
 
-- [ ] `sonos volume <0-100> [--group NAME | --speaker NAME]`
+- [x] `sonos volume <0-100> [--group NAME | --speaker NAME]`
   - Group target → `group.set_volume(level as u16)` (via `GroupVolumeHandle`)
   - Speaker target → `speaker.set_volume(level)` (via `VolumeHandle`)
   - Validation: `SdkError::ValidationFailed` if out of 0–100 range
-- [ ] `sonos mute [--group NAME | --speaker NAME]`
+- [x] `sonos mute [--group NAME | --speaker NAME]`
   - Group → `group.set_mute(true)`, Speaker → `speaker.set_mute(true)`
-- [ ] `sonos unmute [--group NAME | --speaker NAME]`
+- [x] `sonos unmute [--group NAME | --speaker NAME]`
   - Group → `group.set_mute(false)`, Speaker → `speaker.set_mute(false)`
-- [ ] `sonos bass <-10..10> --speaker NAME`
+- [x] `sonos bass <-10..10> --speaker NAME`
   - SDK: `speaker.set_bass(level)` — speaker-only; error if `--group` given
   - Validation: `SdkError::ValidationFailed` for out of −10 to +10 range
-- [ ] `sonos treble <-10..10> --speaker NAME`
+- [x] `sonos treble <-10..10> --speaker NAME`
   - SDK: `speaker.set_treble(level)` — speaker-only
-- [ ] `sonos loudness <on|off> --speaker NAME`
+- [x] `sonos loudness <on|off> --speaker NAME`
   - SDK: `speaker.set_loudness(enabled)` — map `"on"` → `true`, `"off"` → `false`
 
 ### Grouping Commands
 
-- [ ] `sonos join --speaker NAME --group NAME`
+- [x] `sonos join --speaker NAME --group NAME`
   - Resolve both speaker and group
   - SDK: `group.add_speaker(&speaker)` → `Result<(), SdkError>`
   - Cannot add coordinator to itself → `SdkError::InvalidOperation`
-- [ ] `sonos leave --speaker NAME`
+- [x] `sonos leave --speaker NAME`
   - SDK: `speaker.leave_group()` → `Result<BecomeCoordinatorOfStandaloneGroupResponse, SdkError>`
   - Cannot remove coordinator → `SdkError::InvalidOperation` (use dissolve instead)
 
 ### Sleep Timer Commands
 
-- [ ] `sonos sleep <DURATION> [--group NAME | --speaker NAME]`
+- [x] `sonos sleep <DURATION> [--group NAME | --speaker NAME]`
   - Parse duration: `30m` → `"00:30:00"`, `1h` → `"01:00:00"`, `90m` → `"01:30:00"`
   - SDK: `speaker.configure_sleep_timer(hh_mm_ss)`
-- [ ] `sonos sleep cancel [--group NAME | --speaker NAME]`
+- [x] `sonos sleep cancel [--group NAME | --speaker NAME]`
   - SDK: `speaker.cancel_sleep_timer()`
 
 ### Clap Additions
 
 - [x] Add `Volume`, `Mute`, `Unmute` to `Commands`
-- [ ] Add `Bass`, `Treble`, `Loudness`, `Join`, `Leave`, `Sleep` to `Commands`
-- [ ] `Sleep` has a subcommand: positional duration or `cancel` keyword
-- [ ] Speaker-only commands (`bass`, `treble`, `loudness`) validate that `--group` is not present
+- [x] Add `Bass`, `Treble`, `Loudness`, `Join`, `Leave`, `Sleep` to `Commands`
+- [x] `Sleep` has a subcommand: positional duration or `cancel` keyword
+- [x] Speaker-only commands (`bass`, `treble`, `loudness`) validate that `--group` is not present
 
 **Exit criteria:** All volume, EQ, grouping, and sleep timer operations work. Validation errors surface clearly (e.g., bass value out of range). Speaker-only commands reject `--group` flag.
 
@@ -342,26 +342,26 @@ Rounds out the full SDK surface for v1.
 
 ### Commands
 
-- [ ] `sonos queue [--group NAME | --speaker NAME]`
+- [x] `sonos queue [--group NAME | --speaker NAME]`
   - Fetch queue via `speaker.get_media_info()` → `GetMediaInfoResponse { nr_tracks, media_duration, ... }`
   - Print current queue: track number, title, artist, duration
   - Mark currently playing track with `▶`
   - Use coordinator speaker for group targets
 
-- [ ] `sonos queue add <URI> [--group NAME | --speaker NAME]`
+- [x] `sonos queue add <URI> [--group NAME | --speaker NAME]`
   - SDK: `speaker.add_uri_to_queue(uri, "", 0, false)` → `AddURIToQueueResponse`
   - Print: `"Added to queue (position {first_track_number_enqueued})"`
 
-- [ ] `sonos queue clear [--group NAME | --speaker NAME]`
+- [x] `sonos queue clear [--group NAME | --speaker NAME]`
   - Prompt for confirmation unless `--no-input` flag is set
   - SDK: `speaker.remove_all_tracks_from_queue()`
   - Print: `"Queue cleared"`
 
 ### Clap Additions
 
-- [ ] `Queue` command with optional subcommand: `Add { uri: String }`, `Clear`
-- [ ] No subcommand = show queue (default behavior)
-- [ ] Add `--no-input` to `GlobalFlags`
+- [x] `Queue` command with optional subcommand: `Add { uri: String }`, `Clear`
+- [x] No subcommand = show queue (default behavior)
+- [x] Add `--no-input` to `GlobalFlags`
 
 **Exit criteria:** Queue commands round-trip correctly. `sonos queue` output is readable and scannable.
 

@@ -7,26 +7,22 @@ use clap::Parser;
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
+use sonos_sdk::SonosSystem;
+
 mod cli;
 mod config;
 mod errors;
 
-/// Control Sonos speakers from the command line.
-#[derive(Parser)]
-#[command(name = "sonos", about = "Control Sonos speakers")]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<cli::Commands>,
-}
+use cli::{run_command, Cli};
+use config::Config;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let config = config::Config::load();
+    let config = Config::load();
 
     match cli.command {
         None => {
             if std::io::stdout().is_terminal() {
-                // Launch TUI (future milestone)
                 eprintln!("TUI not yet implemented");
                 ExitCode::from(1)
             } else {
@@ -35,21 +31,29 @@ fn main() -> ExitCode {
             }
         }
         Some(cmd) => {
-            let system = match sonos_sdk::SonosSystem::new() {
+            let system = match SonosSystem::new() {
                 Ok(s) => s,
                 Err(e) => {
+                    if cli.global.verbose {
+                        eprintln!("debug: {:?}", e);
+                    }
                     eprintln!("error: {}", e);
                     eprintln!("Check that your speakers are on the same network, then retry.");
                     return ExitCode::from(1);
                 }
             };
 
-            match cmd.run(&system, &config) {
+            match run_command(cmd, &system, &config, &cli.global) {
                 Ok(msg) => {
-                    println!("{}", msg);
+                    if !cli.global.quiet {
+                        println!("{}", msg);
+                    }
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
+                    if cli.global.verbose {
+                        eprintln!("debug: {:?}", e);
+                    }
                     eprintln!("error: {}", e);
                     if let Some(hint) = e.recovery_hint() {
                         eprintln!("{}", hint);
