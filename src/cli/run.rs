@@ -4,8 +4,8 @@ use sonos_sdk::{SeekTarget, SonosSystem};
 
 use super::{
     format_duration_human, format_time_ms, parse_duration, playback_icon, playback_label,
-    require_speaker_only, resolve_speaker, validate_seek_time, Commands, GlobalFlags, OnOff,
-    QueueAction,
+    require_speaker_only, resolve_group, resolve_speaker, validate_seek_time, Commands,
+    GlobalFlags, OnOff, QueueAction,
 };
 use crate::config::Config;
 use crate::errors::CliError;
@@ -66,21 +66,9 @@ pub fn run_command(
             s.set_play_mode(mode.to_sdk())?;
             Ok(format!("Mode set to {:?} ({})", mode, s.name))
         }
-        Commands::Volume { level } => {
-            let s = spk()?;
-            s.set_volume(level)?;
-            Ok(format!("Volume set to {} ({})", level, s.name))
-        }
-        Commands::Mute => {
-            let s = spk()?;
-            s.set_mute(true)?;
-            Ok(format!("Muted ({})", s.name))
-        }
-        Commands::Unmute => {
-            let s = spk()?;
-            s.set_mute(false)?;
-            Ok(format!("Unmuted ({})", s.name))
-        }
+        Commands::Volume { level } => cmd_volume(system, config, global, level),
+        Commands::Mute => cmd_mute(system, config, global, true),
+        Commands::Unmute => cmd_mute(system, config, global, false),
     }
 }
 
@@ -162,6 +150,51 @@ fn cmd_groups(system: &SonosSystem) -> Result<String, CliError> {
         })
         .collect();
     Ok(lines.join("\n"))
+}
+
+fn cmd_volume(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    level: u8,
+) -> Result<String, CliError> {
+    // Explicit --speaker (without --group) → Speaker.set_volume(u8)
+    if global.speaker.is_some() && global.group.is_none() {
+        let s = resolve_speaker(system, config, global)?;
+        s.set_volume(level)?;
+        return Ok(format!("Volume set to {} ({})", level, s.name));
+    }
+    // Otherwise → Group.set_volume(u16) via GroupRenderingControl
+    let g = resolve_group(system, config, global)?;
+    let name = g
+        .coordinator()
+        .map(|c| c.name)
+        .unwrap_or_else(|| "unknown".to_string());
+    g.set_volume(level as u16)?;
+    Ok(format!("Volume set to {} ({})", level, name))
+}
+
+fn cmd_mute(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    muted: bool,
+) -> Result<String, CliError> {
+    let label = if muted { "Muted" } else { "Unmuted" };
+    // Explicit --speaker (without --group) → Speaker.set_mute(bool)
+    if global.speaker.is_some() && global.group.is_none() {
+        let s = resolve_speaker(system, config, global)?;
+        s.set_mute(muted)?;
+        return Ok(format!("{} ({})", label, s.name));
+    }
+    // Otherwise → Group.set_mute(bool) via GroupRenderingControl
+    let g = resolve_group(system, config, global)?;
+    let name = g
+        .coordinator()
+        .map(|c| c.name)
+        .unwrap_or_else(|| "unknown".to_string());
+    g.set_mute(muted)?;
+    Ok(format!("{} ({})", label, name))
 }
 
 fn cmd_status(

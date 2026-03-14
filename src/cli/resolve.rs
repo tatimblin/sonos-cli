@@ -1,4 +1,4 @@
-use sonos_sdk::{Speaker, SonosSystem};
+use sonos_sdk::{Group, Speaker, SonosSystem};
 
 use crate::cli::GlobalFlags;
 use crate::config::Config;
@@ -44,6 +44,35 @@ pub fn resolve_speaker(
         .into_iter()
         .next()
         .ok_or_else(|| CliError::SpeakerNotFound("no speakers available".to_string()))
+}
+
+/// Resolve --group / --speaker flags to a Group handle.
+///
+/// Priority: --group wins. If neither flag is given, uses config default
+/// or falls back to the first available group.
+pub fn resolve_group(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+) -> Result<Group, CliError> {
+    if let Some(group_name) = &global.group {
+        return system
+            .group(group_name)
+            .ok_or_else(|| CliError::GroupNotFound(group_name.to_string()));
+    }
+
+    // Default: config group → first group
+    if let Some(default_group) = &config.default_group {
+        if let Some(g) = system.group(default_group) {
+            return Ok(g);
+        }
+    }
+
+    system
+        .groups()
+        .into_iter()
+        .next()
+        .ok_or_else(|| CliError::GroupNotFound("no groups available".to_string()))
 }
 
 /// Resolve --speaker flag for speaker-only commands (bass, treble, loudness).
@@ -171,5 +200,102 @@ mod tests {
         };
         let spk = require_speaker_only(&system, &global, "bass").unwrap();
         assert_eq!(spk.name, "Kitchen");
+    }
+
+    #[test]
+    fn resolve_group_by_name() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let config = Config::default();
+        let global = GlobalFlags {
+            speaker: None,
+            group: Some("Kitchen".into()),
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let grp = resolve_group(&system, &config, &global).unwrap();
+        let coord = grp.coordinator().unwrap();
+        assert_eq!(coord.name, "Kitchen");
+    }
+
+    #[test]
+    fn resolve_group_not_found() {
+        let system = SonosSystem::with_groups(&["Kitchen"]);
+        let config = Config::default();
+        let global = GlobalFlags {
+            speaker: None,
+            group: Some("Nonexistent".into()),
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let result = resolve_group(&system, &config, &global);
+        assert!(matches!(result, Err(CliError::GroupNotFound(_))));
+    }
+
+    #[test]
+    fn resolve_group_falls_back_to_first() {
+        let system = SonosSystem::with_groups(&["Kitchen"]);
+        let config = Config::default();
+        let global = GlobalFlags {
+            speaker: None,
+            group: None,
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let grp = resolve_group(&system, &config, &global).unwrap();
+        let coord = grp.coordinator().unwrap();
+        assert_eq!(coord.name, "Kitchen");
+    }
+
+    #[test]
+    fn resolve_group_uses_config_default() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let config = Config {
+            default_group: Some("Bedroom".into()),
+            ..Config::default()
+        };
+        let global = GlobalFlags {
+            speaker: None,
+            group: None,
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let grp = resolve_group(&system, &config, &global).unwrap();
+        let coord = grp.coordinator().unwrap();
+        assert_eq!(coord.name, "Bedroom");
+    }
+
+    #[test]
+    fn resolve_group_empty_system_fails() {
+        let system = SonosSystem::with_groups(&[]);
+        let config = Config::default();
+        let global = GlobalFlags {
+            speaker: None,
+            group: None,
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let result = resolve_group(&system, &config, &global);
+        assert!(matches!(result, Err(CliError::GroupNotFound(_))));
+    }
+
+    #[test]
+    fn resolve_group_flag_wins_over_speaker() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let config = Config::default();
+        let global = GlobalFlags {
+            speaker: Some("Bedroom".into()),
+            group: Some("Kitchen".into()),
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let grp = resolve_group(&system, &config, &global).unwrap();
+        let coord = grp.coordinator().unwrap();
+        assert_eq!(coord.name, "Kitchen");
     }
 }
