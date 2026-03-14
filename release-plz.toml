@@ -1,0 +1,20 @@
+[workspace]
+git_tag_name = "v{{ version }}"
+git_release_enable = true
+git_release_name = "v{{ version }}"
+git_release_draft = false
+pr_name = "chore: release v{{ version }}"
+
+[changelog]
+commit_parsers = [
+    { message = "^feat", group = "Added" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^refactor", group = "Changed" },
+    { message = "^perf", group = "Performance" },
+    { message = "^docs", skip = true },
+    { message = "^chore", skip = true },
+    { message = "^ci", skip = true },
+    { message = "^test", skip = true },
+    { message = "^build", skip = true },
+]
+protect_breaking_commits = true

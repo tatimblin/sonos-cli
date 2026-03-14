@@ -57,6 +57,14 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 - Exit code 0 = success, 1 = runtime error, 2 = usage error
 - Error format: `error: <description>\nCheck that your speakers are on the same network, then retry.`
 
+## Contributing Workflow
+
+Follow `docs/references/contributing-agent-guide.md` for the complete workflow when making changes:
+- Always work on a feature branch, never commit directly to `main`
+- Commit messages and PR titles must use conventional commit format (`feat:`, `fix:`, etc.)
+- Verify CI passes before merging: `gh pr checks`
+- Never manually bump versions — release-plz handles versioning and changelog automatically
+
 ## Reference Documentation
 
 | Document | What it covers |
@@ -65,6 +73,7 @@ Follow `docs/references/cli-guidelines.md` for all command design decisions:
 | `docs/references/sonos-sdk.md` | Complete SDK API — every type, method, and example |
 | `docs/references/cli-guidelines.md` | clig.dev rules applied to this project |
 | `docs/references/cli-commands.md` | Per-command reference — syntax, flags, examples, output, errors for all 27 commands |
+| `docs/references/contributing-agent-guide.md` | Step-by-step workflow for AI agents: branching, commits, PRs, CI validation, versioning |
 
 ## Brainstorm Sources
 

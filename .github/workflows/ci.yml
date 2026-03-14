@@ -1,0 +1,29 @@
+name: CI
+# Runs fmt, clippy, and tests on every PR and push to main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout sonos-sdk (path dependency)
+        run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Formatting
+        run: cargo fmt -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test

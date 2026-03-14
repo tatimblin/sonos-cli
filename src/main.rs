@@ -35,9 +35,9 @@ fn main() -> ExitCode {
                 Ok(s) => s,
                 Err(e) => {
                     if cli.global.verbose {
-                        eprintln!("debug: {:?}", e);
+                        eprintln!("debug: {e:?}");
                     }
-                    eprintln!("error: {}", e);
+                    eprintln!("error: {e}");
                     eprintln!("Check that your speakers are on the same network, then retry.");
                     return ExitCode::from(1);
                 }
@@ -46,17 +46,17 @@ fn main() -> ExitCode {
             match run_command(cmd, &system, &config, &cli.global) {
                 Ok(msg) => {
                     if !cli.global.quiet {
-                        println!("{}", msg);
+                        println!("{msg}");
                     }
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
                     if cli.global.verbose {
-                        eprintln!("debug: {:?}", e);
+                        eprintln!("debug: {e:?}");
                     }
-                    eprintln!("error: {}", e);
+                    eprintln!("error: {e}");
                     if let Some(hint) = e.recovery_hint() {
-                        eprintln!("{}", hint);
+                        eprintln!("{hint}");
                     }
                     e.exit_code()
                 }

@@ -2,15 +2,33 @@
 name = "sonos-cli"
 version = "0.1.0"
 edition = "2021"
-description = "CLI/TUI application for controlling Sonos speakers"
+description = "CLI and TUI for controlling Sonos speakers"
+license = "MIT"
+repository = "https://github.com/tatimblin/sonos-cli"
+readme = "README.md"
+keywords = ["sonos", "cli", "tui", "audio", "speakers"]
+categories = ["command-line-utilities", "multimedia::audio"]
+exclude = ["docs/", ".github/", ".claude/", ".kiro/", "todos/", "CLAUDE.md", "AGENTS.md"]
+
+[lib]
+name = "sonos_cli"
+path = "src/lib.rs"
 
 [[bin]]
 name = "sonos"
 path = "src/main.rs"
 
+[[bin]]
+name = "sonos-generate"
+path = "src/generate.rs"
+required-features = ["generate"]
+
+[features]
+generate = ["dep:clap_complete", "dep:clap_mangen"]
+
 [dependencies]
 # Sonos SDK
-sonos-sdk = { path = "../sonos-sdk/sonos-sdk" }
+sonos-sdk = { version = "0.1", path = "../sonos-sdk/sonos-sdk" }
 
 # CLI parsing
 clap = { version = "4", features = ["derive"] }
@@ -33,7 +51,40 @@ dirs = "5"
 anyhow = "1"
 thiserror = "2"
 
+# Shell completions and man pages (optional, for generate binary)
+clap_complete = { version = "4", optional = true }
+clap_mangen = { version = "0.2", optional = true }
+
 [dev-dependencies]
-sonos-sdk = { path = "../sonos-sdk/sonos-sdk", features = ["test-support"] }
+sonos-sdk = { version = "0.1", path = "../sonos-sdk/sonos-sdk", features = ["test-support"] }
 proptest = "1"
 tempfile = "3"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.27.0"
+ci = "github"
+installers = ["shell", "powershell", "homebrew"]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+tap = "tatimblin/homebrew-tap"
+publish-jobs = ["homebrew"]
+pr-run-mode = "plan"
+install-path = "CARGO_HOME"
+
+[[workspace.metadata.dist.extra-artifacts]]
+artifacts = [
+    "completions/sonos.bash",
+    "completions/_sonos",
+    "completions/sonos.fish",
+    "completions/_sonos.ps1",
+    "man/sonos.1",
+]
+build = ["cargo", "run", "--features", "generate", "--bin", "sonos-generate", "--", "--out-dir", "."]

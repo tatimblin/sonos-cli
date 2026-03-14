@@ -16,6 +16,7 @@ pub enum CliError {
     Sdk(#[from] sonos_sdk::SdkError),
 
     #[error("configuration error: {0}")]
+    #[allow(dead_code)]
     Config(String),
 
     #[error("validation error: {0}")]
@@ -42,7 +43,6 @@ impl CliError {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

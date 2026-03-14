@@ -5,35 +5,32 @@ pub fn validate_seek_time(input: &str) -> Result<(), CliError> {
     let parts: Vec<&str> = input.split(':').collect();
     if parts.len() != 3 {
         return Err(CliError::Validation(format!(
-            "invalid position \"{}\" — expected H:MM:SS format",
-            input
+            "invalid position \"{input}\" — expected H:MM:SS format"
         )));
     }
     parts[0].parse::<u32>().map_err(|_| {
-        CliError::Validation(format!("invalid position \"{}\" — hours must be a number", input))
+        CliError::Validation(format!(
+            "invalid position \"{input}\" — hours must be a number"
+        ))
     })?;
     let minutes: u32 = parts[1].parse().map_err(|_| {
         CliError::Validation(format!(
-            "invalid position \"{}\" — minutes must be a number",
-            input
+            "invalid position \"{input}\" — minutes must be a number"
         ))
     })?;
     let seconds: u32 = parts[2].parse().map_err(|_| {
         CliError::Validation(format!(
-            "invalid position \"{}\" — seconds must be a number",
-            input
+            "invalid position \"{input}\" — seconds must be a number"
         ))
     })?;
     if minutes > 59 {
         return Err(CliError::Validation(format!(
-            "invalid position \"{}\" — minutes must be 0–59",
-            input
+            "invalid position \"{input}\" — minutes must be 0–59"
         )));
     }
     if seconds > 59 {
         return Err(CliError::Validation(format!(
-            "invalid position \"{}\" — seconds must be 0–59",
-            input
+            "invalid position \"{input}\" — seconds must be 0–59"
         )));
     }
     Ok(())
@@ -41,21 +38,19 @@ pub fn validate_seek_time(input: &str) -> Result<(), CliError> {
 
 /// Parse a duration string (e.g. "30m", "1h", "90m") into HH:MM:SS format.
 pub fn parse_duration(input: &str) -> Result<String, CliError> {
-    let (num_str, unit) = if input.ends_with('m') {
-        (&input[..input.len() - 1], 'm')
-    } else if input.ends_with('h') {
-        (&input[..input.len() - 1], 'h')
+    let (num_str, unit) = if let Some(s) = input.strip_suffix('m') {
+        (s, 'm')
+    } else if let Some(s) = input.strip_suffix('h') {
+        (s, 'h')
     } else {
         return Err(CliError::Validation(format!(
-            "invalid duration \"{}\" — use a unit suffix: 30m or 1h",
-            input
+            "invalid duration \"{input}\" — use a unit suffix: 30m or 1h"
         )));
     };
 
     let value: u32 = num_str.parse().map_err(|_| {
         CliError::Validation(format!(
-            "invalid duration \"{}\" — use a unit suffix: 30m or 1h",
-            input
+            "invalid duration \"{input}\" — use a unit suffix: 30m or 1h"
         ))
     })?;
 
@@ -67,24 +62,22 @@ pub fn parse_duration(input: &str) -> Result<String, CliError> {
 
     let hours = total_minutes / 60;
     let minutes = total_minutes % 60;
-    Ok(format!("{:02}:{:02}:00", hours, minutes))
+    Ok(format!("{hours:02}:{minutes:02}:00"))
 }
 
 /// Format a duration string for human-readable output.
 pub fn format_duration_human(input: &str) -> String {
-    if input.ends_with('m') {
-        let num = &input[..input.len() - 1];
+    if let Some(num) = input.strip_suffix('m') {
         if num == "1" {
             "1 minute".to_string()
         } else {
-            format!("{} minutes", num)
+            format!("{num} minutes")
         }
-    } else if input.ends_with('h') {
-        let num = &input[..input.len() - 1];
+    } else if let Some(num) = input.strip_suffix('h') {
         if num == "1" {
             "1 hour".to_string()
         } else {
-            format!("{} hours", num)
+            format!("{num} hours")
         }
     } else {
         input.to_string()

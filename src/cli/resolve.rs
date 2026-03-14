@@ -1,4 +1,4 @@
-use sonos_sdk::{Group, Speaker, SonosSystem};
+use sonos_sdk::{Group, SonosSystem, Speaker};
 
 use crate::cli::GlobalFlags;
 use crate::config::Config;
@@ -84,13 +84,13 @@ pub fn require_speaker_only(
 ) -> Result<Speaker, CliError> {
     if global.group.is_some() {
         return Err(CliError::Validation(format!(
-            "--speaker is required for {}",
-            command_name
+            "--speaker is required for {command_name}"
         )));
     }
-    let name = global.speaker.as_deref().ok_or_else(|| {
-        CliError::Validation(format!("--speaker is required for {}", command_name))
-    })?;
+    let name = global
+        .speaker
+        .as_deref()
+        .ok_or_else(|| CliError::Validation(format!("--speaker is required for {command_name}")))?;
     system
         .speaker(name)
         .ok_or_else(|| CliError::SpeakerNotFound(name.to_string()))

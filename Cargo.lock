@@ -367,6 +367,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19c9f1dde76b736e3681f28cec9d5a61299cbaae0fce80a68e43724ad56031eb"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.5.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -383,6 +392,16 @@ name = "clap_lex"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
+
+[[package]]
+name = "clap_mangen"
+version = "0.2.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e30ffc187e2e3aeafcd1c6e2aa416e29739454c0ccaa419226d5ecd181f2d78"
+dependencies = [
+ "clap",
+ "roff",
+]
 
 [[package]]
 name = "color_quant"
@@ -2231,6 +2250,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "roff"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf2048e0e979efb2ca7b91c4f1a8d77c91853e9b987c94c555668a8994915ad"
+
+[[package]]
 name = "rustix"
 version = "0.38.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2561,6 +2586,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "clap_complete",
+ "clap_mangen",
  "crossterm",
  "dirs",
  "image",
