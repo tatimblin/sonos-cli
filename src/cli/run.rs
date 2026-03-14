@@ -103,7 +103,7 @@ fn cmd_speakers(system: &SonosSystem) -> Result<String, CliError> {
                 parts.push(vol_str);
             }
             if !group_name.is_empty() {
-                parts.push(format!("({})", group_name));
+                parts.push(format!("({group_name})"));
             }
             parts.join("   ")
         })
@@ -171,7 +171,7 @@ fn cmd_volume(
         .map(|c| c.name)
         .unwrap_or_else(|| "unknown".to_string());
     g.set_volume(level as u16)?;
-    Ok(format!("Volume set to {} ({})", level, name))
+    Ok(format!("Volume set to {level} ({name})"))
 }
 
 fn cmd_mute(
@@ -194,7 +194,7 @@ fn cmd_mute(
         .map(|c| c.name)
         .unwrap_or_else(|| "unknown".to_string());
     g.set_mute(muted)?;
-    Ok(format!("{} ({})", label, name))
+    Ok(format!("{label} ({name})"))
 }
 
 fn cmd_status(
@@ -254,7 +254,7 @@ fn cmd_join(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliErr
         .group(group_name)
         .ok_or_else(|| CliError::GroupNotFound(group_name.into()))?;
     grp.add_speaker(&spk)?;
-    Ok(format!("{} joined {}", speaker_name, group_name))
+    Ok(format!("{speaker_name} joined {group_name}"))
 }
 
 fn cmd_leave(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliError> {
@@ -270,7 +270,7 @@ fn cmd_leave(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliEr
         .and_then(|g| g.coordinator().map(|c| c.name))
         .unwrap_or_else(|| "its group".into());
     spk.leave_group()?;
-    Ok(format!("{} left {}", speaker_name, group_name))
+    Ok(format!("{speaker_name} left {group_name}"))
 }
 
 fn cmd_bass(system: &SonosSystem, global: &GlobalFlags, level: i8) -> Result<String, CliError> {

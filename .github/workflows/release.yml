@@ -1,0 +1,133 @@
+# Release workflow — triggered by git tag push (created by release-plz).
+# Builds cross-platform binaries, generates installers, and publishes to GitHub Releases + Homebrew.
+
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout sonos-sdk (path dependency)
+        run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
+      - name: Get tag
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+      - name: Install dist
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+      - name: Plan
+        run: dist plan --output-format=json --no-local-paths > manifest.json
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan
+          path: manifest.json
+
+  build-local-artifacts:
+    needs: plan
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout sonos-sdk (path dependency)
+        run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
+      - name: Install dist
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+      - name: Build
+        run: dist build --target=${{ matrix.target }} --artifacts=local --output-format=json > dist-manifest.json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.target }}
+          path: target/distrib/
+
+  build-global-artifacts:
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout sonos-sdk (path dependency)
+        run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
+      - name: Install dist
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+      - name: Build global artifacts
+        run: dist build --artifacts=global --output-format=json > dist-manifest.json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-global
+          path: target/distrib/
+
+  publish:
+    needs: [build-local-artifacts, build-global-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+      - name: Flatten artifacts
+        run: |
+          mkdir -p upload
+          find artifacts -type f -exec cp {} upload/ \;
+          ls -la upload/
+      - name: Create or update GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "upload/*"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          allowUpdates: true
+
+  publish-homebrew:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout sonos-sdk (path dependency)
+        run: git clone --depth 1 https://github.com/tatimblin/sonos-sdk.git ../sonos-sdk
+      - name: Install dist
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/latest/download/cargo-dist-installer.sh | sh
+      - name: Generate Homebrew formula
+        run: dist plan --output-format=json > manifest.json
+      - name: Push to Homebrew tap
+        uses: dmnemec/copy_file_to_another_repo_action@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.RELEASE_PLZ_TOKEN }}
+        with:
+          source_file: "target/distrib/homebrew/sonos-cli.rb"
+          destination_repo: "tatimblin/homebrew-tap"
+          destination_folder: "Formula"
+          destination_branch: "main"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          user_name: "github-actions[bot]"
+          commit_message: "Update sonos-cli formula"
