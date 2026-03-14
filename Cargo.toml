@@ -26,6 +26,7 @@ required-features = ["generate"]
 
 [features]
 generate = ["dep:clap_complete", "dep:clap_mangen"]
+test-helpers = ["sonos-sdk/test-support"]
 
 [dependencies]
 # Sonos SDK
@@ -57,7 +58,7 @@ clap_complete = { version = "4", optional = true }
 clap_mangen = { version = "0.2", optional = true }
 
 [dev-dependencies]
-sonos-sdk = { version = "0.1", features = ["test-support"] }
+sonos-sdk = "0.1"
 proptest = "1"
 tempfile = "3"
 
