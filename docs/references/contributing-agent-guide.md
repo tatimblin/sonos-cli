@@ -117,9 +117,13 @@ Do not:
 
 If your change requires modifications to `sonos-sdk`:
 
-1. Make changes in `../sonos-sdk/sonos-sdk`
-2. Test locally (the `Cargo.toml` path dependency uses the local SDK)
-3. Ensure the SDK change is published to crates.io before the CLI PR is merged (CI resolves from crates.io, not the local path)
+1. Develop locally — `.cargo/config.toml` (gitignored) patches `sonos-sdk`
+   to your local checkout at `../sonos-sdk/sonos-sdk`
+2. Ship the SDK change first (merge PR → merge release PR → published to crates.io)
+3. Update the CLI's SDK version (Dependabot PR or `cargo update -p sonos-sdk`)
+4. Then open / update your CLI PR
+
+See `docs/references/releasing.md` for the full step-by-step.
 
 ## Squash merge
 
