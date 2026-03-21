@@ -19,7 +19,7 @@ path = "src/lib.rs"
 name = "sonos"
 path = "src/main.rs"
 
-[[bin]]
+[[example]]
 name = "sonos-generate"
 path = "src/generate.rs"
 required-features = ["generate"]
@@ -90,4 +90,4 @@ artifacts = [
     "completions/_sonos.ps1",
     "man/sonos.1",
 ]
-build = ["cargo", "run", "--features", "generate", "--bin", "sonos-generate", "--", "--out-dir", "."]
+build = ["cargo", "run", "--features", "generate", "--example", "sonos-generate", "--", "--out-dir", "."]
