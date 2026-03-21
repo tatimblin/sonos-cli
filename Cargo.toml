@@ -79,6 +79,7 @@ targets = [
 tap = "tatimblin/homebrew-tap"
 publish-jobs = ["homebrew"]
 pr-run-mode = "plan"
+allow-dirty = ["ci"]
 install-path = "CARGO_HOME"
 
 [[workspace.metadata.dist.extra-artifacts]]
