@@ -13,6 +13,7 @@ mod cli;
 mod config;
 mod diagnostics;
 mod errors;
+mod tui;
 
 use cli::{run_command, Cli};
 use config::Config;
@@ -24,8 +25,16 @@ fn main() -> ExitCode {
     match cli.command {
         None => {
             if std::io::stdout().is_terminal() {
-                eprintln!("TUI not yet implemented");
-                ExitCode::from(1)
+                match tui::run(config) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        if format!("{e:?}").contains("DiscoveryFailed") {
+                            eprintln!("{}", diagnostics::discovery_hint());
+                        }
+                        ExitCode::from(1)
+                    }
+                }
             } else {
                 eprintln!("error: no command specified and stdout is not a terminal");
                 ExitCode::from(1)
