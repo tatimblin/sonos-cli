@@ -2,9 +2,7 @@
 publish = true
 publish_allow_dirty = true
 git_tag_name = "v{{ version }}"
-git_release_enable = true
-git_release_name = "v{{ version }}"
-git_release_draft = false
+git_release_enable = false
 pr_name = "chore: release v{{ version }}"
 
 [changelog]
