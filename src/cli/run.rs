@@ -8,6 +8,7 @@ use super::{
     GlobalFlags, OnOff, QueueAction,
 };
 use crate::config::Config;
+use crate::diagnostics;
 use crate::errors::CliError;
 
 pub fn run_command(
@@ -77,6 +78,7 @@ pub fn run_command(
 fn cmd_speakers(system: &SonosSystem) -> Result<String, CliError> {
     let speakers = system.speakers();
     if speakers.is_empty() {
+        eprintln!("{}", diagnostics::discovery_hint());
         return Ok("No speakers found".to_string());
     }
     let lines: Vec<String> = speakers
@@ -114,6 +116,7 @@ fn cmd_speakers(system: &SonosSystem) -> Result<String, CliError> {
 fn cmd_groups(system: &SonosSystem) -> Result<String, CliError> {
     let groups = system.groups();
     if groups.is_empty() {
+        eprintln!("{}", diagnostics::discovery_hint());
         return Ok("No groups found".to_string());
     }
     let lines: Vec<String> = groups

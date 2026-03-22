@@ -7,10 +7,11 @@ use clap::Parser;
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
-use sonos_sdk::SonosSystem;
+use sonos_sdk::{SdkError, SonosSystem};
 
 mod cli;
 mod config;
+mod diagnostics;
 mod errors;
 
 use cli::{run_command, Cli};
@@ -38,7 +39,12 @@ fn main() -> ExitCode {
                         eprintln!("debug: {e:?}");
                     }
                     eprintln!("error: {e}");
-                    eprintln!("Check that your speakers are on the same network, then retry.");
+                    if matches!(&e, SdkError::DiscoveryFailed(_)) {
+                        eprintln!("{}", diagnostics::discovery_hint());
+                        diagnostics::offer_open_settings(&cli.global);
+                    } else {
+                        eprintln!("Check that your speakers are on the same network, then retry.");
+                    }
                     return ExitCode::from(1);
                 }
             };
