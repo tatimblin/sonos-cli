@@ -43,9 +43,7 @@ fn main() -> ExitCode {
                         eprintln!("{}", diagnostics::discovery_hint());
                         diagnostics::offer_open_settings(&cli.global);
                     } else {
-                        eprintln!(
-                            "Check that your speakers are on the same network, then retry."
-                        );
+                        eprintln!("Check that your speakers are on the same network, then retry.");
                     }
                     return ExitCode::from(1);
                 }

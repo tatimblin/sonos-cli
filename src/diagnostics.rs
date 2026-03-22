@@ -128,9 +128,8 @@ mod tests {
     fn discovery_failed_triggers_platform_hint() {
         // SdkError::DiscoveryFailed is the variant that should route to
         // platform-specific diagnostics in main.rs
-        let err = sonos_sdk::SdkError::DiscoveryFailed(
-            "no Sonos devices found on the network".into(),
-        );
+        let err =
+            sonos_sdk::SdkError::DiscoveryFailed("no Sonos devices found on the network".into());
         assert!(matches!(err, sonos_sdk::SdkError::DiscoveryFailed(_)));
 
         // And the hint it would display is our platform-specific one
@@ -171,6 +170,10 @@ mod tests {
         use crate::errors::CliError;
         let err = CliError::Sdk(sonos_sdk::SdkError::LockPoisoned);
         let hint = err.recovery_hint().unwrap();
-        assert_ne!(hint, discovery_hint(), "non-network SDK errors should use generic hint");
+        assert_ne!(
+            hint,
+            discovery_hint(),
+            "non-network SDK errors should use generic hint"
+        );
     }
 }
