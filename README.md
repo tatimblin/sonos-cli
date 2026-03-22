@@ -11,7 +11,7 @@ Control Sonos speakers from the command line.
 ### Homebrew (macOS)
 
 ```bash
-brew install tatimblin/tap/sonos
+brew install tatimblin/tap/sonos-cli
 ```
 
 ### Cargo

@@ -32,7 +32,15 @@ impl CliError {
             Self::SpeakerNotFound(_) | Self::GroupNotFound(_) => {
                 Some(diagnostics::discovery_hint())
             }
-            Self::Sdk(_) => Some("Check network connectivity and speaker power."),
+            Self::Sdk(e) => {
+                if matches!(e, sonos_sdk::SdkError::DiscoveryFailed(_))
+                    || e.to_string().contains("Network error")
+                {
+                    Some(diagnostics::discovery_hint())
+                } else {
+                    Some("Check network connectivity and speaker power.")
+                }
+            }
             Self::Config(_) | Self::Validation(_) => None,
         }
     }
@@ -54,7 +62,7 @@ mod tests {
     fn speaker_not_found_has_recovery_hint() {
         let err = CliError::SpeakerNotFound("Kitchen".to_string());
         assert!(err.recovery_hint().is_some());
-        assert!(err.recovery_hint().unwrap().contains("hint:"));
+        assert!(err.recovery_hint().unwrap().contains("this could mean:"));
     }
 
     #[test]
