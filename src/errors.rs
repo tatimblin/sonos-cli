@@ -3,6 +3,8 @@
 use std::process::ExitCode;
 use thiserror::Error;
 
+use crate::diagnostics;
+
 /// Domain error type with recovery hints and exit codes.
 #[derive(Error, Debug)]
 pub enum CliError {
@@ -25,10 +27,10 @@ pub enum CliError {
 
 impl CliError {
     /// Returns actionable follow-up text for the user.
-    pub fn recovery_hint(&self) -> Option<&str> {
+    pub fn recovery_hint(&self) -> Option<&'static str> {
         match self {
             Self::SpeakerNotFound(_) | Self::GroupNotFound(_) => {
-                Some("Check that your speakers are on the same network, then retry.")
+                Some(diagnostics::discovery_hint())
             }
             Self::Sdk(_) => Some("Check network connectivity and speaker power."),
             Self::Config(_) | Self::Validation(_) => None,
@@ -52,7 +54,7 @@ mod tests {
     fn speaker_not_found_has_recovery_hint() {
         let err = CliError::SpeakerNotFound("Kitchen".to_string());
         assert!(err.recovery_hint().is_some());
-        assert!(err.recovery_hint().unwrap().contains("same network"));
+        assert!(err.recovery_hint().unwrap().contains("hint:"));
     }
 
     #[test]
