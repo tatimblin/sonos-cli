@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/tatimblin/sonos-cli/compare/v0.1.1...v0.1.2) - 2026-03-22
+
+### Fixed
+
+- *(ci)* disable release-plz GitHub Release creation ([#20](https://github.com/tatimblin/sonos-cli/pull/20))
+
 ## [0.1.1](https://github.com/tatimblin/sonos-cli/compare/v0.1.0...v0.1.1) - 2026-03-22
 
 ### Added
