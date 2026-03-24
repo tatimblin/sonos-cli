@@ -1,4 +1,5 @@
-//! Track progress bar: `━━━━━━━╺──── 2:31/5:55`
+//! Track progress bar: `━━━━━━━●──── 2:31/5:55`
+#![allow(dead_code)]
 
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -22,7 +23,7 @@ pub fn format_time(ms: u64) -> String {
 
 /// Render a progress bar as a `Line` within the given character width.
 ///
-/// Pattern: `━━━━━━━╺──── 2:31/5:55`
+/// Pattern: `━━━━━━━●──── 2:31/5:55`
 #[allow(clippy::too_many_arguments)]
 pub fn render_progress_bar(
     progress: f64,
@@ -50,7 +51,7 @@ pub fn render_progress_bar(
     let empty_count = bar_width.saturating_sub(filled_count + 1);
 
     let filled_str: String = "━".repeat(filled_count);
-    let cursor_str = if filled_count < bar_width { "╺" } else { "" };
+    let cursor_str = if filled_count < bar_width { "●" } else { "" };
     let empty_str: String = "─".repeat(empty_count);
 
     Line::from(vec![

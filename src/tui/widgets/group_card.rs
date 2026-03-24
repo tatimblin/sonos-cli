@@ -6,13 +6,14 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use ratatui::Frame;
 
 use crate::tui::theme::Theme;
-use crate::tui::widgets::{progress_bar, volume_bar};
+use crate::tui::widgets::progress_bar;
 
 /// Data needed to render a single group card.
 pub struct GroupCardData {
     pub group_name: String,
     pub playback_state: PlaybackIcon,
-    pub track_display: String,
+    pub track_title: String,
+    pub track_artist: String,
     pub volume: u16,
     pub progress: f64,
     pub elapsed_ms: u64,
@@ -47,9 +48,10 @@ impl PlaybackIcon {
 }
 
 /// Render a group card within the given area.
+#[allow(clippy::too_many_lines)]
 pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, theme: &Theme) {
     let (border_type, border_style) = if data.selected {
-        (BorderType::Double, theme.card_border_selected)
+        (BorderType::Thick, theme.card_border_selected)
     } else {
         (BorderType::Plain, theme.card_border)
     };
@@ -59,12 +61,22 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
         .border_type(border_type)
         .border_style(border_style);
 
-    let inner = block.inner(area);
+    let raw_inner = block.inner(area);
     frame.render_widget(block, area);
 
-    if inner.height == 0 || inner.width == 0 {
+    // Horizontal padding (1 char each side)
+    let inner = Rect::new(
+        raw_inner.x + 1,
+        raw_inner.y,
+        raw_inner.width.saturating_sub(2),
+        raw_inner.height,
+    );
+
+    if inner.height == 0 || inner.width < 10 {
         return;
     }
+
+    let w = inner.width as usize;
 
     let icon_style = match data.playback_state {
         PlaybackIcon::Playing => theme.playing_icon,
@@ -72,71 +84,108 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
         PlaybackIcon::Stopped => theme.stopped_icon,
     };
 
-    // Line 1: group name + playback state
-    let prefix = if data.selected { "● " } else { "  " };
-    let title_line = Line::from(vec![
-        Span::styled(prefix, theme.card_title),
-        Span::styled(data.group_name.clone(), theme.card_title),
+    // Line 1: ●/○ Name          ▶ Playing
+    let prefix = if data.selected { "● " } else { "○ " };
+    let left = format!("{prefix}{}", data.group_name);
+    let right = format!("{} {}", data.playback_state.symbol(), data.playback_state.label());
+    let left_width = left.chars().count();
+    let right_width = right.chars().count();
+    let pad = w.saturating_sub(left_width + right_width);
+    let line1 = Line::from(vec![
+        Span::styled(left, theme.card_title),
+        Span::raw(" ".repeat(pad)),
+        Span::styled(right, icon_style),
+    ]);
+
+    // Line 2: empty
+    let line2 = Line::raw("");
+
+    // Line 3: track title (indented)
+    let title = if data.track_title.is_empty() {
+        "Nothing playing"
+    } else {
+        &data.track_title
+    };
+    let line3 = Line::from(Span::styled(format!("  {title}"), theme.track_info));
+
+    // Line 4: artist (indented)
+    let line4 = if data.track_artist.is_empty() {
+        Line::raw("")
+    } else {
+        Line::from(Span::styled(
+            format!("  {}", data.track_artist),
+            theme.muted,
+        ))
+    };
+
+    // Line 5: empty
+    let line5 = Line::raw("");
+
+    // Line 6: ▶  ━━━━━━━━╺────────  2:31/5:55
+    let elapsed_str = progress_bar::format_time(data.elapsed_ms);
+    let duration_str = progress_bar::format_time(data.duration_ms);
+    let time_text = format!("  {elapsed_str}/{duration_str}");
+    // prefix: "  " + icon(1) + "  " = 5 display cols
+    let prog_prefix_width = 5;
+    let prog_bar_width = w.saturating_sub(prog_prefix_width + time_text.len());
+    let progress = data.progress.clamp(0.0, 1.0);
+    let cursor_pos = (prog_bar_width as f64 * progress) as usize;
+    let has_track = !data.track_title.is_empty();
+    let filled_count = cursor_pos.min(prog_bar_width);
+    let cursor_width = if has_track { 1 } else { 0 };
+    let empty_count = prog_bar_width.saturating_sub(filled_count + cursor_width);
+    let cursor = if has_track && filled_count < prog_bar_width {
+        "●"
+    } else {
+        ""
+    };
+    let line6 = Line::from(vec![
         Span::raw("  "),
         Span::styled(data.playback_state.symbol(), icon_style),
-        Span::raw(" "),
-        Span::styled(data.playback_state.label(), icon_style),
-    ]);
-
-    // Line 2: track info
-    let track_text = if data.track_display.is_empty() {
-        "Nothing playing".to_string()
-    } else {
-        data.track_display.clone()
-    };
-    let track_line = Line::from(vec![
         Span::raw("  "),
-        Span::styled(track_text, theme.track_info),
+        Span::styled("━".repeat(filled_count), theme.progress_filled),
+        Span::styled(cursor.to_string(), theme.progress_cursor),
+        Span::styled("─".repeat(empty_count), theme.progress_empty),
+        Span::styled(time_text, theme.progress_time),
     ]);
 
-    // Line 3: volume bar
-    let vol_line = volume_bar::render_volume_bar(
-        data.volume,
-        inner.width.saturating_sub(2),
-        theme.volume_filled,
-        theme.volume_empty,
-    );
-    let vol_line = prepend_spaces(vol_line, 2);
-
-    // Line 4: progress bar
-    let prog_line = progress_bar::render_progress_bar(
-        data.progress,
-        data.elapsed_ms,
-        data.duration_ms,
-        inner.width.saturating_sub(2),
-        theme.progress_filled,
-        theme.progress_empty,
-        theme.progress_cursor,
-        theme.progress_time,
-    );
-    let prog_line = prepend_spaces(prog_line, 2);
-
-    // Line 5: speaker count
-    let speaker_line = Line::from(vec![
-        Span::raw("  "),
-        Span::styled(data.speaker_count_text.clone(), theme.muted),
+    // Line 7: Speaker text          🔊 ████░░░░
+    // Each half gets max 50% of the width.
+    let half_w = w / 2;
+    let spk_text = &data.speaker_count_text;
+    let spk_display = format!("  {spk_text}");
+    let spk_len = spk_display.chars().count();
+    let spk_pad = half_w.saturating_sub(spk_len);
+    // volume prefix: 🔊(2) + " " = 3 display cols; suffix: " XX%"
+    let vol_label = format!(" {}%", data.volume);
+    let vol_prefix_width = 3;
+    let vol_bar_width = half_w.saturating_sub(vol_prefix_width + vol_label.len());
+    let vol_filled = ((vol_bar_width as f64) * (data.volume as f64) / 100.0) as usize;
+    let vol_empty = vol_bar_width.saturating_sub(vol_filled);
+    let line7 = Line::from(vec![
+        Span::styled(spk_display, theme.muted),
+        Span::raw(" ".repeat(spk_pad)),
+        Span::raw("🔊 "),
+        Span::styled("■".repeat(vol_filled), theme.volume_filled),
+        Span::styled("·".repeat(vol_empty), theme.volume_empty),
+        Span::styled(vol_label, theme.muted),
     ]);
 
-    let lines: Vec<Line> = vec![title_line, track_line, vol_line, prog_line, speaker_line];
+    let lines = vec![line1, line2, line3, line4, line5, line6, line7];
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
 }
 
-fn prepend_spaces(mut line: Line<'static>, count: usize) -> Line<'static> {
-    line.spans
-        .insert(0, Span::raw(" ".repeat(count)));
-    line
-}
-
 /// Render a placeholder for an unavailable group.
-pub fn render_unavailable_card(frame: &mut Frame, area: Rect, group_name: &str, selected: bool, theme: &Theme) {
+pub fn render_unavailable_card(
+    frame: &mut Frame,
+    area: Rect,
+    group_name: &str,
+    selected: bool,
+    theme: &Theme,
+) {
     let (border_type, border_style) = if selected {
-        (BorderType::Double, theme.card_border_selected)
+        (BorderType::Thick, theme.card_border_selected)
     } else {
         (BorderType::Plain, theme.card_border)
     };
@@ -149,16 +198,13 @@ pub fn render_unavailable_card(frame: &mut Frame, area: Rect, group_name: &str, 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let prefix = if selected { "● " } else { "  " };
     let lines = vec![
-        Line::from(vec![
-            Span::styled(prefix, theme.card_title),
-            Span::styled(group_name.to_string(), theme.card_title),
-        ]),
-        Line::from(vec![
-            Span::raw("  "),
-            Span::styled("Unavailable", theme.muted),
-        ]),
+        Line::from(Span::styled(
+            format!("○ {group_name}"),
+            theme.card_title,
+        )),
+        Line::raw(""),
+        Line::from(Span::styled("  Unavailable", theme.muted)),
     ];
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);

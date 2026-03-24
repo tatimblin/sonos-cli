@@ -34,8 +34,10 @@ pub struct Theme {
     pub progress_cursor: Style,
     pub progress_time: Style,
 
-    // Mini-player
+    // Mini-player (unused in current layout, kept for Group View)
+    #[allow(dead_code)]
     pub mini_player_border: Style,
+    #[allow(dead_code)]
     pub mini_player_title: Style,
 
     // Speakers tab

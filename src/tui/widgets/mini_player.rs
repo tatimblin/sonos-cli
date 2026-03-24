@@ -1,4 +1,6 @@
 //! Mini-player bar — 2-line widget showing the focused group's now-playing info.
+//! Currently unused (removed from Home layout); kept for future Group View screen.
+#![allow(dead_code)]
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};

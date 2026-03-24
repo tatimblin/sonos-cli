@@ -1,47 +1,43 @@
-//! TUI rendering — layout dispatch, breadcrumb, key legend, and mini-player.
+//! TUI rendering — framed layout with header, content, separators, and key legend.
 //!
 //! Screen rendering is delegated to `tui/screens/` modules. Widget rendering
 //! lives in `tui/widgets/`.
 
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::layout::{Alignment, Rect};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 use sonos_sdk::SonosSystem;
 
-use crate::tui::app::{App, GroupTab, HomeGroupsState, HomeTab, HomeSpeakersState, Screen};
+use crate::tui::app::{App, GroupTab, HomeTab, Screen};
 use crate::tui::screens::{home_groups, home_speakers};
-use crate::tui::widgets::group_card::PlaybackIcon;
-use crate::tui::widgets::mini_player::{self, MiniPlayerData};
 
-/// Top-level render dispatch. Splits the frame into header / content / [mini-player] / legend.
+/// Top-level render dispatch. Draws header, separators, content, and key legend.
 pub fn render(frame: &mut Frame, app: &App) {
-    let is_home = matches!(app.navigation.current(), Screen::Home { .. });
+    let area = frame.area();
+    if area.height < 4 || area.width < 20 {
+        return;
+    }
 
-    let areas = if is_home && !app.system.groups().is_empty() {
-        // 4-region layout with mini-player
-        let [header, content, mini, legend] = Layout::vertical([
-            Constraint::Length(1),  // breadcrumb header
-            Constraint::Min(0),    // content area
-            Constraint::Length(3), // mini-player (top border + 2 lines)
-            Constraint::Length(1), // key legend
-        ])
-        .areas(frame.area());
-        (header, content, Some(mini), legend)
-    } else {
-        // 3-region layout without mini-player
-        let [header, content, legend] = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(1),
-        ])
-        .areas(frame.area());
-        (header, content, None, legend)
-    };
+    // Horizontal padding (1 char each side)
+    let padded_x = area.x + 1;
+    let padded_w = area.width.saturating_sub(2);
 
-    let (header_area, content_area, mini_player_area, legend_area) = areas;
+    // Header (first row)
+    let header_area = Rect::new(padded_x, area.y, padded_w, 1);
+    render_header(frame, header_area, app);
 
-    render_breadcrumb(frame, header_area, app);
+    // Separator between header and content
+    draw_separator(frame, area.y + 1, area.x, area.x + area.width - 1, app.theme.muted);
+
+    // Content area
+    let content_area = Rect::new(
+        padded_x,
+        area.y + 2,
+        padded_w,
+        area.height.saturating_sub(4),
+    );
 
     match app.navigation.current() {
         Screen::Home {
@@ -49,16 +45,10 @@ pub fn render(frame: &mut Frame, app: &App) {
             groups_state,
             speakers_state,
             ..
-        } => {
-            match tab {
-                HomeTab::Groups => home_groups::render(frame, content_area, app, groups_state),
-                HomeTab::Speakers => home_speakers::render(frame, content_area, app, speakers_state),
-            }
-
-            if let Some(mini_area) = mini_player_area {
-                render_mini_player(frame, mini_area, app, tab, groups_state, speakers_state);
-            }
-        }
+        } => match tab {
+            HomeTab::Groups => home_groups::render(frame, content_area, app, groups_state),
+            HomeTab::Speakers => home_speakers::render(frame, content_area, app, speakers_state),
+        },
         Screen::GroupView { group_id, tab } => {
             render_group_view(frame, content_area, app, group_id, tab);
         }
@@ -67,140 +57,81 @@ pub fn render(frame: &mut Frame, app: &App) {
         }
     }
 
-    render_key_legend(frame, legend_area, app);
+    // Separator between content and footer
+    draw_separator(
+        frame,
+        area.y + area.height - 2,
+        area.x,
+        area.x + area.width - 1,
+        app.theme.muted,
+    );
+
+    // Key legend (last row)
+    let footer_area = Rect::new(padded_x, area.y + area.height - 1, padded_w, 1);
+    render_key_legend(frame, footer_area, app);
 }
 
-// ---------------------------------------------------------------------------
-// Mini-player
-// ---------------------------------------------------------------------------
-
-fn render_mini_player(
-    frame: &mut Frame,
-    area: Rect,
-    app: &App,
-    tab: &HomeTab,
-    groups_state: &HomeGroupsState,
-    speakers_state: &HomeSpeakersState,
-) {
-    let groups = app.system.groups();
-    if groups.is_empty() {
-        return;
-    }
-
-    // Determine focused group based on active tab
-    let focused_group = match tab {
-        HomeTab::Groups => groups.get(groups_state.selected_index),
-        HomeTab::Speakers => {
-            // Find the group of the selected speaker
-            let speakers = app.system.speakers();
-            speakers
-                .get(speakers_state.selected_index)
-                .and_then(|s| s.group())
-                .or_else(|| groups.first().cloned())
-                .as_ref()
-                .and_then(|g| groups.iter().find(|og| og.id == g.id))
+/// Draw a full-width horizontal separator line.
+fn draw_separator(frame: &mut Frame, y: u16, left: u16, right: u16, style: Style) {
+    let buf = frame.buffer_mut();
+    for x in left..=right {
+        if let Some(cell) = buf.cell_mut((x, y)) {
+            cell.set_char('─').set_style(style);
         }
-    };
-
-    let Some(group) = focused_group else {
-        return;
-    };
-
-    let coordinator = match group.coordinator() {
-        Some(c) => c,
-        None => return,
-    };
-
-    let playback_state = coordinator.playback_state.get();
-    let current_track = coordinator.current_track.get();
-    let group_volume = group.volume.get();
-
-    let playback_icon = match playback_state.as_ref() {
-        Some(sonos_sdk::PlaybackState::Playing) => PlaybackIcon::Playing,
-        Some(sonos_sdk::PlaybackState::Paused) => PlaybackIcon::Paused,
-        _ => PlaybackIcon::Stopped,
-    };
-
-    let track_display = current_track
-        .as_ref()
-        .filter(|t| !t.is_empty())
-        .map(|t| t.display())
-        .unwrap_or_default();
-
-    let volume = group_volume.map(|v| v.value()).unwrap_or(0);
-
-    let (progress, elapsed_ms, duration_ms) = if let Some(ps) = app.progress_states.get(&group.id)
-    {
-        let elapsed = ps.interpolated_position_ms();
-        let duration = ps.last_duration_ms;
-        let ratio = if duration > 0 {
-            elapsed as f64 / duration as f64
-        } else {
-            0.0
-        };
-        (ratio, elapsed, duration)
-    } else {
-        let position = coordinator.position.get();
-        match position.as_ref() {
-            Some(pos) => (pos.progress(), pos.position_ms, pos.duration_ms),
-            None => (0.0, 0, 0),
-        }
-    };
-
-    let data = MiniPlayerData {
-        group_name: coordinator.name.clone(),
-        playback_state: playback_icon,
-        track_display,
-        volume,
-        progress,
-        elapsed_ms,
-        duration_ms,
-    };
-
-    mini_player::render_mini_player(frame, area, &data, &app.theme);
-}
-
-// ---------------------------------------------------------------------------
-// Breadcrumb header
-// ---------------------------------------------------------------------------
-
-fn screen_label(screen: &Screen, system: &SonosSystem) -> String {
-    match screen {
-        Screen::Home { .. } => "SONOS".to_string(),
-        Screen::GroupView { group_id, .. } => system
-            .group_by_id(group_id)
-            .and_then(|g| g.coordinator())
-            .map(|c| c.name.clone())
-            .unwrap_or_else(|| "Group".to_string()),
-        Screen::SpeakerDetail { speaker_id } => system
-            .speaker_by_id(speaker_id)
-            .map(|s| s.name.clone())
-            .unwrap_or_else(|| "Speaker".to_string()),
     }
 }
 
-fn render_breadcrumb(frame: &mut Frame, area: Rect, app: &App) {
-    let labels: Vec<String> = app
-        .navigation
-        .stack
-        .iter()
-        .map(|screen| screen_label(screen, &app.system))
-        .collect();
-    let breadcrumb = labels.join(" > ");
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
 
-    let mut spans = vec![Span::styled(&breadcrumb, app.theme.header)];
+fn render_header(frame: &mut Frame, area: Rect, app: &App) {
+    let screen = app.navigation.current();
 
-    let tab_spans = current_tab_spans(app.navigation.current(), &app.theme);
-    if !tab_spans.is_empty() {
-        spans.push(Span::raw("  "));
-        spans.extend(tab_spans);
-    }
+    let logo = build_logo(screen, &app.system);
+    let tab_spans = build_tab_spans(screen, &app.theme);
 
-    let paragraph = Paragraph::new(Line::from(spans)).style(app.theme.header);
+    let logo_width = logo.chars().count();
+    let tab_width: usize = tab_spans.iter().map(|s| s.content.chars().count()).sum();
+    let padding = (area.width as usize).saturating_sub(logo_width + tab_width);
+
+    let mut spans = vec![Span::styled(logo, app.theme.header)];
+    spans.push(Span::raw(" ".repeat(padding)));
+    spans.extend(tab_spans);
+
+    let paragraph = Paragraph::new(Line::from(spans));
     frame.render_widget(paragraph, area);
 }
 
-fn current_tab_spans(screen: &Screen, theme: &crate::tui::theme::Theme) -> Vec<Span<'static>> {
+fn build_logo(screen: &Screen, system: &SonosSystem) -> String {
+    let mut parts = vec!["♪  S O N O S".to_string()];
+
+    // Build breadcrumb for non-root screens
+    for s in std::iter::once(screen) {
+        match s {
+            Screen::Home { .. } => {}
+            Screen::GroupView { group_id, .. } => {
+                let name = system
+                    .group_by_id(group_id)
+                    .and_then(|g| g.coordinator())
+                    .map(|c| c.name.clone())
+                    .unwrap_or_else(|| "Group".to_string());
+                parts.push(name);
+            }
+            Screen::SpeakerDetail { speaker_id } => {
+                let name = system
+                    .speaker_by_id(speaker_id)
+                    .map(|s| s.name.clone())
+                    .unwrap_or_else(|| "Speaker".to_string());
+                parts.push(name);
+            }
+        }
+    }
+
+    parts.join("  ›  ")
+}
+
+fn build_tab_spans(screen: &Screen, theme: &crate::tui::theme::Theme) -> Vec<Span<'static>> {
     match screen {
         Screen::Home {
             tab, tab_focused, ..
@@ -231,24 +162,15 @@ fn render_tab_labels(
     let mut spans = Vec::new();
     for (i, (label, is_active)) in tabs.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::raw(" "));
+            spans.push(Span::raw("      "));
         }
-        let style = if *is_active && focused {
-            // Tab bar focused + this is the active tab: highlighted
-            theme.accent
-        } else if *is_active {
-            // Active tab but tab bar not focused: just brackets, muted
-            theme.muted
+        if *is_active {
+            let style = if focused { theme.accent } else { theme.header };
+            spans.push(Span::styled(format!("[▸{label}]"), style));
         } else {
-            // Inactive tab: dimmer
-            theme.muted
-        };
-        let text = if *is_active {
-            format!("[{label}]")
-        } else {
-            format!(" {label} ")
-        };
-        spans.push(Span::styled(text, style));
+            let style = theme.muted;
+            spans.push(Span::styled(label.to_string(), style));
+        }
     }
     spans
 }
@@ -262,24 +184,24 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
         Screen::Home {
             tab: HomeTab::Groups,
             ..
-        } => "↑↓←→ Navigate  Enter Open group  q Quit",
+        } => "↑↓←→ Navigate   ⏎ Open   ␣ Play/Pause   ⎋ Quit",
         Screen::Home {
             tab: HomeTab::Speakers,
             ..
-        } => "↑↓ Navigate  n New group  d Ungroup  Enter Move  q Quit",
+        } => "↑↓ Navigate   n New group   d Ungroup   ⏎ Move   ⎋ Quit",
         Screen::GroupView {
             tab: GroupTab::NowPlaying,
             ..
-        } => "←→ Tabs  Esc Back",
+        } => "←→ Tabs   ⎋ Back",
         Screen::GroupView {
             tab: GroupTab::Speakers,
             ..
-        } => "←→ Tabs  Enter Open speaker  Esc Back",
+        } => "←→ Tabs   ⏎ Open speaker   ⎋ Back",
         Screen::GroupView {
             tab: GroupTab::Queue,
             ..
-        } => "←→ Tabs  Esc Back",
-        Screen::SpeakerDetail { .. } => "Esc Back",
+        } => "←→ Tabs   ⎋ Back",
+        Screen::SpeakerDetail { .. } => "⎋ Back",
     };
 
     let paragraph = Paragraph::new(text).style(app.theme.legend);

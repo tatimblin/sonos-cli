@@ -8,8 +8,8 @@ use sonos_sdk::PlaybackState;
 use crate::tui::app::{App, HomeGroupsState};
 use crate::tui::widgets::group_card::{self, GroupCardData, PlaybackIcon};
 
-/// Minimum card height (border + 5 content lines).
-const CARD_HEIGHT: u16 = 7;
+/// Card height (border + 7 content lines).
+const CARD_HEIGHT: u16 = 9;
 
 /// Render the Groups tab content.
 pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState) {
@@ -72,10 +72,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
                 _ => PlaybackIcon::Stopped,
             };
 
-            let track_display = current_track
+            let (track_title, track_artist) = current_track
                 .as_ref()
                 .filter(|t| !t.is_empty())
-                .map(|t| t.display())
+                .map(|t| {
+                    (
+                        t.title.clone().unwrap_or_default(),
+                        t.artist.clone().unwrap_or_default(),
+                    )
+                })
                 .unwrap_or_default();
 
             let volume = group_volume.map(|v| v.value()).unwrap_or(0);
@@ -102,18 +107,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
             let speaker_count_text = if members.len() <= 1 {
                 coordinator.model_name.clone()
             } else {
-                format!(
-                    "{} + {} speaker{}",
-                    coordinator.model_name,
-                    members.len() - 1,
-                    if members.len() == 2 { "" } else { "s" }
-                )
+                format!("{} + {}", coordinator.model_name, members.len() - 1)
             };
 
             let data = GroupCardData {
                 group_name: coordinator.name.clone(),
                 playback_state: playback_icon,
-                track_display,
+                track_title,
+                track_artist,
                 volume,
                 progress,
                 elapsed_ms,
