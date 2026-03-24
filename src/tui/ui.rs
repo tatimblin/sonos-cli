@@ -24,7 +24,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_breadcrumb(frame, header_area, app);
 
     match app.navigation.current() {
-        Screen::Home { tab } => render_home(frame, content_area, app, tab),
+        Screen::Home { tab, .. } => render_home(frame, content_area, app, tab),
         Screen::GroupView { group_id, tab } => {
             render_group_view(frame, content_area, app, group_id, tab)
         }
@@ -77,7 +77,7 @@ fn render_breadcrumb(frame: &mut Frame, area: Rect, app: &App) {
 
 fn current_tab_text(screen: &Screen) -> Option<String> {
     match screen {
-        Screen::Home { tab } => {
+        Screen::Home { tab, .. } => {
             let groups = if *tab == HomeTab::Groups {
                 "[Groups]"
             } else {
@@ -120,10 +120,12 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
     let text = match app.navigation.current() {
         Screen::Home {
             tab: HomeTab::Groups,
-        } => "←→ Tabs  Enter Open group  q Quit",
+            ..
+        } => "Tab Switch  ↑↓←→ Select  Enter Open group  q Quit",
         Screen::Home {
             tab: HomeTab::Speakers,
-        } => "←→ Tabs  Enter Open speaker  q Quit",
+            ..
+        } => "Tab Switch  ↑↓ Navigate  n New group  d Ungroup  Enter Move  q Quit",
         Screen::GroupView {
             tab: GroupTab::NowPlaying,
             ..

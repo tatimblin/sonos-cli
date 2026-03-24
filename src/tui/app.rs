@@ -3,6 +3,9 @@
 // Fields and variants used by tests now and by M7+ screens later.
 #![allow(dead_code)]
 
+use std::collections::{HashMap, HashSet};
+use std::time::Instant;
+
 use crate::config::Config;
 use crate::tui::theme::Theme;
 use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
@@ -17,6 +20,14 @@ pub struct App {
     pub dirty: bool,
     pub config: Config,
     pub theme: Theme,
+    /// Per-group progress interpolation state for smooth animation.
+    pub progress_states: HashMap<GroupId, ProgressState>,
+    /// Tracks which properties are currently watched for clean teardown.
+    pub watch_registry: HashSet<(SpeakerId, &'static str)>,
+    /// Inline status message (e.g. errors from speaker actions). Cleared on next key press.
+    pub status_message: Option<String>,
+    /// Terminal width cached from last render/resize, used for grid navigation.
+    pub terminal_width: u16,
 }
 
 impl App {
@@ -29,7 +40,48 @@ impl App {
             dirty: true, // first frame always renders
             config,
             theme,
+            progress_states: HashMap::new(),
+            watch_registry: HashSet::new(),
+            status_message: None,
+            terminal_width: 80, // updated on first render/resize
         })
+    }
+}
+
+/// Client-side progress interpolation state for a single group.
+#[derive(Clone, Debug)]
+pub struct ProgressState {
+    pub last_position_ms: u64,
+    pub last_duration_ms: u64,
+    pub wall_clock_at_last_update: Instant,
+    pub is_playing: bool,
+}
+
+impl ProgressState {
+    pub fn new(position_ms: u64, duration_ms: u64, is_playing: bool) -> Self {
+        Self {
+            last_position_ms: position_ms,
+            last_duration_ms: duration_ms,
+            wall_clock_at_last_update: Instant::now(),
+            is_playing,
+        }
+    }
+
+    /// Compute interpolated position in milliseconds.
+    pub fn interpolated_position_ms(&self) -> u64 {
+        if !self.is_playing {
+            return self.last_position_ms;
+        }
+        let elapsed = self.wall_clock_at_last_update.elapsed().as_millis() as u64;
+        (self.last_position_ms + elapsed).min(self.last_duration_ms)
+    }
+
+    /// Compute interpolated progress ratio (0.0–1.0).
+    pub fn interpolated_progress(&self) -> f64 {
+        if self.last_duration_ms == 0 {
+            return 0.0;
+        }
+        self.interpolated_position_ms() as f64 / self.last_duration_ms as f64
     }
 }
 
@@ -49,6 +101,8 @@ impl Navigation {
         Self {
             stack: vec![Screen::Home {
                 tab: HomeTab::default(),
+                groups_state: HomeGroupsState::default(),
+                speakers_state: HomeSpeakersState::default(),
             }],
         }
     }
@@ -84,9 +138,42 @@ impl Navigation {
 
 #[derive(Clone, Debug)]
 pub enum Screen {
-    Home { tab: HomeTab },
-    GroupView { group_id: GroupId, tab: GroupTab },
-    SpeakerDetail { speaker_id: SpeakerId },
+    Home {
+        tab: HomeTab,
+        groups_state: HomeGroupsState,
+        speakers_state: HomeSpeakersState,
+    },
+    GroupView {
+        group_id: GroupId,
+        tab: GroupTab,
+    },
+    SpeakerDetail {
+        speaker_id: SpeakerId,
+    },
+}
+
+/// UI state for the Home > Groups tab.
+#[derive(Clone, Debug, Default)]
+pub struct HomeGroupsState {
+    pub selected_index: usize,
+    pub scroll_offset: usize,
+}
+
+/// UI state for the Home > Speakers tab.
+#[derive(Clone, Debug, Default)]
+pub struct HomeSpeakersState {
+    pub selected_index: usize,
+    pub scroll_offset: usize,
+    /// Active modal (e.g. group picker for move-to-group).
+    pub modal: Option<ModalState>,
+}
+
+/// State for a modal overlay (e.g. group picker).
+#[derive(Clone, Debug)]
+pub struct ModalState {
+    pub title: String,
+    pub items: Vec<String>,
+    pub selected_index: usize,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -146,11 +233,11 @@ mod tests {
     #[test]
     fn current_mut_allows_tab_switch() {
         let mut nav = Navigation::new();
-        *nav.current_mut() = Screen::Home {
-            tab: HomeTab::Speakers,
-        };
+        if let Screen::Home { ref mut tab, .. } = nav.current_mut() {
+            *tab = HomeTab::Speakers;
+        }
         match nav.current() {
-            Screen::Home { tab } => assert_eq!(*tab, HomeTab::Speakers),
+            Screen::Home { tab, .. } => assert_eq!(*tab, HomeTab::Speakers),
             _ => panic!("expected Home screen"),
         }
     }
