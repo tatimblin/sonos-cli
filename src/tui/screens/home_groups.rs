@@ -24,7 +24,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
     }
 
     let cols = if area.width >= 100 { 2usize } else { 1 };
-    let rows = (groups.len() + cols - 1) / cols;
+    let rows = groups.len().div_ceil(cols);
 
     // Build row constraints
     let row_constraints: Vec<Constraint> = (0..rows)

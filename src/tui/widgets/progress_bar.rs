@@ -23,6 +23,7 @@ pub fn format_time(ms: u64) -> String {
 /// Render a progress bar as a `Line` within the given character width.
 ///
 /// Pattern: `━━━━━━━╺──── 2:31/5:55`
+#[allow(clippy::too_many_arguments)]
 pub fn render_progress_bar(
     progress: f64,
     elapsed_ms: u64,
