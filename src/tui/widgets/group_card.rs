@@ -8,6 +8,18 @@ use ratatui::Frame;
 use crate::tui::theme::Theme;
 use crate::tui::widgets::progress_bar;
 
+// Pre-computed bar strings — sliced per-frame instead of allocating via `.repeat()`.
+// All chars below are 3 bytes in UTF-8. 100 chars covers any reasonable terminal width.
+const VOL_FILLED: &str = "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■";
+const VOL_EMPTY: &str = "····································································································";
+const PROG_FILLED: &str = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+const PROG_EMPTY: &str = "────────────────────────────────────────────────────────────────────────────────────────────────────────";
+const SPACES: &str = "                                                                                                    ";
+
+const VOL_FILLED_CHAR_BYTES: usize = 3; // ■ U+25A0
+const VOL_EMPTY_CHAR_BYTES: usize = 2; // · U+00B7
+const PROG_CHAR_BYTES: usize = 3; // ━ U+2501, ─ U+2500
+
 /// Data needed to render a single group card.
 pub struct GroupCardData {
     pub group_name: String,
@@ -87,13 +99,17 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
     // Line 1: ●/○ Name          ▶ Playing
     let prefix = if data.selected { "● " } else { "○ " };
     let left = format!("{prefix}{}", data.group_name);
-    let right = format!("{} {}", data.playback_state.symbol(), data.playback_state.label());
+    let right = format!(
+        "{} {}",
+        data.playback_state.symbol(),
+        data.playback_state.label()
+    );
     let left_width = left.chars().count();
     let right_width = right.chars().count();
-    let pad = w.saturating_sub(left_width + right_width);
+    let pad = w.saturating_sub(left_width + right_width).min(100);
     let line1 = Line::from(vec![
         Span::styled(left, theme.card_title),
-        Span::raw(" ".repeat(pad)),
+        Span::raw(&SPACES[..pad]),
         Span::styled(right, icon_style),
     ]);
 
@@ -139,13 +155,21 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
     } else {
         ""
     };
+    let filled_count = filled_count.min(100);
+    let empty_count = empty_count.min(100);
     let line6 = Line::from(vec![
         Span::raw("  "),
         Span::styled(data.playback_state.symbol(), icon_style),
         Span::raw("  "),
-        Span::styled("━".repeat(filled_count), theme.progress_filled),
-        Span::styled(cursor.to_string(), theme.progress_cursor),
-        Span::styled("─".repeat(empty_count), theme.progress_empty),
+        Span::styled(
+            &PROG_FILLED[..filled_count * PROG_CHAR_BYTES],
+            theme.progress_filled,
+        ),
+        Span::styled(cursor, theme.progress_cursor),
+        Span::styled(
+            &PROG_EMPTY[..empty_count * PROG_CHAR_BYTES],
+            theme.progress_empty,
+        ),
         Span::styled(time_text, theme.progress_time),
     ]);
 
@@ -155,19 +179,27 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
     let spk_text = &data.speaker_count_text;
     let spk_display = format!("  {spk_text}");
     let spk_len = spk_display.chars().count();
-    let spk_pad = half_w.saturating_sub(spk_len);
+    let spk_pad = half_w.saturating_sub(spk_len).min(100);
     // volume prefix: 🔊(2) + " " = 3 display cols; suffix: " XX%"
     let vol_label = format!(" {}%", data.volume);
     let vol_prefix_width = 3;
     let vol_bar_width = half_w.saturating_sub(vol_prefix_width + vol_label.len());
     let vol_filled = ((vol_bar_width as f64) * (data.volume as f64) / 100.0) as usize;
     let vol_empty = vol_bar_width.saturating_sub(vol_filled);
+    let vol_filled = vol_filled.min(100);
+    let vol_empty = vol_empty.min(100);
     let line7 = Line::from(vec![
         Span::styled(spk_display, theme.muted),
-        Span::raw(" ".repeat(spk_pad)),
+        Span::raw(&SPACES[..spk_pad]),
         Span::raw("🔊 "),
-        Span::styled("■".repeat(vol_filled), theme.volume_filled),
-        Span::styled("·".repeat(vol_empty), theme.volume_empty),
+        Span::styled(
+            &VOL_FILLED[..vol_filled * VOL_FILLED_CHAR_BYTES],
+            theme.volume_filled,
+        ),
+        Span::styled(
+            &VOL_EMPTY[..vol_empty * VOL_EMPTY_CHAR_BYTES],
+            theme.volume_empty,
+        ),
         Span::styled(vol_label, theme.muted),
     ]);
 
@@ -199,10 +231,7 @@ pub fn render_unavailable_card(
     frame.render_widget(block, area);
 
     let lines = vec![
-        Line::from(Span::styled(
-            format!("○ {group_name}"),
-            theme.card_title,
-        )),
+        Line::from(Span::styled(format!("○ {group_name}"), theme.card_title)),
         Line::raw(""),
         Line::from(Span::styled("  Unavailable", theme.muted)),
     ];

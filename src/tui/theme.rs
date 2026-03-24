@@ -34,12 +34,6 @@ pub struct Theme {
     pub progress_cursor: Style,
     pub progress_time: Style,
 
-    // Mini-player (unused in current layout, kept for Group View)
-    #[allow(dead_code)]
-    pub mini_player_border: Style,
-    #[allow(dead_code)]
-    pub mini_player_title: Style,
-
     // Speakers tab
     pub group_header: Style,
     pub speaker_cursor: Style,
@@ -73,12 +67,8 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             card_border: Style::new().fg(Color::DarkGray),
-            card_border_selected: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-            card_title: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            card_border_selected: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+            card_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::Gray),
 
             playing_icon: Style::new().fg(Color::Green),
@@ -93,11 +83,6 @@ impl Theme {
             progress_cursor: Style::new().fg(Color::White),
             progress_time: Style::new().fg(Color::DarkGray),
 
-            mini_player_border: Style::new().fg(Color::DarkGray),
-            mini_player_title: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-
             group_header: Style::new()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -105,9 +90,7 @@ impl Theme {
             speaker_name: Style::new().fg(Color::Gray),
 
             modal_border: Style::new().fg(Color::White),
-            modal_title: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            modal_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             modal_selected: Style::new()
                 .fg(Color::Black)
                 .bg(Color::White)
@@ -125,12 +108,8 @@ impl Theme {
             muted: Style::new().fg(Color::Gray),
 
             card_border: Style::new().fg(Color::Gray),
-            card_border_selected: Style::new()
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD),
-            card_title: Style::new()
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD),
+            card_border_selected: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
+            card_title: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::DarkGray),
 
             playing_icon: Style::new().fg(Color::Green),
@@ -145,11 +124,6 @@ impl Theme {
             progress_cursor: Style::new().fg(Color::Black),
             progress_time: Style::new().fg(Color::Gray),
 
-            mini_player_border: Style::new().fg(Color::Gray),
-            mini_player_title: Style::new()
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD),
-
             group_header: Style::new()
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -157,9 +131,7 @@ impl Theme {
             speaker_name: Style::new().fg(Color::DarkGray),
 
             modal_border: Style::new().fg(Color::Black),
-            modal_title: Style::new()
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD),
+            modal_title: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
             modal_selected: Style::new()
                 .fg(Color::White)
                 .bg(Color::Black)
@@ -172,19 +144,13 @@ impl Theme {
 
     pub fn neon() -> Self {
         Self {
-            header: Style::new()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
+            header: Style::new().fg(Color::Magenta).add_modifier(Modifier::BOLD),
             legend: Style::new().fg(Color::DarkGray),
             muted: Style::new().fg(Color::DarkGray),
 
             card_border: Style::new().fg(Color::DarkGray),
-            card_border_selected: Style::new()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-            card_title: Style::new()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+            card_border_selected: Style::new().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            card_title: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::LightMagenta),
 
             playing_icon: Style::new().fg(Color::Green),
@@ -199,11 +165,6 @@ impl Theme {
             progress_cursor: Style::new().fg(Color::Cyan),
             progress_time: Style::new().fg(Color::DarkGray),
 
-            mini_player_border: Style::new().fg(Color::Magenta),
-            mini_player_title: Style::new()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-
             group_header: Style::new()
                 .fg(Color::Magenta)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -211,9 +172,7 @@ impl Theme {
             speaker_name: Style::new().fg(Color::LightMagenta),
 
             modal_border: Style::new().fg(Color::Magenta),
-            modal_title: Style::new()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+            modal_title: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             modal_selected: Style::new()
                 .fg(Color::Black)
                 .bg(Color::Magenta)
@@ -232,12 +191,8 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             card_border: Style::new().fg(Color::DarkGray),
-            card_border_selected: Style::new()
-                .fg(orange)
-                .add_modifier(Modifier::BOLD),
-            card_title: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            card_border_selected: Style::new().fg(orange).add_modifier(Modifier::BOLD),
+            card_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::Gray),
 
             playing_icon: Style::new().fg(orange),
@@ -252,11 +207,6 @@ impl Theme {
             progress_cursor: Style::new().fg(orange),
             progress_time: Style::new().fg(Color::DarkGray),
 
-            mini_player_border: Style::new().fg(Color::DarkGray),
-            mini_player_title: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-
             group_header: Style::new()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
@@ -264,9 +214,7 @@ impl Theme {
             speaker_name: Style::new().fg(Color::Gray),
 
             modal_border: Style::new().fg(orange),
-            modal_title: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            modal_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             modal_selected: Style::new()
                 .fg(Color::Black)
                 .bg(orange)

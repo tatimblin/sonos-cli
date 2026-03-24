@@ -3,10 +3,24 @@
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
+// Pre-computed bar strings — sliced per-frame instead of allocating via `.repeat()`.
+// 100 chars each covers any reasonable terminal width.
+// ■ = 3 bytes UTF-8, · = 2 bytes UTF-8.
+const FILLED: &str = "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■";
+const EMPTY: &str = "····································································································";
+
+const FILLED_CHAR_BYTES: usize = 3; // ■ U+25A0
+const EMPTY_CHAR_BYTES: usize = 2; // · U+00B7
+
 /// Render a volume bar as a `Line` within the given character width.
 ///
 /// Pattern: `■■■■■■■■···· 80%`
-pub fn render_volume_bar(level: u16, width: u16, filled_style: Style, empty_style: Style) -> Line<'static> {
+pub fn render_volume_bar(
+    level: u16,
+    width: u16,
+    filled_style: Style,
+    empty_style: Style,
+) -> Line<'static> {
     let label = format!(" {level}%");
     let label_width = label.len() as u16;
     let bar_width = width.saturating_sub(label_width + 1) as usize;
@@ -22,12 +36,12 @@ pub fn render_volume_bar(level: u16, width: u16, filled_style: Style, empty_styl
     };
     let empty_count = bar_width.saturating_sub(filled_count);
 
-    let filled_str: String = "■".repeat(filled_count);
-    let empty_str: String = "·".repeat(empty_count);
+    let filled_count = filled_count.min(100);
+    let empty_count = empty_count.min(100);
 
     Line::from(vec![
-        Span::styled(filled_str, filled_style),
-        Span::styled(empty_str, empty_style),
+        Span::styled(&FILLED[..filled_count * FILLED_CHAR_BYTES], filled_style),
+        Span::styled(&EMPTY[..empty_count * EMPTY_CHAR_BYTES], empty_style),
         Span::styled(label, filled_style),
     ])
 }

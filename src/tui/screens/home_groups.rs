@@ -27,9 +27,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
     let rows = groups.len().div_ceil(cols);
 
     // Build row constraints
-    let row_constraints: Vec<Constraint> = (0..rows)
-        .map(|_| Constraint::Length(CARD_HEIGHT))
-        .collect();
+    let row_constraints: Vec<Constraint> =
+        (0..rows).map(|_| Constraint::Length(CARD_HEIGHT)).collect();
 
     let row_areas = Layout::vertical(row_constraints).split(area);
 

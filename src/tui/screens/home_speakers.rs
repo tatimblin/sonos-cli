@@ -4,9 +4,40 @@ use ratatui::layout::{Alignment, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
+use sonos_sdk::SpeakerId;
 
 use crate::tui::app::{App, HomeSpeakersState};
 use crate::tui::widgets::{modal, volume_bar};
+
+/// Returns speakers in display order (multi-member group members first, then
+/// standalone speakers). This ordering is shared between the renderer and the
+/// event handlers so `selected_index` always maps to the visually highlighted row.
+pub fn speakers_in_display_order(app: &App) -> Vec<SpeakerId> {
+    let groups = app.system.groups();
+    let mut ids = Vec::new();
+
+    // Multi-member groups first
+    for group in &groups {
+        if group.is_standalone() {
+            continue;
+        }
+        for member in group.members() {
+            ids.push(member.id.clone());
+        }
+    }
+
+    // Standalone speakers
+    for group in &groups {
+        if !group.is_standalone() {
+            continue;
+        }
+        if let Some(coordinator) = group.coordinator() {
+            ids.push(coordinator.id.clone());
+        }
+    }
+
+    ids
+}
 
 /// Render the Speakers tab content.
 pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersState) {
@@ -71,10 +102,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
 
             let mut spans = vec![
                 Span::styled(cursor.to_string(), cursor_style),
-                Span::styled(
-                    format!("{}{role_suffix}", member.name),
-                    cursor_style,
-                ),
+                Span::styled(format!("{}{role_suffix}", member.name), cursor_style),
                 Span::raw("  "),
             ];
             spans.extend(vol_line.spans);

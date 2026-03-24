@@ -29,7 +29,13 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_header(frame, header_area, app);
 
     // Separator between header and content
-    draw_separator(frame, area.y + 1, area.x, area.x + area.width - 1, app.theme.muted);
+    draw_separator(
+        frame,
+        area.y + 1,
+        area.x,
+        area.x + area.width - 1,
+        app.theme.muted,
+    );
 
     // Content area
     let content_area = Rect::new(
@@ -104,31 +110,26 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn build_logo(screen: &Screen, system: &SonosSystem) -> String {
-    let mut parts = vec!["♪  S O N O S".to_string()];
+    let base = "♪  S O N O S";
 
-    // Build breadcrumb for non-root screens
-    for s in std::iter::once(screen) {
-        match s {
-            Screen::Home { .. } => {}
-            Screen::GroupView { group_id, .. } => {
-                let name = system
-                    .group_by_id(group_id)
-                    .and_then(|g| g.coordinator())
-                    .map(|c| c.name.clone())
-                    .unwrap_or_else(|| "Group".to_string());
-                parts.push(name);
-            }
-            Screen::SpeakerDetail { speaker_id } => {
-                let name = system
-                    .speaker_by_id(speaker_id)
-                    .map(|s| s.name.clone())
-                    .unwrap_or_else(|| "Speaker".to_string());
-                parts.push(name);
-            }
+    match screen {
+        Screen::Home { .. } => base.to_string(),
+        Screen::GroupView { group_id, .. } => {
+            let name = system
+                .group_by_id(group_id)
+                .and_then(|g| g.coordinator())
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| "Group".to_string());
+            format!("{base}  ›  {name}")
+        }
+        Screen::SpeakerDetail { speaker_id } => {
+            let name = system
+                .speaker_by_id(speaker_id)
+                .map(|s| s.name.clone())
+                .unwrap_or_else(|| "Speaker".to_string());
+            format!("{base}  ›  {name}")
         }
     }
-
-    parts.join("  ›  ")
 }
 
 fn build_tab_spans(screen: &Screen, theme: &crate::tui::theme::Theme) -> Vec<Span<'static>> {

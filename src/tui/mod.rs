@@ -4,6 +4,7 @@
 
 mod app;
 mod event;
+mod handlers;
 mod screens;
 mod theme;
 mod ui;

@@ -1,8 +1,5 @@
 //! TUI application state and navigation types.
 
-// Fields and variants used by tests now and by M7+ screens later.
-#![allow(dead_code)]
-
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -18,6 +15,7 @@ pub struct App {
     pub navigation: Navigation,
     pub should_quit: bool,
     pub dirty: bool,
+    #[allow(dead_code)] // used in future milestones
     pub config: Config,
     pub theme: Theme,
     /// Per-group progress interpolation state for smooth animation.
@@ -68,15 +66,19 @@ impl ProgressState {
     }
 
     /// Compute interpolated position in milliseconds.
+    ///
+    /// Caps interpolation at 10s ahead to limit drift from system sleep/stalls.
     pub fn interpolated_position_ms(&self) -> u64 {
         if !self.is_playing {
             return self.last_position_ms;
         }
         let elapsed = self.wall_clock_at_last_update.elapsed().as_millis() as u64;
-        (self.last_position_ms + elapsed).min(self.last_duration_ms)
+        let capped_elapsed = elapsed.min(10_000);
+        (self.last_position_ms + capped_elapsed).min(self.last_duration_ms)
     }
 
     /// Compute interpolated progress ratio (0.0–1.0).
+    #[allow(dead_code)] // used in future milestones
     pub fn interpolated_progress(&self) -> f64 {
         if self.last_duration_ms == 0 {
             return 0.0;
@@ -149,6 +151,7 @@ pub enum Screen {
         group_id: GroupId,
         tab: GroupTab,
     },
+    #[allow(dead_code)] // used in future milestones
     SpeakerDetail {
         speaker_id: SpeakerId,
     },
@@ -158,14 +161,12 @@ pub enum Screen {
 #[derive(Clone, Debug, Default)]
 pub struct HomeGroupsState {
     pub selected_index: usize,
-    pub scroll_offset: usize,
 }
 
 /// UI state for the Home > Speakers tab.
 #[derive(Clone, Debug, Default)]
 pub struct HomeSpeakersState {
     pub selected_index: usize,
-    pub scroll_offset: usize,
     /// Active modal (e.g. group picker for move-to-group).
     pub modal: Option<ModalState>,
 }
