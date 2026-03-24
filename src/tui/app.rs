@@ -101,6 +101,7 @@ impl Navigation {
         Self {
             stack: vec![Screen::Home {
                 tab: HomeTab::default(),
+                tab_focused: false,
                 groups_state: HomeGroupsState::default(),
                 speakers_state: HomeSpeakersState::default(),
             }],
@@ -140,6 +141,7 @@ impl Navigation {
 pub enum Screen {
     Home {
         tab: HomeTab,
+        tab_focused: bool,
         groups_state: HomeGroupsState,
         speakers_state: HomeSpeakersState,
     },

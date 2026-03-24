@@ -289,15 +289,47 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
     // Screen-specific keys
     match app.navigation.current().clone() {
-        Screen::Home { tab, .. } => handle_home_key(app, key, &tab),
+        Screen::Home {
+            tab, tab_focused, ..
+        } => handle_home_key(app, key, &tab, tab_focused),
         Screen::GroupView { group_id, tab } => handle_group_key(app, key, &group_id, &tab),
         Screen::SpeakerDetail { .. } => handle_speaker_key(app, key),
     }
 }
 
-fn handle_home_key(app: &mut App, key: KeyEvent, tab: &HomeTab) {
+fn handle_home_key(app: &mut App, key: KeyEvent, tab: &HomeTab, tab_focused: bool) {
     // Clear status message on any key press
     app.status_message = None;
+
+    // When tab bar is focused, Left/Right switch tabs, Down/Enter return to content
+    if tab_focused {
+        match key.code {
+            KeyCode::Left | KeyCode::Right => {
+                if let Screen::Home {
+                    ref mut tab,
+                    ref mut tab_focused,
+                    ..
+                } = app.navigation.current_mut()
+                {
+                    *tab = match tab {
+                        HomeTab::Groups => HomeTab::Speakers,
+                        HomeTab::Speakers => HomeTab::Groups,
+                    };
+                    *tab_focused = false;
+                }
+            }
+            KeyCode::Down | KeyCode::Enter => {
+                if let Screen::Home {
+                    ref mut tab_focused, ..
+                } = app.navigation.current_mut()
+                {
+                    *tab_focused = false;
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
 
     match tab {
         HomeTab::Groups => handle_home_groups_key(app, key),
@@ -311,19 +343,18 @@ fn handle_home_groups_key(app: &mut App, key: KeyEvent) {
     let cols = if app.terminal_width >= 100 { 2 } else { 1 };
 
     match key.code {
-        KeyCode::Tab | KeyCode::BackTab => {
-            if let Screen::Home { ref mut tab, .. } = app.navigation.current_mut() {
-                *tab = HomeTab::Speakers;
-            }
-        }
         KeyCode::Up => {
             if let Screen::Home {
                 ref mut groups_state,
+                ref mut tab_focused,
                 ..
             } = app.navigation.current_mut()
             {
                 if total > 0 && groups_state.selected_index >= cols {
                     groups_state.selected_index -= cols;
+                } else {
+                    // Already at top row — focus the tab bar
+                    *tab_focused = true;
                 }
             }
         }
@@ -388,14 +419,10 @@ fn handle_home_speakers_key(app: &mut App, key: KeyEvent) {
     let speaker_count = app.system.speakers().len();
 
     match key.code {
-        KeyCode::Tab | KeyCode::BackTab => {
-            if let Screen::Home { ref mut tab, .. } = app.navigation.current_mut() {
-                *tab = HomeTab::Groups;
-            }
-        }
         KeyCode::Up => {
             if let Screen::Home {
                 ref mut speakers_state,
+                ref mut tab_focused,
                 ..
             } = app.navigation.current_mut()
             {
@@ -407,6 +434,9 @@ fn handle_home_speakers_key(app: &mut App, key: KeyEvent) {
                 }
                 if speakers_state.selected_index > 0 {
                     speakers_state.selected_index -= 1;
+                } else {
+                    // Already at top — focus the tab bar
+                    *tab_focused = true;
                 }
             }
         }

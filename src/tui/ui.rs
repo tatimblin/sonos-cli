@@ -48,6 +48,7 @@ pub fn render(frame: &mut Frame, app: &App) {
             tab,
             groups_state,
             speakers_state,
+            ..
         } => {
             match tab {
                 HomeTab::Groups => home_groups::render(frame, content_area, app, groups_state),
@@ -189,50 +190,67 @@ fn render_breadcrumb(frame: &mut Frame, area: Rect, app: &App) {
 
     let mut spans = vec![Span::styled(&breadcrumb, app.theme.header)];
 
-    if let Some(tab_text) = current_tab_text(app.navigation.current()) {
+    let tab_spans = current_tab_spans(app.navigation.current(), &app.theme);
+    if !tab_spans.is_empty() {
         spans.push(Span::raw("  "));
-        spans.push(Span::styled(tab_text, app.theme.muted));
+        spans.extend(tab_spans);
     }
 
     let paragraph = Paragraph::new(Line::from(spans)).style(app.theme.header);
     frame.render_widget(paragraph, area);
 }
 
-fn current_tab_text(screen: &Screen) -> Option<String> {
+fn current_tab_spans(screen: &Screen, theme: &crate::tui::theme::Theme) -> Vec<Span<'static>> {
     match screen {
-        Screen::Home { tab, .. } => {
-            let groups = if *tab == HomeTab::Groups {
-                "[Groups]"
-            } else {
-                " Groups "
-            };
-            let speakers = if *tab == HomeTab::Speakers {
-                "[Speakers]"
-            } else {
-                " Speakers "
-            };
-            Some(format!("{groups} {speakers}"))
+        Screen::Home {
+            tab, tab_focused, ..
+        } => {
+            let tabs = [
+                ("Groups", *tab == HomeTab::Groups),
+                ("Speakers", *tab == HomeTab::Speakers),
+            ];
+            render_tab_labels(&tabs, *tab_focused, theme)
         }
         Screen::GroupView { tab, .. } => {
-            let np = if *tab == GroupTab::NowPlaying {
-                "[NowPlaying]"
-            } else {
-                " NowPlaying "
-            };
-            let sp = if *tab == GroupTab::Speakers {
-                "[Speakers]"
-            } else {
-                " Speakers "
-            };
-            let q = if *tab == GroupTab::Queue {
-                "[Queue]"
-            } else {
-                " Queue "
-            };
-            Some(format!("{np} {sp} {q}"))
+            let tabs = [
+                ("NowPlaying", *tab == GroupTab::NowPlaying),
+                ("Speakers", *tab == GroupTab::Speakers),
+                ("Queue", *tab == GroupTab::Queue),
+            ];
+            render_tab_labels(&tabs, false, theme)
         }
-        Screen::SpeakerDetail { .. } => None,
+        Screen::SpeakerDetail { .. } => vec![],
     }
+}
+
+fn render_tab_labels(
+    tabs: &[(&str, bool)],
+    focused: bool,
+    theme: &crate::tui::theme::Theme,
+) -> Vec<Span<'static>> {
+    let mut spans = Vec::new();
+    for (i, (label, is_active)) in tabs.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw(" "));
+        }
+        let style = if *is_active && focused {
+            // Tab bar focused + this is the active tab: highlighted
+            theme.accent
+        } else if *is_active {
+            // Active tab but tab bar not focused: just brackets, muted
+            theme.muted
+        } else {
+            // Inactive tab: dimmer
+            theme.muted
+        };
+        let text = if *is_active {
+            format!("[{label}]")
+        } else {
+            format!(" {label} ")
+        };
+        spans.push(Span::styled(text, style));
+    }
+    spans
 }
 
 // ---------------------------------------------------------------------------
@@ -244,11 +262,11 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
         Screen::Home {
             tab: HomeTab::Groups,
             ..
-        } => "Tab Switch  ↑↓←→ Select  Enter Open group  q Quit",
+        } => "↑↓←→ Navigate  Enter Open group  q Quit",
         Screen::Home {
             tab: HomeTab::Speakers,
             ..
-        } => "Tab Switch  ↑↓ Navigate  n New group  d Ungroup  Enter Move  q Quit",
+        } => "↑↓ Navigate  n New group  d Ungroup  Enter Move  q Quit",
         Screen::GroupView {
             tab: GroupTab::NowPlaying,
             ..
