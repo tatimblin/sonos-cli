@@ -495,8 +495,8 @@ The landing experience. Must feel live and scannable.
 
 ### Groups Tab (default)
 
-- [ ] Responsive group card grid: 2 columns on terminals ≥ 100 chars wide, 1 column on narrow
-- [ ] Each group card widget rendering:
+- [x] Responsive group card grid: 2 columns on terminals ≥ 100 chars wide, 1 column on narrow
+- [x] Each group card widget rendering:
   - Group name (bold)
   - Playback state icon: `▶` Playing, `⏸` Paused, `■` Stopped
   - Current track + artist (marquee scroll if truncated)
@@ -504,42 +504,42 @@ The landing experience. Must feel live and scannable.
   - Animated progress bar: `━━━━━━━╺──── 2:31/5:55` with elapsed/total
   - Speaker count: `Beam + 2 surrounds`
 
-- [ ] Selected card: double border (`BorderType::Double`) + bold + `●` indicator
-- [ ] Arrow key navigation between cards (`↑↓←→`)
+- [x] Selected card: double border (`BorderType::Double`) + bold + `●` indicator
+- [x] Arrow key navigation between cards (`↑↓←→`)
 
-- [ ] Mini-player at bottom: tracks focused card
+- [x] Mini-player at bottom: tracks focused card
   - Group name + current track + progress + volume
   - Only visible on Home screen
 
 ### Property Watching for Groups Tab
 
-- [ ] On entering Groups tab, watch these properties for each group's coordinator:
+- [x] On entering Groups tab, watch these properties for each group's coordinator:
   - `speaker.current_track.watch()` — `CurrentTrack`
   - `speaker.playback_state.watch()` — `PlaybackState`
   - `speaker.position.watch()` — `Position`
   - `group.volume.watch()` — `GroupVolume`
 
-- [ ] On leaving Groups tab, `unwatch()` all of the above
+- [x] On leaving Groups tab, `unwatch()` all of the above
 
-- [ ] Handle `ChangeEvent` in event loop:
+- [x] Handle `ChangeEvent` in event loop:
   - Match `event.property_key`: `"current_track"`, `"playback_state"`, `"position"`, `"group_volume"`
   - Update corresponding card state, trigger re-render
 
 ### Progress Bar Animation
 
-- [ ] Client-side interpolation: if last known position is `Position { position_ms: 151000, duration_ms: 355000 }` and state is `Playing`, increment displayed position by elapsed wall-clock time each frame
-- [ ] Reset interpolation on `ChangeEvent` with `"position"` key (authoritative update)
-- [ ] Pause interpolation when `PlaybackState::Paused` or `Stopped`
+- [x] Client-side interpolation: if last known position is `Position { position_ms: 151000, duration_ms: 355000 }` and state is `Playing`, increment displayed position by elapsed wall-clock time each frame
+- [x] Reset interpolation on `ChangeEvent` with `"position"` key (authoritative update)
+- [x] Pause interpolation when `PlaybackState::Paused` or `Stopped`
 
 ### Speakers Tab
 
-- [ ] Speakers organized by group with group name headers
-- [ ] `"NOT IN A GROUP"` section for ungrouped speakers (standalone groups with `group.is_standalone()`)
-- [ ] `▸` cursor with `↑↓` navigation
-- [ ] `n` — create new group: pick a coordinator, calls `system.create_group(&coordinator, &[])`
-- [ ] `Enter` — move selected speaker into a group (picker modal listing available groups)
+- [x] Speakers organized by group with group name headers
+- [x] `"NOT IN A GROUP"` section for ungrouped speakers (standalone groups with `group.is_standalone()`)
+- [x] `▸` cursor with `↑↓` navigation
+- [x] `n` — create new group: pick a coordinator, calls `system.create_group(&coordinator, &[])`
+- [x] `Enter` — move selected speaker into a group (picker modal listing available groups)
   - SDK: `group.add_speaker(&speaker)`
-- [ ] `d` — ungroup selected speaker
+- [x] `d` — ungroup selected speaker
   - SDK: `speaker.leave_group()`
 
 **Exit criteria:** Home screen renders live data. Progress bars animate. State changes from the Sonos app (volume, track change, play/pause) appear on screen within 1 second.
