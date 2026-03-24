@@ -648,7 +648,16 @@ version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "dirs"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+dependencies = [
+ "dirs-sys 0.5.0",
 ]
 
 [[package]]
@@ -659,8 +668,20 @@ checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
 dependencies = [
  "libc",
  "option-ext",
- "redox_users",
+ "redox_users 0.4.6",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users 0.5.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2179,6 +2200,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_users"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
+dependencies = [
+ "getrandom 0.2.17",
+ "libredox",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "regex-automata"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2576,6 +2608,8 @@ dependencies = [
 [[package]]
 name = "sonos-api"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ff5a3f949e11b823d09209bb76f3b642c4edd5410cdb46321cc8030229abfcf"
 dependencies = [
  "paste",
  "quick-xml",
@@ -2595,7 +2629,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "crossterm",
- "dirs",
+ "dirs 6.0.0",
  "image",
  "proptest",
  "ratatui",
@@ -2611,8 +2645,10 @@ dependencies = [
 [[package]]
 name = "sonos-sdk"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e193a0a900c0e5bb36f46cc4653e032c867f0766823738f9f972fb365600aaf0"
 dependencies = [
- "dirs",
+ "dirs 5.0.1",
  "serde",
  "serde_json",
  "sonos-api",
@@ -2626,6 +2662,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-callback-server"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69d7846934d94e393f31b17533b2be7abc57287846b1578a9d4c33932d1ce9d6"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2642,6 +2680,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-discovery"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52042c1ef80df93a488c4eaf6b30da7f405f54f35ca0063be1ba3ed3039689c2"
 dependencies = [
  "quick-xml",
  "reqwest",
@@ -2651,6 +2691,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-event-manager"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1977341b5c7fa18c7b7fc10bdbaa81f103081e8d41dbacb605004979ce3c23cc"
 dependencies = [
  "dashmap",
  "sonos-api",
@@ -2664,6 +2706,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-soap-client"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81c57e9267f67b1476967fb2cf274516b89cce0409ff4a73a34899178a3fc261"
 dependencies = [
  "thiserror 1.0.69",
  "ureq",
@@ -2673,6 +2717,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-state"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb7c36334b7f157ec3a3d974d434ced0274d081f568ca6629ee3eebd4d14c6d0"
 dependencies = [
  "serde",
  "sonos-api",
@@ -2686,10 +2732,14 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-state-store"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "597c7e8bde3cf9296783d2d7c68ea2c561493d8af2fd8476f2042afb59e36333"
 
 [[package]]
 name = "sonos-sdk-stream"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a3fd662dd0b4c5085aa7faa99abd8fc7292c8c38c28b5ac4a99bc41df0c9824"
 dependencies = [
  "async-trait",
  "bytes",
