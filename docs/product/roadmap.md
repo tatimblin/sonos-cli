@@ -383,7 +383,7 @@ The TUI event loop, state management, and navigation skeleton — no real data y
 
 ### App State — `src/tui/app.rs`
 
-- [ ] `App` struct holding state:
+- [x] `App` struct holding state:
 ```rust
 pub struct App {
     pub system: SonosSystem,      // Single source of truth for speaker/group data
@@ -408,13 +408,13 @@ pub enum HomeTab { Groups, Speakers }
 pub enum GroupTab { NowPlaying, Speakers, Queue }
 ```
 
-- [ ] `Navigation::push(screen)`, `Navigation::pop() -> Option<Screen>`, `Navigation::current() -> &Screen`
+- [x] `Navigation::push(screen)`, `Navigation::pop() -> Option<Screen>`, `Navigation::current() -> &Screen`
 
 ### Terminal Setup & Teardown
 
-- [ ] Raw mode + alternate screen setup via `crossterm::terminal::{enable_raw_mode, EnterAlternateScreen}`
-- [ ] Clean teardown on exit: `disable_raw_mode`, `LeaveAlternateScreen`
-- [ ] Panic hook: restore terminal before printing panic message
+- [x] Raw mode + alternate screen setup via `crossterm::terminal::{enable_raw_mode, EnterAlternateScreen}`
+- [x] Clean teardown on exit: `disable_raw_mode`, `LeaveAlternateScreen`
+- [x] Panic hook: restore terminal before printing panic message
 ```rust
 let original_hook = std::panic::take_hook();
 std::panic::set_hook(Box::new(move |panic| {
@@ -426,8 +426,8 @@ std::panic::set_hook(Box::new(move |panic| {
 
 ### Event Loop
 
-- [ ] Tick-based loop: `crossterm::event::poll(Duration::from_millis(50))`
-- [ ] On each tick:
+- [x] Tick-based loop: `crossterm::event::poll(Duration::from_millis(50))`
+- [x] On each tick:
   1. Poll crossterm events (keyboard input)
   2. Drain `system.iter().try_iter()` for all pending `ChangeEvent`s
   3. Update `App` state from change events
@@ -457,8 +457,8 @@ loop {
 
 ### Navigation & Key Handling
 
-- [ ] `Screen` enum navigation with push/pop stack
-- [ ] Global key handler:
+- [x] `Screen` enum navigation with push/pop stack
+- [x] Global key handler:
   - `Esc` = pop navigation (quit from root)
   - `q` = quit from root screen
   - `?` = toggle help overlay
@@ -469,21 +469,21 @@ loop {
 
 ### Key Legend Bar
 
-- [ ] Bottom row widget, re-renders based on `app.navigation.current()`
-- [ ] Each `Screen` variant defines its own key legend text
-- [ ] Render as `Paragraph` in a bottom `Rect`
+- [x] Bottom row widget, re-renders based on `app.navigation.current()`
+- [x] Each `Screen` variant defines its own key legend text
+- [x] Render as `Paragraph` in a bottom `Rect`
 
 ### Breadcrumb Header
 
-- [ ] Top row: `SONOS`, `SONOS > Living Room`, `SONOS > Living Room > Beam`
-- [ ] Built from `Navigation::stack` — each `Screen` contributes its label
+- [x] Top row: `SONOS`, `SONOS > Living Room`, `SONOS > Living Room > Beam`
+- [x] Built from `Navigation::stack` — each `Screen` contributes its label
 
 ### Theme System
 
-- [ ] Load theme name from `config.theme`
-- [ ] `Theme` struct with `ratatui::style::Style` values: `bg`, `fg`, `accent`, `highlight`, `muted`, `error`
-- [ ] Four built-in themes: `dark`, `light`, `neon`, `sonos`
-- [ ] All widgets reference `app.theme` for styling
+- [x] Load theme name from `config.theme`
+- [x] `Theme` struct with `ratatui::style::Style` values: `bg`, `fg`, `accent`, `highlight`, `muted`, `error`
+- [x] Four built-in themes: `dark`, `light`, `neon`, `sonos`
+- [x] All widgets reference `app.theme` for styling
 
 **Exit criteria:** TUI launches, shows a blank frame with correct header and legend bar, navigates between screen stubs with arrow keys and Enter/Esc, exits cleanly on `q` and `Esc`. Terminal restores on panic.
 
