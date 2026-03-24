@@ -1,8 +1,7 @@
-//! TUI rendering — layout dispatch, screen stubs, breadcrumb, and key legend.
+//! TUI rendering — layout dispatch, breadcrumb, key legend, and mini-player.
 //!
-//! All rendering lives in this one file for M6. When a screen or widget grows
-//! beyond ~80 lines, extract it to `tui/screens/<name>.rs` or
-//! `tui/widgets/<name>.rs`.
+//! Screen rendering is delegated to `tui/screens/` modules. Widget rendering
+//! lives in `tui/widgets/`.
 
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
@@ -10,30 +9,154 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 use sonos_sdk::SonosSystem;
 
-use crate::tui::app::{App, GroupTab, HomeTab, Screen};
+use crate::tui::app::{App, GroupTab, HomeGroupsState, HomeTab, HomeSpeakersState, Screen};
+use crate::tui::screens::{home_groups, home_speakers};
+use crate::tui::widgets::group_card::PlaybackIcon;
+use crate::tui::widgets::mini_player::{self, MiniPlayerData};
 
-/// Top-level render dispatch. Splits the frame into header / content / legend.
+/// Top-level render dispatch. Splits the frame into header / content / [mini-player] / legend.
 pub fn render(frame: &mut Frame, app: &App) {
-    let [header_area, content_area, legend_area] = Layout::vertical([
-        Constraint::Length(1), // breadcrumb header
-        Constraint::Min(0),    // content area
-        Constraint::Length(1), // key legend
-    ])
-    .areas(frame.area());
+    let is_home = matches!(app.navigation.current(), Screen::Home { .. });
+
+    let areas = if is_home && !app.system.groups().is_empty() {
+        // 4-region layout with mini-player
+        let [header, content, mini, legend] = Layout::vertical([
+            Constraint::Length(1),  // breadcrumb header
+            Constraint::Min(0),    // content area
+            Constraint::Length(3), // mini-player (top border + 2 lines)
+            Constraint::Length(1), // key legend
+        ])
+        .areas(frame.area());
+        (header, content, Some(mini), legend)
+    } else {
+        // 3-region layout without mini-player
+        let [header, content, legend] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Min(0),
+            Constraint::Length(1),
+        ])
+        .areas(frame.area());
+        (header, content, None, legend)
+    };
+
+    let (header_area, content_area, mini_player_area, legend_area) = areas;
 
     render_breadcrumb(frame, header_area, app);
 
     match app.navigation.current() {
-        Screen::Home { tab, .. } => render_home(frame, content_area, app, tab),
+        Screen::Home {
+            tab,
+            groups_state,
+            speakers_state,
+        } => {
+            match tab {
+                HomeTab::Groups => home_groups::render(frame, content_area, app, groups_state),
+                HomeTab::Speakers => home_speakers::render(frame, content_area, app, speakers_state),
+            }
+
+            if let Some(mini_area) = mini_player_area {
+                render_mini_player(frame, mini_area, app, tab, groups_state, speakers_state);
+            }
+        }
         Screen::GroupView { group_id, tab } => {
-            render_group_view(frame, content_area, app, group_id, tab)
+            render_group_view(frame, content_area, app, group_id, tab);
         }
         Screen::SpeakerDetail { speaker_id } => {
-            render_speaker_detail(frame, content_area, app, speaker_id)
+            render_speaker_detail(frame, content_area, app, speaker_id);
         }
     }
 
     render_key_legend(frame, legend_area, app);
+}
+
+// ---------------------------------------------------------------------------
+// Mini-player
+// ---------------------------------------------------------------------------
+
+fn render_mini_player(
+    frame: &mut Frame,
+    area: Rect,
+    app: &App,
+    tab: &HomeTab,
+    groups_state: &HomeGroupsState,
+    speakers_state: &HomeSpeakersState,
+) {
+    let groups = app.system.groups();
+    if groups.is_empty() {
+        return;
+    }
+
+    // Determine focused group based on active tab
+    let focused_group = match tab {
+        HomeTab::Groups => groups.get(groups_state.selected_index),
+        HomeTab::Speakers => {
+            // Find the group of the selected speaker
+            let speakers = app.system.speakers();
+            speakers
+                .get(speakers_state.selected_index)
+                .and_then(|s| s.group())
+                .or_else(|| groups.first().cloned())
+                .as_ref()
+                .and_then(|g| groups.iter().find(|og| og.id == g.id))
+        }
+    };
+
+    let Some(group) = focused_group else {
+        return;
+    };
+
+    let coordinator = match group.coordinator() {
+        Some(c) => c,
+        None => return,
+    };
+
+    let playback_state = coordinator.playback_state.get();
+    let current_track = coordinator.current_track.get();
+    let group_volume = group.volume.get();
+
+    let playback_icon = match playback_state.as_ref() {
+        Some(sonos_sdk::PlaybackState::Playing) => PlaybackIcon::Playing,
+        Some(sonos_sdk::PlaybackState::Paused) => PlaybackIcon::Paused,
+        _ => PlaybackIcon::Stopped,
+    };
+
+    let track_display = current_track
+        .as_ref()
+        .filter(|t| !t.is_empty())
+        .map(|t| t.display())
+        .unwrap_or_default();
+
+    let volume = group_volume.map(|v| v.value()).unwrap_or(0);
+
+    let (progress, elapsed_ms, duration_ms) = if let Some(ps) = app.progress_states.get(&group.id)
+    {
+        let elapsed = ps.interpolated_position_ms();
+        let duration = ps.last_duration_ms;
+        let ratio = if duration > 0 {
+            elapsed as f64 / duration as f64
+        } else {
+            0.0
+        };
+        (ratio, elapsed, duration)
+    } else {
+        let position = coordinator.position.get();
+        match position.as_ref() {
+            Some(pos) => (pos.progress(), pos.position_ms, pos.duration_ms),
+            None => (0.0, 0, 0),
+        }
+    };
+
+    let data = MiniPlayerData {
+        group_name: coordinator.name.clone(),
+        playback_state: playback_icon,
+        track_display,
+        volume,
+        progress,
+        elapsed_ms,
+        duration_ms,
+    };
+
+    mini_player::render_mini_player(frame, area, &data, &app.theme);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,19 +269,8 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 // ---------------------------------------------------------------------------
-// Screen stubs — replaced with real content in M7+
+// Screen stubs — replaced with real content in M8+
 // ---------------------------------------------------------------------------
-
-fn render_home(frame: &mut Frame, area: Rect, app: &App, tab: &HomeTab) {
-    let text = match tab {
-        HomeTab::Groups => "Groups — Milestone 7",
-        HomeTab::Speakers => "Speakers — Milestone 7",
-    };
-    let paragraph = Paragraph::new(text)
-        .alignment(Alignment::Center)
-        .style(app.theme.muted);
-    frame.render_widget(paragraph, area);
-}
 
 fn render_group_view(
     frame: &mut Frame,
@@ -168,9 +280,9 @@ fn render_group_view(
     tab: &GroupTab,
 ) {
     let text = match tab {
-        GroupTab::NowPlaying => "Now Playing — Milestone 7",
-        GroupTab::Speakers => "Group Speakers — Milestone 7",
-        GroupTab::Queue => "Queue — Milestone 7",
+        GroupTab::NowPlaying => "Now Playing — Milestone 8",
+        GroupTab::Speakers => "Group Speakers — Milestone 8",
+        GroupTab::Queue => "Queue — Milestone 8",
     };
     let paragraph = Paragraph::new(text)
         .alignment(Alignment::Center)
@@ -184,7 +296,7 @@ fn render_speaker_detail(
     app: &App,
     _speaker_id: &sonos_sdk::SpeakerId,
 ) {
-    let paragraph = Paragraph::new("Speaker Detail — Milestone 8")
+    let paragraph = Paragraph::new("Speaker Detail — Milestone 9")
         .alignment(Alignment::Center)
         .style(app.theme.muted);
     frame.render_widget(paragraph, area);
