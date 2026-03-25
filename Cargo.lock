@@ -2523,11 +2523,11 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.9"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf41e0cfaf7226dca15e8197172c295a782857fcb97fad1808a166870dee75a3"
+checksum = "876ac351060d4f882bb1032b6369eb0aef79ad9df1ea8bc404874d8cc3d0cd98"
 dependencies = [
- "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -2649,6 +2649,8 @@ dependencies = [
 [[package]]
 name = "sonos-api"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ff5a3f949e11b823d09209bb76f3b642c4edd5410cdb46321cc8030229abfcf"
 dependencies = [
  "paste",
  "quick-xml",
@@ -2684,6 +2686,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e193a0a900c0e5bb36f46cc4653e032c867f0766823738f9f972fb365600aaf0"
 dependencies = [
  "dirs",
  "serde",
@@ -2699,6 +2703,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-callback-server"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69d7846934d94e393f31b17533b2be7abc57287846b1578a9d4c33932d1ce9d6"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2715,6 +2721,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-discovery"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52042c1ef80df93a488c4eaf6b30da7f405f54f35ca0063be1ba3ed3039689c2"
 dependencies = [
  "quick-xml",
  "reqwest",
@@ -2724,6 +2732,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-event-manager"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1977341b5c7fa18c7b7fc10bdbaa81f103081e8d41dbacb605004979ce3c23cc"
 dependencies = [
  "dashmap",
  "sonos-api",
@@ -2737,6 +2747,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-soap-client"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81c57e9267f67b1476967fb2cf274516b89cce0409ff4a73a34899178a3fc261"
 dependencies = [
  "thiserror 1.0.69",
  "ureq",
@@ -2746,6 +2758,8 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-state"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb7c36334b7f157ec3a3d974d434ced0274d081f568ca6629ee3eebd4d14c6d0"
 dependencies = [
  "serde",
  "sonos-api",
@@ -2759,10 +2773,14 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-state-store"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "597c7e8bde3cf9296783d2d7c68ea2c561493d8af2fd8476f2042afb59e36333"
 
 [[package]]
 name = "sonos-sdk-stream"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a3fd662dd0b4c5085aa7faa99abd8fc7292c8c38c28b5ac4a99bc41df0c9824"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3037,44 +3055,42 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.23"
+version = "1.1.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
-dependencies = [
- "serde",
- "serde_spanned",
- "toml_datetime",
- "toml_edit",
-]
-
-[[package]]
-name = "toml_datetime"
-version = "0.6.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22cddaf88f4fbc13c51aebbf5f8eceb5c7c5a9da2ac40a13519eb5b0a0e8f11c"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml_edit"
-version = "0.22.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41fe8c660ae4257887cf66394862d21dbca4a6ddd26f04a3560410406a2f819a"
+checksum = "f8195ca05e4eb728f4ba94f3e3291661320af739c4e43779cbdfae82ab239fcc"
 dependencies = [
  "indexmap",
- "serde",
+ "serde_core",
  "serde_spanned",
  "toml_datetime",
- "toml_write",
+ "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 
 [[package]]
-name = "toml_write"
-version = "0.1.2"
+name = "toml_datetime"
+version = "1.1.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
+checksum = "97251a7c317e03ad83774a8752a7e81fb6067740609f75ea2b585b569a59198f"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
+name = "toml_parser"
+version = "1.1.0+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2334f11ee363607eb04df9b8fc8a13ca1715a72ba8662a26ac285c98aabb4011"
+dependencies = [
+ "winnow",
+]
+
+[[package]]
+name = "toml_writer"
+version = "1.1.0+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d282ade6016312faf3e41e57ebbba0c073e4056dab1232ab1cb624199648f8ed"
 
 [[package]]
 name = "tower-service"
@@ -3784,12 +3800,9 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "winnow"
-version = "0.7.15"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
-dependencies = [
- "memchr",
-]
+checksum = "a90e88e4667264a994d34e6d1ab2d26d398dcdca8b7f52bec8668957517fc7d8"
 
 [[package]]
 name = "winreg"
