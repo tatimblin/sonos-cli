@@ -2726,6 +2726,7 @@ name = "sonos-sdk-event-manager"
 version = "0.2.1"
 dependencies = [
  "dashmap",
+ "parking_lot",
  "sonos-api",
  "sonos-sdk-discovery",
  "sonos-sdk-stream",
@@ -2747,6 +2748,7 @@ dependencies = [
 name = "sonos-sdk-state"
 version = "0.2.1"
 dependencies = [
+ "parking_lot",
  "serde",
  "sonos-api",
  "sonos-sdk-discovery",
