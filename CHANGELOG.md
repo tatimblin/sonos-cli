@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/tatimblin/sonos-cli/compare/v0.1.1...v0.1.2) - 2026-03-26
+
+### Added
+
+- *(tui)* implement Home Screen with live group cards and speaker management ([#29](https://github.com/tatimblin/sonos-cli/pull/29))
+- *(tui)* scaffold TUI foundation with event loop, navigation, and theme ([#22](https://github.com/tatimblin/sonos-cli/pull/22))
+
+### Fixed
+
+- *(ci)* disable release-plz GitHub Release creation ([#20](https://github.com/tatimblin/sonos-cli/pull/20))
+
 ## [0.1.1](https://github.com/tatimblin/sonos-cli/compare/v0.1.0...v0.1.1) - 2026-03-22
 
 ### Added
