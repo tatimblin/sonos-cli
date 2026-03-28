@@ -1,11 +1,15 @@
 //! TUI application state and navigation types.
 
-use std::collections::{HashMap, HashSet};
+use std::any::Any;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::config::Config;
 use crate::tui::theme::Theme;
+use sonos_sdk::property::{GroupPropertyHandle, PropertyHandle};
 use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
+use sonos_state::property::SonosProperty;
 
 /// Top-level TUI state. Owns the SDK handle and all UI state.
 ///
@@ -20,8 +24,9 @@ pub struct App {
     pub theme: Theme,
     /// Per-group progress interpolation state for smooth animation.
     pub progress_states: HashMap<GroupId, ProgressState>,
-    /// Tracks which properties are currently watched for clean teardown.
-    pub watch_registry: HashSet<(SpeakerId, &'static str)>,
+    /// Current frame's watch handles. Widgets push into this during render.
+    /// Cleared before each render cycle; widgets repopulate via app.watch().
+    watch_handles: RefCell<Vec<Box<dyn Any>>>,
     /// Inline status message (e.g. errors from speaker actions). Cleared on next key press.
     pub status_message: Option<String>,
     /// Terminal width cached from last render/resize, used for grid navigation.
@@ -39,10 +44,54 @@ impl App {
             config,
             theme,
             progress_states: HashMap::new(),
-            watch_registry: HashSet::new(),
+            watch_handles: RefCell::new(Vec::new()),
             status_message: None,
             terminal_width: 80, // updated on first render/resize
         })
+    }
+
+    /// Watch a speaker property — returns current value, keeps subscription alive.
+    ///
+    /// Call this in widget rendering code wherever you need a property value.
+    /// The returned WatchHandle is stored internally and kept alive until the
+    /// next render cycle.
+    ///
+    /// Returns `None` on cold cache (first watch before any event arrives).
+    /// The SDK subscription delivers data within ~50-200ms, triggering a
+    /// re-render with the populated value. Widgets already handle `None`.
+    pub fn watch<P>(&self, prop: &PropertyHandle<P>) -> Option<P>
+    where
+        P: SonosProperty + Clone + 'static,
+    {
+        match prop.watch() {
+            Ok(wh) => {
+                let val = wh.value().cloned();
+                self.watch_handles.borrow_mut().push(Box::new(wh));
+                val
+            }
+            Err(_) => prop.get(),
+        }
+    }
+
+    /// Watch a group property — returns current value, keeps subscription alive.
+    pub fn watch_group<P>(&self, prop: &GroupPropertyHandle<P>) -> Option<P>
+    where
+        P: SonosProperty + Clone + 'static,
+    {
+        match prop.watch() {
+            Ok(wh) => {
+                let val = wh.value().cloned();
+                self.watch_handles.borrow_mut().push(Box::new(wh));
+                val
+            }
+            Err(_) => prop.get(),
+        }
+    }
+
+    /// Drop all watch handles — called by event loop before render.
+    /// Starts grace periods; widgets re-acquire during draw(), cancelling them.
+    pub fn clear_watch_handles(&mut self) {
+        self.watch_handles.get_mut().clear();
     }
 }
 

@@ -519,7 +519,7 @@ The landing experience. Must feel live and scannable.
   - `speaker.position.watch()` — `Position`
   - `group.volume.watch()` — `GroupVolume`
 
-- [x] On leaving Groups tab, `unwatch()` all of the above
+- [x] On leaving Groups tab, watch handles dropped automatically
 
 - [x] Handle `ChangeEvent` in event loop:
   - Match `event.property_key`: `"current_track"`, `"playback_state"`, `"position"`, `"group_volume"`
@@ -585,7 +585,7 @@ The per-group detail experience. Three tabs.
   - `speaker.playback_state.watch()`
   - `speaker.position.watch()`
   - `group.volume.watch()`
-- [ ] Unwatch when leaving
+- [ ] Watch handles dropped when leaving
 
 ### Speakers Tab
 
@@ -652,7 +652,7 @@ The per-group detail experience. Three tabs.
 ### Property Watching for Speaker Detail
 
 - [ ] Watch: `speaker.volume`, `speaker.bass`, `speaker.treble`, `speaker.loudness`, `speaker.mute`
-- [ ] Unwatch on leaving
+- [ ] Watch handles dropped on leaving
 
 **Exit criteria:** Startup screen shows real discovery progress. Speaker Detail shows accurate device info and live-updates EQ controls.
 

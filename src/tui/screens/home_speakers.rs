@@ -86,7 +86,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
                 ""
             };
 
-            let volume = member.volume.get().map(|v| v.value() as u16).unwrap_or(0);
+            let volume = app.watch(&member.volume).map(|v| v.value() as u16).unwrap_or(0);
             let vol_line = volume_bar::render_volume_bar(
                 volume,
                 20.min(area.width.saturating_sub(40)),
@@ -135,7 +135,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
                 "  "
             };
 
-            let volume = speaker.volume.get().map(|v| v.value() as u16).unwrap_or(0);
+            let volume = app.watch(&speaker.volume).map(|v| v.value() as u16).unwrap_or(0);
             let vol_line = volume_bar::render_volume_bar(
                 volume,
                 20.min(area.width.saturating_sub(40)),

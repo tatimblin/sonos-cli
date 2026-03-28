@@ -2676,6 +2676,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sonos-sdk",
+ "sonos-sdk-state",
  "tempfile",
  "thiserror 2.0.18",
  "toml",

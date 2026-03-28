@@ -59,11 +59,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
             }
             let coordinator = coordinator.unwrap();
 
-            // Read cached properties
-            let playback_state = coordinator.playback_state.get();
-            let current_track = coordinator.current_track.get();
-            let position = coordinator.position.get();
-            let group_volume = group.volume.get();
+            // Watch properties — subscribes and returns current value
+            let playback_state = app.watch(&coordinator.playback_state);
+            let current_track = app.watch(&coordinator.current_track);
+            let position = app.watch(&coordinator.position);
+            let group_volume = app.watch_group(&group.volume);
 
             let playback_icon = match playback_state.as_ref() {
                 Some(PlaybackState::Playing) => PlaybackIcon::Playing,
