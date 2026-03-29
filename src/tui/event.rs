@@ -36,11 +36,6 @@ fn run_event_loop_inner(
     let initial_size = terminal.size()?;
     app.terminal_width = initial_size.width;
 
-    // Bootstrap: eagerly fetch group coordinator properties so the first render
-    // has data. These are blocking SOAP calls (~5-20ms each) but they run once
-    // before the event loop starts — not inside terminal.draw().
-    bootstrap_group_data(app);
-
     // Throttle animation renders — 250ms is plenty for a progress bar
     let mut last_animation_render: Option<Instant> = None;
 
@@ -92,27 +87,6 @@ fn run_event_loop_inner(
     }
 
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Bootstrap — one-time fetch to populate SDK cache before first render
-// ---------------------------------------------------------------------------
-
-/// Eagerly fetch group coordinator properties so the first render has values.
-///
-/// Without this, `app.watch()` returns `None` on cold cache and the UI shows
-/// blank state until UPnP subscription events arrive (~50-200ms). The old
-/// `setup_watches()` had the same blocking fetches — we just moved them out
-/// of the render path into a one-shot bootstrap.
-fn bootstrap_group_data(app: &App) {
-    for group in app.system.groups() {
-        if let Some(coord) = group.coordinator() {
-            let _ = coord.playback_state.fetch();
-            let _ = coord.current_track.fetch();
-            let _ = coord.position.fetch();
-        }
-        let _ = group.volume.fetch();
-    }
 }
 
 // ---------------------------------------------------------------------------
