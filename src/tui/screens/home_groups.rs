@@ -5,20 +5,21 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 use sonos_sdk::PlaybackState;
 
-use crate::tui::app::{App, HomeGroupsState};
+use crate::tui::app::HomeGroupsState;
+use crate::tui::hooks::{ProgressState, RenderContext};
 use crate::tui::widgets::group_card::{self, GroupCardData, PlaybackIcon};
 
 /// Card height (border + 7 content lines).
 const CARD_HEIGHT: u16 = 9;
 
 /// Render the Groups tab content.
-pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState) {
-    let groups = app.system.groups();
+pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &HomeGroupsState) {
+    let groups = ctx.app.system.groups();
 
     if groups.is_empty() {
         let paragraph = Paragraph::new("No groups found")
             .alignment(Alignment::Center)
-            .style(app.theme.muted);
+            .style(ctx.app.theme.muted);
         frame.render_widget(paragraph, area);
         return;
     }
@@ -54,16 +55,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
             let coordinator = group.coordinator();
             if coordinator.is_none() {
                 let name = format!("Group {}", group.id);
-                group_card::render_unavailable_card(frame, *col_area, &name, selected, &app.theme);
+                group_card::render_unavailable_card(
+                    frame,
+                    *col_area,
+                    &name,
+                    selected,
+                    &ctx.app.theme,
+                );
                 continue;
             }
             let coordinator = coordinator.unwrap();
 
-            // Watch properties — subscribes and returns current value
-            let playback_state = app.watch(&coordinator.playback_state);
-            let current_track = app.watch(&coordinator.current_track);
-            let position = app.watch(&coordinator.position);
-            let group_volume = app.watch_group(&group.volume);
+            // Hooks: use_watch returns owned values (borrow released immediately)
+            let playback_state = ctx.hooks.use_watch(&coordinator.playback_state);
+            let current_track = ctx.hooks.use_watch(&coordinator.current_track);
+            let position = ctx.hooks.use_watch(&coordinator.position);
+            let group_volume = ctx.hooks.use_watch_group(&group.volume);
 
             let playback_icon = match playback_state.as_ref() {
                 Some(PlaybackState::Playing) => PlaybackIcon::Playing,
@@ -84,22 +91,36 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
 
             let volume = group_volume.map(|v| v.value()).unwrap_or(0);
 
-            // Use interpolated progress if available, otherwise SDK position
-            let (progress, elapsed_ms, duration_ms) =
-                if let Some(ps) = app.progress_states.get(&group.id) {
-                    let elapsed = ps.interpolated_position_ms();
-                    let duration = ps.last_duration_ms;
-                    let ratio = if duration > 0 {
-                        elapsed as f64 / duration as f64
-                    } else {
-                        0.0
-                    };
-                    (ratio, elapsed, duration)
-                } else if let Some(pos) = position.as_ref() {
-                    (pos.progress(), pos.position_ms, pos.duration_ms)
-                } else {
-                    (0.0, 0, 0)
-                };
+            let is_playing = playback_state
+                .as_ref()
+                .is_some_and(|p| *p == PlaybackState::Playing);
+
+            // Hooks: use_animation before use_state (borrow ordering)
+            let group_id_str = group.id.to_string();
+            ctx.hooks
+                .use_animation(&format!("{group_id_str}:tick"), is_playing);
+
+            // Hooks: use_state for progress interpolation (must be last)
+            let progress_key = format!("{group_id_str}:progress");
+            let progress_state = ctx
+                .hooks
+                .use_state::<ProgressState>(&progress_key, ProgressState::default);
+
+            // Update progress state from SDK values
+            if let Some(pos) = position.as_ref() {
+                progress_state.update(pos.position_ms, pos.duration_ms, is_playing);
+            } else {
+                // No position data yet — just update playing state
+                progress_state.is_playing = is_playing;
+            }
+
+            let elapsed = progress_state.interpolated_position_ms();
+            let duration = progress_state.last_duration_ms;
+            let progress = if duration > 0 {
+                elapsed as f64 / duration as f64
+            } else {
+                0.0
+            };
 
             // Speaker count text
             let members = group.members();
@@ -116,13 +137,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeGroupsState)
                 track_artist,
                 volume,
                 progress,
-                elapsed_ms,
-                duration_ms,
+                elapsed_ms: elapsed,
+                duration_ms: duration,
                 speaker_count_text,
                 selected,
             };
 
-            group_card::render_group_card(frame, *col_area, &data, &app.theme);
+            group_card::render_group_card(frame, *col_area, &data, &ctx.app.theme);
         }
     }
 }

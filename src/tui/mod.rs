@@ -5,6 +5,7 @@
 mod app;
 mod event;
 mod handlers;
+pub mod hooks;
 mod screens;
 mod theme;
 mod ui;

@@ -7,6 +7,7 @@ use ratatui::Frame;
 use sonos_sdk::SpeakerId;
 
 use crate::tui::app::{App, HomeSpeakersState};
+use crate::tui::hooks::RenderContext;
 use crate::tui::widgets::{modal, volume_bar};
 
 /// Returns speakers in display order (multi-member group members first, then
@@ -40,18 +41,18 @@ pub fn speakers_in_display_order(app: &App) -> Vec<SpeakerId> {
 }
 
 /// Render the Speakers tab content.
-pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersState) {
-    let speakers = app.system.speakers();
+pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &HomeSpeakersState) {
+    let speakers = ctx.app.system.speakers();
 
     if speakers.is_empty() {
         let paragraph = Paragraph::new("No speakers found")
             .alignment(Alignment::Center)
-            .style(app.theme.muted);
+            .style(ctx.app.theme.muted);
         frame.render_widget(paragraph, area);
         return;
     }
 
-    let groups = app.system.groups();
+    let groups = ctx.app.system.groups();
 
     let mut lines: Vec<Line> = Vec::new();
     let mut flat_index: usize = 0;
@@ -70,7 +71,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
         // Group header
         lines.push(Line::from(vec![Span::styled(
             format!(" {coordinator_name} "),
-            app.theme.group_header,
+            ctx.app.theme.group_header,
         )]));
         lines.push(Line::raw("")); // spacing
 
@@ -86,18 +87,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
                 ""
             };
 
-            let volume = member.volume.get().map(|v| v.value() as u16).unwrap_or(0);
+            let volume = ctx
+                .hooks
+                .use_watch(&member.volume)
+                .map(|v| v.value() as u16)
+                .unwrap_or(0);
             let vol_line = volume_bar::render_volume_bar(
                 volume,
                 20.min(area.width.saturating_sub(40)),
-                app.theme.volume_filled,
-                app.theme.volume_empty,
+                ctx.app.theme.volume_filled,
+                ctx.app.theme.volume_empty,
             );
 
             let cursor_style = if flat_index == state.selected_index {
-                app.theme.speaker_cursor
+                ctx.app.theme.speaker_cursor
             } else {
-                app.theme.speaker_name
+                ctx.app.theme.speaker_name
             };
 
             let mut spans = vec![
@@ -124,7 +129,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
     if !standalone_speakers.is_empty() {
         lines.push(Line::from(vec![Span::styled(
             " NOT IN A GROUP ",
-            app.theme.group_header,
+            ctx.app.theme.group_header,
         )]));
         lines.push(Line::raw(""));
 
@@ -135,18 +140,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
                 "  "
             };
 
-            let volume = speaker.volume.get().map(|v| v.value() as u16).unwrap_or(0);
+            let volume = ctx
+                .hooks
+                .use_watch(&speaker.volume)
+                .map(|v| v.value() as u16)
+                .unwrap_or(0);
             let vol_line = volume_bar::render_volume_bar(
                 volume,
                 20.min(area.width.saturating_sub(40)),
-                app.theme.volume_filled,
-                app.theme.volume_empty,
+                ctx.app.theme.volume_filled,
+                ctx.app.theme.volume_empty,
             );
 
             let cursor_style = if flat_index == state.selected_index {
-                app.theme.speaker_cursor
+                ctx.app.theme.speaker_cursor
             } else {
-                app.theme.speaker_name
+                ctx.app.theme.speaker_name
             };
 
             let mut spans = vec![
@@ -165,12 +174,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
     }
 
     // Render status message if present
-    if let Some(ref msg) = app.status_message {
+    if let Some(ref msg) = ctx.app.status_message {
         lines.push(Line::raw(""));
         let style = if msg.starts_with("error:") {
-            app.theme.error
+            ctx.app.theme.error
         } else {
-            app.theme.accent
+            ctx.app.theme.accent
         };
         lines.push(Line::from(vec![Span::styled(format!(" {msg}"), style)]));
     }
@@ -180,6 +189,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App, state: &HomeSpeakersStat
 
     // Render modal overlay if present
     if let Some(ref modal_state) = state.modal {
-        modal::render_modal(frame, area, modal_state, &app.theme);
+        modal::render_modal(frame, area, modal_state, &ctx.app.theme);
     }
 }

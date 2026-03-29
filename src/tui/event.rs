@@ -4,15 +4,16 @@
 //! input. The `dirty` flag skips rendering on idle poll timeouts.
 //! Progress bars animate via client-side interpolation when any group is Playing.
 //!
-//! Watch lifecycle is declarative: widgets call `app.watch()` during render to
-//! subscribe to properties. The event loop clears handles before each draw,
-//! starting grace periods. `draw()` immediately re-acquires handles via
-//! `app.watch()`, cancelling the grace periods.
+//! Watch lifecycle is managed by the hooks system: widgets call
+//! `ctx.hooks.use_watch()` during render to subscribe to properties.
+//! Handles are refreshed each frame (WatchHandle is a snapshot) and
+//! cleaned up via mark-and-sweep when widgets stop rendering.
 
 use std::time::{Duration, Instant};
 
-use crate::tui::app::{App, HomeTab, ProgressState, Screen};
+use crate::tui::app::{App, HomeTab, Screen};
 use crate::tui::handlers;
+use crate::tui::hooks::{Hooks, RenderContext};
 use crate::tui::ui;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
@@ -37,21 +38,31 @@ fn run_event_loop_inner(
     let initial_size = terminal.size()?;
     app.terminal_width = initial_size.width;
 
+    // Hooks system — owns widget state, watch handles, and animation registrations
+    let mut hooks = Hooks::new();
+
     // Throttle animation renders — 250ms is plenty for a progress bar
     let mut last_animation_render: Option<Instant> = None;
     let mut frame_count: u64 = 0;
 
     loop {
         // 1. Render (only when state changed)
-        //    Clear old handles → grace periods start.
-        //    draw() → widgets call app.watch() → grace periods cancelled.
+        //    Hooks manage watch subscriptions via persistent handles.
+        //    Mark-and-sweep evicts state for widgets that stopped rendering.
         if app.dirty {
             frame_count += 1;
             if frame_count <= 3 {
-                tracing::debug!("TUI render frame {frame_count}: clearing watch handles, drawing");
+                tracing::debug!("TUI render frame {frame_count}");
             }
-            app.clear_watch_handles();
-            terminal.draw(|frame| ui::render(frame, app))?;
+            hooks.begin_frame();
+            terminal.draw(|frame| {
+                let mut ctx = RenderContext {
+                    app,
+                    hooks: &mut hooks,
+                };
+                ui::render(frame, &mut ctx);
+            })?;
+            hooks.end_frame();
             app.dirty = false;
         }
 
@@ -70,14 +81,14 @@ fn run_event_loop_inner(
             }
         }
 
-        // 3. Drain all pending SDK events (non-blocking)
-        for sdk_event in change_iter.try_iter() {
-            handle_change_event(app, &sdk_event);
+        // 3. Drain all pending SDK events — dirty-marking only.
+        //    State updates happen in the render phase via use_watch + use_state.
+        for _sdk_event in change_iter.try_iter() {
             app.dirty = true;
         }
 
         // 4. Animation tick — throttle to ~4fps (250ms) for progress bar smoothness
-        if has_active_animation(app) {
+        if hooks.has_active_animations() {
             let should_animate = last_animation_render
                 .map(|t| t.elapsed() >= Duration::from_millis(250))
                 .unwrap_or(true);
@@ -93,65 +104,6 @@ fn run_event_loop_inner(
     }
 
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Change event handling
-// ---------------------------------------------------------------------------
-
-fn handle_change_event(app: &mut App, event: &sonos_sdk::ChangeEvent) {
-    match event.property_key {
-        "position" => {
-            if let Some(speaker) = app.system.speaker_by_id(&event.speaker_id) {
-                if let Some(pos) = speaker.position.get() {
-                    if let Some(group) = speaker.group() {
-                        let ps = app
-                            .progress_states
-                            .entry(group.id.clone())
-                            .or_insert_with(|| ProgressState::new(0, 0, false));
-                        ps.last_position_ms = pos.position_ms;
-                        ps.last_duration_ms = pos.duration_ms;
-                        ps.wall_clock_at_last_update = Instant::now();
-                    }
-                }
-            }
-        }
-        "playback_state" => {
-            if let Some(speaker) = app.system.speaker_by_id(&event.speaker_id) {
-                if let Some(state) = speaker.playback_state.get() {
-                    if let Some(group) = speaker.group() {
-                        let ps = app
-                            .progress_states
-                            .entry(group.id.clone())
-                            .or_insert_with(|| ProgressState::new(0, 0, false));
-                        let now_playing = state.is_playing();
-                        if ps.is_playing && !now_playing {
-                            // Freeze at current interpolated position
-                            ps.last_position_ms = ps.interpolated_position_ms();
-                            ps.wall_clock_at_last_update = Instant::now();
-                        }
-                        ps.is_playing = now_playing;
-                        if now_playing {
-                            ps.wall_clock_at_last_update = Instant::now();
-                        }
-                    }
-                }
-            }
-        }
-        "group_membership" => {
-            // Topology changed — next render will re-watch new groups automatically.
-            app.progress_states.clear();
-        }
-        _ => {
-            // Other events (current_track, group_volume, etc.) — just mark dirty
-            // The render functions read fresh values from SDK cache
-        }
-    }
-}
-
-/// Check if any group has an active playing animation.
-fn has_active_animation(app: &App) -> bool {
-    app.progress_states.values().any(|ps| ps.is_playing)
 }
 
 // ---------------------------------------------------------------------------
