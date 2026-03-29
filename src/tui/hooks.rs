@@ -148,6 +148,12 @@ pub struct Hooks {
     accessed_animations: HashSet<String>,
 }
 
+impl Default for Hooks {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hooks {
     pub fn new() -> Self {
         Self {

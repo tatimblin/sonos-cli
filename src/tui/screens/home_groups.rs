@@ -93,7 +93,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
 
             let is_playing = playback_state
                 .as_ref()
-                .map_or(false, |p| *p == PlaybackState::Playing);
+                .is_some_and(|p| *p == PlaybackState::Playing);
 
             // Hooks: use_animation before use_state (borrow ordering)
             let group_id_str = group.id.to_string();
