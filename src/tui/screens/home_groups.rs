@@ -102,9 +102,9 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
 
             // Hooks: use_state for progress interpolation (must be last)
             let progress_key = format!("{group_id_str}:progress");
-            let progress_state =
-                ctx.hooks
-                    .use_state::<ProgressState>(&progress_key, ProgressState::default);
+            let progress_state = ctx
+                .hooks
+                .use_state::<ProgressState>(&progress_key, ProgressState::default);
 
             // Update progress state from SDK values
             if let Some(pos) = position.as_ref() {

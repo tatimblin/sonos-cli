@@ -203,11 +203,7 @@ impl Hooks {
     ///
     /// **Must be called last** — the returned `&mut V` borrows `&mut self`,
     /// preventing other hook calls until the reference is dropped.
-    pub fn use_state<V: 'static>(
-        &mut self,
-        key: &str,
-        default: impl FnOnce() -> V,
-    ) -> &mut V {
+    pub fn use_state<V: 'static>(&mut self, key: &str, default: impl FnOnce() -> V) -> &mut V {
         let hook_key = HookKey::new::<V>(key);
         self.accessed_states.insert(hook_key.clone());
 
@@ -249,7 +245,10 @@ impl Hooks {
                 val
             }
             Err(e) => {
-                tracing::warn!("use_watch failed for {}: {e}, falling back to get()", P::KEY);
+                tracing::warn!(
+                    "use_watch failed for {}: {e}, falling back to get()",
+                    P::KEY
+                );
                 prop.get()
             }
         }

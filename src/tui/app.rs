@@ -35,7 +35,6 @@ impl App {
             terminal_width: 80, // updated on first render/resize
         })
     }
-
 }
 
 /// Stack-based navigation. The bottom of the stack is always Home.
