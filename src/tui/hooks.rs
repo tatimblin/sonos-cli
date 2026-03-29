@@ -404,10 +404,12 @@ mod tests {
 
     #[test]
     fn progress_state_interpolation() {
-        let mut ps = ProgressState::default();
-        ps.last_position_ms = 1000;
-        ps.last_duration_ms = 5000;
-        ps.is_playing = false;
+        let mut ps = ProgressState {
+            last_position_ms: 1000,
+            last_duration_ms: 5000,
+            is_playing: false,
+            ..Default::default()
+        };
 
         // Not playing → returns last position
         assert_eq!(ps.interpolated_position_ms(), 1000);
@@ -421,13 +423,14 @@ mod tests {
 
     #[test]
     fn progress_state_caps_at_duration() {
-        let mut ps = ProgressState::default();
-        ps.last_position_ms = 4900;
-        ps.last_duration_ms = 5000;
-        ps.is_playing = true;
-        // Simulate old timestamp (10+ seconds ago)
-        ps.wall_clock_at_last_update =
-            std::time::Instant::now() - std::time::Duration::from_secs(20);
+        let ps = ProgressState {
+            last_position_ms: 4900,
+            last_duration_ms: 5000,
+            is_playing: true,
+            // Simulate old timestamp (10+ seconds ago)
+            wall_clock_at_last_update: std::time::Instant::now()
+                - std::time::Duration::from_secs(20),
+        };
 
         // Should cap at duration, not overflow
         assert_eq!(ps.interpolated_position_ms(), 5000);
