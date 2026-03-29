@@ -13,6 +13,7 @@ mod cli;
 mod config;
 mod diagnostics;
 mod errors;
+mod logging;
 mod tui;
 
 use cli::{run_command, Cli};
@@ -21,6 +22,9 @@ use config::Config;
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let config = Config::load();
+
+    let is_tui = cli.command.is_none() && std::io::stdout().is_terminal();
+    logging::init_logging(cli.global.verbose, is_tui);
 
     match cli.command {
         None => {
@@ -44,9 +48,7 @@ fn main() -> ExitCode {
             let system = match SonosSystem::new() {
                 Ok(s) => s,
                 Err(e) => {
-                    if cli.global.verbose {
-                        eprintln!("debug: {e:?}");
-                    }
+                    tracing::debug!("{e:?}");
                     eprintln!("error: {e}");
                     if matches!(&e, SdkError::DiscoveryFailed(_)) {
                         eprintln!("{}", diagnostics::discovery_hint());
@@ -66,9 +68,7 @@ fn main() -> ExitCode {
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    if cli.global.verbose {
-                        eprintln!("debug: {e:?}");
-                    }
+                    tracing::debug!("{e:?}");
                     eprintln!("error: {e}");
                     if let Some(hint) = e.recovery_hint() {
                         eprintln!("{hint}");

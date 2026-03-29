@@ -54,12 +54,16 @@ dirs = "5"
 anyhow = "1"
 thiserror = "2"
 
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
 # Shell completions and man pages (optional, for generate binary)
 clap_complete = { version = "4", optional = true }
 clap_mangen = { version = "0.2", optional = true }
 
 [dev-dependencies]
-sonos-sdk = { version = "0.2", features = ["test-support"] }
+sonos-sdk = { version = "0.3", features = ["test-support"] }
 proptest = "1"
 tempfile = "3"
 

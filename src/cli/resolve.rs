@@ -119,7 +119,7 @@ mod tests {
             speaker: Some("Kitchen".into()),
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
@@ -134,7 +134,7 @@ mod tests {
             speaker: Some("Nonexistent".into()),
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let result = resolve_speaker(&system, &config, &global);
@@ -149,7 +149,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
@@ -164,7 +164,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
@@ -182,7 +182,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let result = resolve_speaker(&system, &config, &global);
@@ -196,7 +196,7 @@ mod tests {
             speaker: None,
             group: Some("Living Room".into()),
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let result = require_speaker_only(&system, &global, "bass");
@@ -210,7 +210,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let result = require_speaker_only(&system, &global, "bass");
@@ -224,7 +224,7 @@ mod tests {
             speaker: Some("Kitchen".into()),
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let spk = require_speaker_only(&system, &global, "bass").unwrap();
@@ -239,7 +239,7 @@ mod tests {
             speaker: None,
             group: Some("Kitchen".into()),
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
@@ -255,7 +255,7 @@ mod tests {
             speaker: None,
             group: Some("Nonexistent".into()),
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let result = resolve_group(&system, &config, &global);
@@ -270,7 +270,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
@@ -289,7 +289,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
@@ -305,7 +305,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let result = resolve_group(&system, &config, &global);
@@ -320,7 +320,7 @@ mod tests {
             speaker: Some("Bedroom".into()),
             group: Some("Kitchen".into()),
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: false,
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
