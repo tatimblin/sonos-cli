@@ -31,6 +31,7 @@ fn run_event_loop_inner(
     terminal: &mut ratatui::DefaultTerminal,
 ) -> anyhow::Result<()> {
     let change_iter = app.system.iter();
+    tracing::debug!("TUI event loop started, got change_iter");
 
     // Get initial terminal width
     let initial_size = terminal.size()?;
@@ -38,12 +39,17 @@ fn run_event_loop_inner(
 
     // Throttle animation renders — 250ms is plenty for a progress bar
     let mut last_animation_render: Option<Instant> = None;
+    let mut frame_count: u64 = 0;
 
     loop {
         // 1. Render (only when state changed)
         //    Clear old handles → grace periods start.
         //    draw() → widgets call app.watch() → grace periods cancelled.
         if app.dirty {
+            frame_count += 1;
+            if frame_count <= 3 {
+                tracing::debug!("TUI render frame {frame_count}: clearing watch handles, drawing");
+            }
             app.clear_watch_handles();
             terminal.draw(|frame| ui::render(frame, app))?;
             app.dirty = false;

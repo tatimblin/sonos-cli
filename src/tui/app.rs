@@ -63,13 +63,17 @@ impl App {
     where
         P: SonosProperty + Clone + 'static,
     {
+        tracing::trace!("App::watch called for speaker property");
         match prop.watch() {
             Ok(wh) => {
                 let val = wh.value().cloned();
                 self.watch_handles.borrow_mut().push(Box::new(wh));
                 val
             }
-            Err(_) => prop.get(),
+            Err(e) => {
+                tracing::warn!("App::watch failed: {e}, falling back to get()");
+                prop.get()
+            }
         }
     }
 
@@ -78,13 +82,17 @@ impl App {
     where
         P: SonosProperty + Clone + 'static,
     {
+        tracing::trace!("App::watch_group called for group property");
         match prop.watch() {
             Ok(wh) => {
                 let val = wh.value().cloned();
                 self.watch_handles.borrow_mut().push(Box::new(wh));
                 val
             }
-            Err(_) => prop.get(),
+            Err(e) => {
+                tracing::warn!("App::watch_group failed: {e}, falling back to get()");
+                prop.get()
+            }
         }
     }
 

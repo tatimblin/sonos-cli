@@ -780,7 +780,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1205,7 +1205,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -1715,7 +1715,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2359,7 +2359,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2650,28 +2650,13 @@ dependencies = [
 
 [[package]]
 name = "sonos-api"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ff5a3f949e11b823d09209bb76f3b642c4edd5410cdb46321cc8030229abfcf"
-dependencies = [
- "paste",
- "quick-xml",
- "serde",
- "sonos-sdk-discovery 0.2.1",
- "sonos-sdk-soap-client 0.2.1",
- "thiserror 1.0.69",
- "xmltree",
-]
-
-[[package]]
-name = "sonos-api"
 version = "0.3.0"
 dependencies = [
  "paste",
  "quick-xml",
  "serde",
- "sonos-sdk-discovery 0.3.0",
- "sonos-sdk-soap-client 0.3.0",
+ "sonos-sdk-discovery",
+ "sonos-sdk-soap-client",
  "thiserror 1.0.69",
  "xmltree",
 ]
@@ -2692,29 +2677,13 @@ dependencies = [
  "ratatui-image",
  "serde",
  "serde_json",
- "sonos-sdk 0.2.1",
- "sonos-sdk 0.3.0",
- "sonos-sdk-state 0.3.0",
+ "sonos-sdk",
+ "sonos-sdk-state",
  "tempfile",
  "thiserror 2.0.18",
  "toml",
-]
-
-[[package]]
-name = "sonos-sdk"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e193a0a900c0e5bb36f46cc4653e032c867f0766823738f9f972fb365600aaf0"
-dependencies = [
- "dirs",
- "serde",
- "serde_json",
- "sonos-api 0.2.1",
- "sonos-sdk-discovery 0.2.1",
- "sonos-sdk-event-manager 0.2.1",
- "sonos-sdk-state 0.2.1",
- "thiserror 1.0.69",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2724,30 +2693,12 @@ dependencies = [
  "dirs",
  "serde",
  "serde_json",
- "sonos-api 0.3.0",
- "sonos-sdk-discovery 0.3.0",
- "sonos-sdk-event-manager 0.3.0",
- "sonos-sdk-state 0.3.0",
+ "sonos-api",
+ "sonos-sdk-discovery",
+ "sonos-sdk-event-manager",
+ "sonos-sdk-state",
  "thiserror 1.0.69",
  "tracing",
-]
-
-[[package]]
-name = "sonos-sdk-callback-server"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69d7846934d94e393f31b17533b2be7abc57287846b1578a9d4c33932d1ce9d6"
-dependencies = [
- "async-trait",
- "bytes",
- "reqwest",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "warp",
 ]
 
 [[package]]
@@ -2768,37 +2719,11 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-discovery"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52042c1ef80df93a488c4eaf6b30da7f405f54f35ca0063be1ba3ed3039689c2"
-dependencies = [
- "quick-xml",
- "reqwest",
- "serde",
-]
-
-[[package]]
-name = "sonos-sdk-discovery"
 version = "0.3.0"
 dependencies = [
  "quick-xml",
  "reqwest",
  "serde",
-]
-
-[[package]]
-name = "sonos-sdk-event-manager"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1977341b5c7fa18c7b7fc10bdbaa81f103081e8d41dbacb605004979ce3c23cc"
-dependencies = [
- "dashmap",
- "sonos-api 0.2.1",
- "sonos-sdk-discovery 0.2.1",
- "sonos-sdk-stream 0.2.1",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -2807,23 +2732,12 @@ version = "0.3.0"
 dependencies = [
  "dashmap",
  "parking_lot",
- "sonos-api 0.3.0",
- "sonos-sdk-discovery 0.3.0",
- "sonos-sdk-stream 0.3.0",
+ "sonos-api",
+ "sonos-sdk-discovery",
+ "sonos-sdk-stream",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "sonos-sdk-soap-client"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81c57e9267f67b1476967fb2cf274516b89cce0409ff4a73a34899178a3fc261"
-dependencies = [
- "thiserror 1.0.69",
- "ureq",
- "xmltree",
 ]
 
 [[package]]
@@ -2837,69 +2751,21 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb7c36334b7f157ec3a3d974d434ced0274d081f568ca6629ee3eebd4d14c6d0"
-dependencies = [
- "serde",
- "sonos-api 0.2.1",
- "sonos-sdk-discovery 0.2.1",
- "sonos-sdk-event-manager 0.2.1",
- "sonos-sdk-state-store 0.2.1",
- "sonos-sdk-stream 0.2.1",
- "tracing",
-]
-
-[[package]]
-name = "sonos-sdk-state"
 version = "0.3.0"
 dependencies = [
  "parking_lot",
  "serde",
- "sonos-api 0.3.0",
- "sonos-sdk-discovery 0.3.0",
- "sonos-sdk-event-manager 0.3.0",
- "sonos-sdk-state-store 0.3.0",
- "sonos-sdk-stream 0.3.0",
+ "sonos-api",
+ "sonos-sdk-discovery",
+ "sonos-sdk-event-manager",
+ "sonos-sdk-state-store",
+ "sonos-sdk-stream",
  "tracing",
 ]
-
-[[package]]
-name = "sonos-sdk-state-store"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597c7e8bde3cf9296783d2d7c68ea2c561493d8af2fd8476f2042afb59e36333"
 
 [[package]]
 name = "sonos-sdk-state-store"
 version = "0.3.0"
-
-[[package]]
-name = "sonos-sdk-stream"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a3fd662dd0b4c5085aa7faa99abd8fc7292c8c38c28b5ac4a99bc41df0c9824"
-dependencies = [
- "async-trait",
- "bytes",
- "chrono",
- "crossbeam",
- "dashmap",
- "futures",
- "quick-xml",
- "reqwest",
- "serde",
- "serde_json",
- "sonos-api 0.2.1",
- "sonos-sdk-callback-server 0.2.1",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "warp",
-]
 
 [[package]]
 name = "sonos-sdk-stream"
@@ -2915,8 +2781,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sonos-api 0.3.0",
- "sonos-sdk-callback-server 0.3.0",
+ "sonos-api",
+ "sonos-sdk-callback-server",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -3037,7 +2903,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3698,7 +3564,7 @@ version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
 dependencies = [
- "windows-core 0.58.0",
+ "windows-core",
  "windows-targets 0.52.6",
 ]
 
@@ -3708,24 +3574,11 @@ version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
 dependencies = [
- "windows-implement 0.58.0",
- "windows-interface 0.58.0",
- "windows-result 0.2.0",
- "windows-strings 0.1.0",
+ "windows-implement",
+ "windows-interface",
+ "windows-result",
+ "windows-strings",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -3740,32 +3593,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "windows-interface"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3788,31 +3619,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
-dependencies = [
- "windows-link",
-]
-
-[[package]]
 name = "windows-strings"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd9b125c486025df0eabcb585e62173c6c9eddcec5d117d3b6e8c30e2ee4d10"
 dependencies = [
- "windows-result 0.2.0",
+ "windows-result",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-strings"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
-dependencies = [
- "windows-link",
 ]
 
 [[package]]

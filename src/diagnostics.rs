@@ -118,7 +118,7 @@ mod tests {
             speaker: None,
             group: None,
             quiet: false,
-            verbose: false,
+            verbose: 0,
             no_input: true,
         };
         assert!(!can_prompt(&global));

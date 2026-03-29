@@ -36,9 +36,9 @@ pub struct GlobalFlags {
     /// Suppress all non-error stdout output
     #[arg(long, short, global = true)]
     pub quiet: bool,
-    /// Show raw SDK errors and debug output on stderr
-    #[arg(long, global = true)]
-    pub verbose: bool,
+    /// Increase log verbosity (-v info, -vv debug, -vvv trace)
+    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, global = true)]
+    pub verbose: u8,
     /// Disable all interactive prompts
     #[arg(long, global = true)]
     pub no_input: bool,
