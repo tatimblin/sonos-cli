@@ -575,8 +575,7 @@ pub fn get(&self) -> Option<P>
 pub fn is_watched(&self) -> bool
 pub fn speaker_id(&self) -> &SpeakerId
 pub fn speaker_ip(&self) -> IpAddr
-pub fn watch(&self) -> Result<WatchStatus<P>, SdkError>
-pub fn unwatch(&self)
+pub fn watch(&self) -> Result<WatchHandle<P>, SdkError>
 
 // Defined on PropertyHandle<P> only when P: Fetchable
 pub fn fetch(&self) -> Result<P, SdkError>
@@ -591,8 +590,7 @@ coordinator's IP:
 pub fn get(&self) -> Option<P>
 pub fn is_watched(&self) -> bool
 pub fn group_id(&self) -> &GroupId
-pub fn watch(&self) -> Result<WatchStatus<P>, SdkError>
-pub fn unwatch(&self)
+pub fn watch(&self) -> Result<WatchHandle<P>, SdkError>
 
 // When P: GroupFetchable
 pub fn fetch(&self) -> Result<P, SdkError>
@@ -604,24 +602,34 @@ pub fn fetch(&self) -> Result<P, SdkError>
 |---|---|---|---|
 | `get()` | None | Reads | Fast display of last known value |
 | `fetch()` | Yes (blocking) | Writes | Show definitive current value |
-| `watch()` | No (subscription setup) | Reads current | Receive future changes via `system.iter()` |
-| `unwatch()` | No (subscription teardown) | — | Stop receiving events for this property |
+| `watch()` | No (subscription setup) | Reads current | Returns a `WatchHandle`; hold it to keep the subscription alive. Dropping starts a 50ms grace period. |
 
 `get()` returns `None` until the property has been populated (by `fetch()`, `watch()`, or
 an incoming UPnP event).
 
-### 5.4 `WatchStatus<P>`
+### 5.4 `WatchHandle<P>`
 
-Returned by `watch()`:
+Returned by `watch()`. RAII handle — dropping it starts a 50ms grace period before the
+UPnP subscription is torn down. Re-calling `watch()` within the grace period cancels it
+and reuses the existing subscription.
+
+Not `Clone` — each handle is one subscription hold.
 
 ```rust
-pub struct WatchStatus<P> {
-    pub current: Option<P>,  // cached value at the time watch() was called
-    pub mode:    WatchMode,
+#[must_use]
+pub struct WatchHandle<P> {
+    // Internal: value, mode, cleanup guard
 }
 
-impl WatchStatus<P> {
+impl<P> WatchHandle<P> {
+    pub fn value(&self) -> Option<&P>
+    pub fn has_value(&self) -> bool
+    pub fn mode(&self) -> WatchMode
     pub fn has_realtime_events(&self) -> bool
+}
+
+impl<P> Deref for WatchHandle<P> {
+    type Target = Option<P>;
 }
 ```
 
@@ -635,7 +643,7 @@ pub enum WatchMode {
 }
 ```
 
-Check `status.mode` to surface firewall warnings to the user.
+Check `handle.mode()` to surface firewall warnings to the user.
 
 ### 5.5 Fetchable properties
 
@@ -768,9 +776,9 @@ update it.
 have been `watch()`ed.
 
 ```rust
-// 1. Register the properties you care about
-speaker.volume.watch()?;
-speaker.playback_state.watch()?;
+// 1. Start watching — hold the handles to keep subscriptions alive
+let _vol = speaker.volume.watch()?;
+let _pb = speaker.playback_state.watch()?;
 
 // 2. Iterate (blocks the calling thread)
 for event in system.iter() {
@@ -1114,13 +1122,13 @@ fn main() -> Result<(), SdkError> {
         println!("Group: {} ({} members)", group.id, group.member_count());
     }
 
-    // Start watching for real-time updates
-    let vol_status = speaker.volume.watch()?;
-    speaker.playback_state.watch()?;
-    speaker.current_track.watch()?;
+    // Start watching for real-time updates — hold handles to keep subscriptions alive
+    let vol_handle = speaker.volume.watch()?;
+    let _pb = speaker.playback_state.watch()?;
+    let _ct = speaker.current_track.watch()?;
 
-    if !vol_status.has_realtime_events() {
-        eprintln!("Warning: running in {} mode", vol_status.mode);
+    if !vol_handle.has_realtime_events() {
+        eprintln!("Warning: running in {:?} mode", vol_handle.mode());
     }
 
     // React to changes with a 5-second per-event timeout

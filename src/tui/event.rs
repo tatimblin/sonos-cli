@@ -1,8 +1,13 @@
-//! TUI event loop, key handling, and property watch lifecycle.
+//! TUI event loop, key handling, and SDK event processing.
 //!
 //! Uses `event::poll(50ms)` so the SDK event drain runs even without keyboard
 //! input. The `dirty` flag skips rendering on idle poll timeouts.
 //! Progress bars animate via client-side interpolation when any group is Playing.
+//!
+//! Watch lifecycle is declarative: widgets call `app.watch()` during render to
+//! subscribe to properties. The event loop clears handles before each draw,
+//! starting grace periods. `draw()` immediately re-acquires handles via
+//! `app.watch()`, cancelling the grace periods.
 
 use std::time::{Duration, Instant};
 
@@ -27,9 +32,6 @@ fn run_event_loop_inner(
 ) -> anyhow::Result<()> {
     let change_iter = app.system.iter();
 
-    // Set up initial watches if starting on Groups tab
-    setup_watches_if_groups_tab(app);
-
     // Get initial terminal width
     let initial_size = terminal.size()?;
     app.terminal_width = initial_size.width;
@@ -39,7 +41,10 @@ fn run_event_loop_inner(
 
     loop {
         // 1. Render (only when state changed)
+        //    Clear old handles → grace periods start.
+        //    draw() → widgets call app.watch() → grace periods cancelled.
         if app.dirty {
+            app.clear_watch_handles();
             terminal.draw(|frame| ui::render(frame, app))?;
             app.dirty = false;
         }
@@ -48,17 +53,7 @@ fn run_event_loop_inner(
         if event::poll(Duration::from_millis(50))? {
             match event::read()? {
                 Event::Key(key) => {
-                    let was_groups_tab = is_on_groups_tab(app);
                     handle_key(app, key);
-                    let is_groups_tab = is_on_groups_tab(app);
-
-                    // Handle watch lifecycle on tab/screen transitions
-                    if was_groups_tab && !is_groups_tab {
-                        teardown_watches(app);
-                    } else if !was_groups_tab && is_groups_tab {
-                        setup_watches(app);
-                    }
-
                     app.dirty = true;
                 }
                 Event::Resize(w, _) => {
@@ -95,127 +90,22 @@ fn run_event_loop_inner(
 }
 
 // ---------------------------------------------------------------------------
-// Property watch lifecycle
-// ---------------------------------------------------------------------------
-
-fn is_on_groups_tab(app: &App) -> bool {
-    matches!(
-        app.navigation.current(),
-        Screen::Home {
-            tab: HomeTab::Groups,
-            ..
-        }
-    )
-}
-
-/// Set up watches if the app is currently on the Groups tab.
-fn setup_watches_if_groups_tab(app: &mut App) {
-    if is_on_groups_tab(app) {
-        setup_watches(app);
-    }
-}
-
-/// Watch playback properties for all group coordinators.
-fn setup_watches(app: &mut App) {
-    let groups = app.system.groups();
-
-    for group in &groups {
-        let Some(coordinator) = group.coordinator() else {
-            continue;
-        };
-
-        // Watch speaker properties on the coordinator individually
-        // (different handle types prevent abstraction):
-
-        // current_track
-        if let Ok(status) = coordinator.current_track.watch() {
-            app.watch_registry
-                .insert((coordinator.id.clone(), "current_track"));
-            if status.current.is_none() {
-                let _ = coordinator.current_track.fetch();
-            }
-        }
-
-        // playback_state
-        if let Ok(status) = coordinator.playback_state.watch() {
-            app.watch_registry
-                .insert((coordinator.id.clone(), "playback_state"));
-            if status.current.is_none() {
-                let _ = coordinator.playback_state.fetch();
-            }
-        }
-
-        // position
-        if let Ok(status) = coordinator.position.watch() {
-            app.watch_registry
-                .insert((coordinator.id.clone(), "position"));
-            if status.current.is_none() {
-                let _ = coordinator.position.fetch();
-            }
-        }
-
-        // group volume
-        if let Ok(status) = group.volume.watch() {
-            app.watch_registry
-                .insert((coordinator.id.clone(), "group_volume"));
-            if status.current.is_none() {
-                let _ = group.volume.fetch();
-            }
-        }
-
-        // Initialize progress state
-        let position = coordinator.position.get();
-        let playback = coordinator.playback_state.get();
-        let is_playing = playback.as_ref().map(|s| s.is_playing()).unwrap_or(false);
-        let (pos_ms, dur_ms) = position
-            .as_ref()
-            .map(|p| (p.position_ms, p.duration_ms))
-            .unwrap_or((0, 0));
-
-        app.progress_states.insert(
-            group.id.clone(),
-            ProgressState::new(pos_ms, dur_ms, is_playing),
-        );
-    }
-}
-
-/// Unwatch all currently watched properties.
-fn teardown_watches(app: &mut App) {
-    for (speaker_id, property_key) in app.watch_registry.drain() {
-        if let Some(speaker) = app.system.speaker_by_id(&speaker_id) {
-            match property_key {
-                "current_track" => speaker.current_track.unwatch(),
-                "playback_state" => speaker.playback_state.unwatch(),
-                "position" => speaker.position.unwatch(),
-                "group_volume" => {
-                    if let Some(group) = app.system.group_for_speaker(&speaker_id) {
-                        group.volume.unwatch();
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    app.progress_states.clear();
-}
-
-// ---------------------------------------------------------------------------
 // Change event handling
 // ---------------------------------------------------------------------------
 
 fn handle_change_event(app: &mut App, event: &sonos_sdk::ChangeEvent) {
     match event.property_key {
         "position" => {
-            // Find which group this coordinator belongs to, update progress state
             if let Some(speaker) = app.system.speaker_by_id(&event.speaker_id) {
                 if let Some(pos) = speaker.position.get() {
                     if let Some(group) = speaker.group() {
-                        if let Some(ps) = app.progress_states.get_mut(&group.id) {
-                            ps.last_position_ms = pos.position_ms;
-                            ps.last_duration_ms = pos.duration_ms;
-                            ps.wall_clock_at_last_update = Instant::now();
-                        }
+                        let ps = app
+                            .progress_states
+                            .entry(group.id.clone())
+                            .or_insert_with(|| ProgressState::new(0, 0, false));
+                        ps.last_position_ms = pos.position_ms;
+                        ps.last_duration_ms = pos.duration_ms;
+                        ps.wall_clock_at_last_update = Instant::now();
                     }
                 }
             }
@@ -224,28 +114,27 @@ fn handle_change_event(app: &mut App, event: &sonos_sdk::ChangeEvent) {
             if let Some(speaker) = app.system.speaker_by_id(&event.speaker_id) {
                 if let Some(state) = speaker.playback_state.get() {
                     if let Some(group) = speaker.group() {
-                        if let Some(ps) = app.progress_states.get_mut(&group.id) {
-                            let now_playing = state.is_playing();
-                            if ps.is_playing && !now_playing {
-                                // Freeze at current interpolated position
-                                ps.last_position_ms = ps.interpolated_position_ms();
-                                ps.wall_clock_at_last_update = Instant::now();
-                            }
-                            ps.is_playing = now_playing;
-                            if now_playing {
-                                ps.wall_clock_at_last_update = Instant::now();
-                            }
+                        let ps = app
+                            .progress_states
+                            .entry(group.id.clone())
+                            .or_insert_with(|| ProgressState::new(0, 0, false));
+                        let now_playing = state.is_playing();
+                        if ps.is_playing && !now_playing {
+                            // Freeze at current interpolated position
+                            ps.last_position_ms = ps.interpolated_position_ms();
+                            ps.wall_clock_at_last_update = Instant::now();
+                        }
+                        ps.is_playing = now_playing;
+                        if now_playing {
+                            ps.wall_clock_at_last_update = Instant::now();
                         }
                     }
                 }
             }
         }
         "group_membership" => {
-            // Topology changed — teardown and re-establish watches
-            if is_on_groups_tab(app) {
-                teardown_watches(app);
-                setup_watches(app);
-            }
+            // Topology changed — next render will re-watch new groups automatically.
+            app.progress_states.clear();
         }
         _ => {
             // Other events (current_track, group_volume, etc.) — just mark dirty

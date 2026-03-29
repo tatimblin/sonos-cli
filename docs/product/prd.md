@@ -93,7 +93,7 @@ The TUI uses `system.iter()` from `sonos-sdk` as its state update source. On eac
 2. For each `ChangeEvent`, update the relevant component state
 3. Re-render only changed components
 
-Properties are watched selectively — only the handles visible on the current screen are watched. Navigating to a new screen watches new handles and unwatches stale ones. This keeps subscriptions lean.
+Properties are watched selectively — only the handles visible on the current screen are watched. Navigating to a new screen watches new handles and drops stale watch handles. This keeps subscriptions lean.
 
 #### Screen Map
 
