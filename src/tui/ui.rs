@@ -11,10 +11,11 @@ use ratatui::Frame;
 use sonos_sdk::SonosSystem;
 
 use crate::tui::app::{App, GroupTab, HomeTab, Screen};
+use crate::tui::hooks::RenderContext;
 use crate::tui::screens::{home_groups, home_speakers};
 
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
-pub fn render(frame: &mut Frame, app: &App) {
+pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
     let area = frame.area();
     if area.height < 4 || area.width < 20 {
         return;
@@ -26,7 +27,7 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     // Header (first row)
     let header_area = Rect::new(padded_x, area.y, padded_w, 1);
-    render_header(frame, header_area, app);
+    render_header(frame, header_area, ctx.app);
 
     // Separator between header and content
     draw_separator(
@@ -34,7 +35,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         area.y + 1,
         area.x,
         area.x + area.width - 1,
-        app.theme.muted,
+        ctx.app.theme.muted,
     );
 
     // Content area
@@ -45,21 +46,30 @@ pub fn render(frame: &mut Frame, app: &App) {
         area.height.saturating_sub(4),
     );
 
-    match app.navigation.current() {
+    match ctx.app.navigation.current() {
         Screen::Home {
             tab,
             groups_state,
             speakers_state,
             ..
         } => match tab {
-            HomeTab::Groups => home_groups::render(frame, content_area, app, groups_state),
-            HomeTab::Speakers => home_speakers::render(frame, content_area, app, speakers_state),
+            HomeTab::Groups => {
+                let groups_state = groups_state.clone();
+                home_groups::render(frame, content_area, ctx, &groups_state);
+            }
+            HomeTab::Speakers => {
+                let speakers_state = speakers_state.clone();
+                home_speakers::render(frame, content_area, ctx, &speakers_state);
+            }
         },
         Screen::GroupView { group_id, tab } => {
-            render_group_view(frame, content_area, app, group_id, tab);
+            let group_id = group_id.clone();
+            let tab = tab.clone();
+            render_group_view(frame, content_area, ctx.app, &group_id, &tab);
         }
         Screen::SpeakerDetail { speaker_id } => {
-            render_speaker_detail(frame, content_area, app, speaker_id);
+            let speaker_id = speaker_id.clone();
+            render_speaker_detail(frame, content_area, ctx.app, &speaker_id);
         }
     }
 
@@ -69,12 +79,12 @@ pub fn render(frame: &mut Frame, app: &App) {
         area.y + area.height - 2,
         area.x,
         area.x + area.width - 1,
-        app.theme.muted,
+        ctx.app.theme.muted,
     );
 
     // Key legend (last row)
     let footer_area = Rect::new(padded_x, area.y + area.height - 1, padded_w, 1);
-    render_key_legend(frame, footer_area, app);
+    render_key_legend(frame, footer_area, ctx.app);
 }
 
 /// Draw a full-width horizontal separator line.
