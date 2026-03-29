@@ -27,6 +27,9 @@
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 
+use sonos_sdk::property::{GroupPropertyHandle, PropertyHandle};
+use sonos_state::property::SonosProperty;
+
 use crate::tui::app::App;
 
 // ============================================================================
@@ -207,6 +210,82 @@ impl Hooks {
             .or_insert_with(|| Box::new(default()))
             .downcast_mut::<V>()
             .expect("use_state: type mismatch for key (same key used with different types)")
+    }
+
+    // -----------------------------------------------------------------------
+    // use_watch
+    // -----------------------------------------------------------------------
+
+    /// Subscribe to an SDK speaker property, returning the current value.
+    ///
+    /// On first call, creates a `WatchHandle` via `prop.watch()`. On subsequent
+    /// frames, reuses the stored handle and reads its current value (the SDK
+    /// updates the handle's value internally via UPnP subscriptions).
+    ///
+    /// Two widgets watching the same property share one handle — keyed by
+    /// `(speaker_id, property_key)`.
+    ///
+    /// Falls back to `prop.get()` if `watch()` fails.
+    pub fn use_watch<P>(&mut self, prop: &PropertyHandle<P>) -> Option<P>
+    where
+        P: SonosProperty + Clone + 'static,
+    {
+        let key = format!("{}:{}", prop.speaker_id(), P::KEY);
+        self.accessed_watches.insert(key.clone());
+
+        // Reuse existing handle if available
+        if let Some(boxed) = self.watches.get(&key) {
+            if let Some(wh) = boxed.downcast_ref::<sonos_sdk::WatchHandle<P>>() {
+                return wh.value().cloned();
+            }
+        }
+
+        // Create new watch handle
+        match prop.watch() {
+            Ok(wh) => {
+                let val = wh.value().cloned();
+                self.watches.insert(key, Box::new(wh));
+                val
+            }
+            Err(e) => {
+                tracing::warn!("use_watch failed for {}: {e}, falling back to get()", P::KEY);
+                prop.get()
+            }
+        }
+    }
+
+    /// Subscribe to an SDK group property, returning the current value.
+    ///
+    /// Same as `use_watch` but for group-scoped properties (e.g., group volume).
+    pub fn use_watch_group<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>
+    where
+        P: SonosProperty + Clone + 'static,
+    {
+        let key = format!("group:{}:{}", prop.group_id(), P::KEY);
+        self.accessed_watches.insert(key.clone());
+
+        // Reuse existing handle if available
+        if let Some(boxed) = self.watches.get(&key) {
+            if let Some(wh) = boxed.downcast_ref::<sonos_sdk::WatchHandle<P>>() {
+                return wh.value().cloned();
+            }
+        }
+
+        // Create new watch handle
+        match prop.watch() {
+            Ok(wh) => {
+                let val = wh.value().cloned();
+                self.watches.insert(key, Box::new(wh));
+                val
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "use_watch_group failed for {}: {e}, falling back to get()",
+                    P::KEY
+                );
+                prop.get()
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
