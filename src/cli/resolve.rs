@@ -7,7 +7,7 @@ use crate::errors::CliError;
 /// Resolve --speaker / --group flags to a Speaker handle.
 ///
 /// Priority: --group wins over --speaker. If neither is given, uses config default
-/// or falls back to the first available speaker.
+/// or falls back to the first group's coordinator.
 pub fn resolve_speaker(
     system: &SonosSystem,
     config: &Config,
@@ -29,7 +29,7 @@ pub fn resolve_speaker(
             .ok_or_else(|| CliError::SpeakerNotFound(speaker_name.to_string()));
     }
 
-    // Default: config group → first speaker
+    // Default: config group → first group coordinator → first speaker
     if let Some(default_group) = &config.default_group {
         if let Some(g) = system.group(default_group) {
             if let Some(coordinator) = g.coordinator() {
@@ -38,7 +38,18 @@ pub fn resolve_speaker(
         }
     }
 
-    // Last resort: first speaker
+    // Prefer a group coordinator so we get track/position data
+    // (non-coordinator speakers return NOT_IMPLEMENTED for these)
+    if let Some(coordinator) = system
+        .groups()
+        .into_iter()
+        .next()
+        .and_then(|g| g.coordinator())
+    {
+        return Ok(coordinator);
+    }
+
+    // Last resort: first speaker (standalone, no groups)
     system
         .speakers()
         .into_iter()
@@ -143,6 +154,24 @@ mod tests {
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
         assert_eq!(spk.name, "Kitchen");
+    }
+
+    #[test]
+    fn resolve_speaker_prefers_group_coordinator() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let config = Config::default();
+        let global = GlobalFlags {
+            speaker: None,
+            group: None,
+            quiet: false,
+            verbose: false,
+            no_input: false,
+        };
+        let spk = resolve_speaker(&system, &config, &global).unwrap();
+        // Should pick the first group's coordinator, not an arbitrary speaker
+        let first_group = system.groups().into_iter().next().unwrap();
+        let expected_coordinator = first_group.coordinator().unwrap();
+        assert_eq!(spk.name, expected_coordinator.name);
     }
 
     #[test]
