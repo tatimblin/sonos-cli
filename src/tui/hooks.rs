@@ -224,12 +224,11 @@ impl Hooks {
 
     /// Subscribe to an SDK speaker property, returning the current value.
     ///
-    /// On first call, creates a `WatchHandle` via `prop.watch()`. On subsequent
-    /// frames, reuses the stored handle and reads its current value (the SDK
-    /// updates the handle's value internally via UPnP subscriptions).
-    ///
-    /// Two widgets watching the same property share one handle — keyed by
-    /// `(speaker_id, property_key)`.
+    /// Each frame, creates a fresh `WatchHandle` via `prop.watch()` to get
+    /// an up-to-date snapshot. The old handle is replaced (dropped → grace
+    /// period starts → new handle re-acquires → grace period cancelled).
+    /// This is the SDK's intended pattern: "Re-watch each frame to refresh
+    /// the snapshot."
     ///
     /// Falls back to `prop.get()` if `watch()` fails.
     pub fn use_watch<P>(&mut self, prop: &PropertyHandle<P>) -> Option<P>
@@ -239,14 +238,10 @@ impl Hooks {
         let key = format!("{}:{}", prop.speaker_id(), P::KEY);
         self.accessed_watches.insert(key.clone());
 
-        // Reuse existing handle if available
-        if let Some(boxed) = self.watches.get(&key) {
-            if let Some(wh) = boxed.downcast_ref::<sonos_sdk::WatchHandle<P>>() {
-                return wh.value().cloned();
-            }
-        }
-
-        // Create new watch handle
+        // Create a fresh watch handle each frame to get updated values.
+        // WatchHandle is a snapshot — value is set at creation and never updates.
+        // Replacing the old handle drops it (grace period starts), then the new
+        // handle re-acquires the subscription (grace period cancelled).
         match prop.watch() {
             Ok(wh) => {
                 let val = wh.value().cloned();
@@ -270,14 +265,6 @@ impl Hooks {
         let key = format!("group:{}:{}", prop.group_id(), P::KEY);
         self.accessed_watches.insert(key.clone());
 
-        // Reuse existing handle if available
-        if let Some(boxed) = self.watches.get(&key) {
-            if let Some(wh) = boxed.downcast_ref::<sonos_sdk::WatchHandle<P>>() {
-                return wh.value().cloned();
-            }
-        }
-
-        // Create new watch handle
         match prop.watch() {
             Ok(wh) => {
                 let val = wh.value().cloned();

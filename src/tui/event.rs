@@ -6,7 +6,8 @@
 //!
 //! Watch lifecycle is managed by the hooks system: widgets call
 //! `ctx.hooks.use_watch()` during render to subscribe to properties.
-//! Persistent handles are stored in Hooks and cleaned up via mark-and-sweep.
+//! Handles are refreshed each frame (WatchHandle is a snapshot) and
+//! cleaned up via mark-and-sweep when widgets stop rendering.
 
 use std::time::{Duration, Instant};
 
