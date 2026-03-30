@@ -30,7 +30,7 @@ test-helpers = ["sonos-sdk/test-support"]
 
 [dependencies]
 # Sonos SDK
-sonos-sdk = "0.3"
+sonos-sdk = "0.4"
 sonos-sdk-state = "0.3"
 
 # CLI parsing
@@ -63,7 +63,7 @@ clap_complete = { version = "4", optional = true }
 clap_mangen = { version = "0.2", optional = true }
 
 [dev-dependencies]
-sonos-sdk = { version = "0.3", features = ["test-support"] }
+sonos-sdk = { version = "0.4", features = ["test-support"] }
 proptest = "1"
 tempfile = "3"
 

@@ -2657,8 +2657,23 @@ dependencies = [
  "paste",
  "quick-xml",
  "serde",
- "sonos-sdk-discovery",
- "sonos-sdk-soap-client",
+ "sonos-sdk-discovery 0.3.0",
+ "sonos-sdk-soap-client 0.3.0",
+ "thiserror 1.0.69",
+ "xmltree",
+]
+
+[[package]]
+name = "sonos-api"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfcb47a14530bf0301efa2e794fdb85023af3156810b48d27f1143271377f7c6"
+dependencies = [
+ "paste",
+ "quick-xml",
+ "serde",
+ "sonos-sdk-discovery 0.4.0",
+ "sonos-sdk-soap-client 0.4.0",
  "thiserror 1.0.69",
  "xmltree",
 ]
@@ -2680,7 +2695,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sonos-sdk",
- "sonos-sdk-state",
+ "sonos-sdk-state 0.3.0",
  "tempfile",
  "thiserror 2.0.18",
  "toml",
@@ -2690,17 +2705,17 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "000d80ecbb4e27c66fa11cb704dbd16bb16aa4dfd703d540d9b64dcda1b70ff9"
+checksum = "505d1bef6b56e14e393dfcee4a6f153481872110d1387be581885a27376142cc"
 dependencies = [
  "dirs",
  "serde",
  "serde_json",
- "sonos-api",
- "sonos-sdk-discovery",
- "sonos-sdk-event-manager",
- "sonos-sdk-state",
+ "sonos-api 0.4.0",
+ "sonos-sdk-discovery 0.4.0",
+ "sonos-sdk-event-manager 0.4.0",
+ "sonos-sdk-state 0.4.0",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -2710,6 +2725,24 @@ name = "sonos-sdk-callback-server"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb53c11c73a3526b20698b90da059bdd5e3ef066cfd011e8d7153fba549744c2"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "reqwest",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "warp",
+]
+
+[[package]]
+name = "sonos-sdk-callback-server"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6359c15fcef0100efe403413e7091abcd620bc58c1b28b34c32cf33fac6b3f10"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2735,6 +2768,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sonos-sdk-discovery"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49d7698b790318ef6d1d3f28585599fbcf78024bb59c8a6bf8b152318f19e128"
+dependencies = [
+ "quick-xml",
+ "reqwest",
+ "serde",
+]
+
+[[package]]
 name = "sonos-sdk-event-manager"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2742,9 +2786,25 @@ checksum = "56f67b53947176bd4e707332d40b9d70fe2f667c14d3fb6f187694fe8fc68198"
 dependencies = [
  "dashmap",
  "parking_lot",
- "sonos-api",
- "sonos-sdk-discovery",
- "sonos-sdk-stream",
+ "sonos-api 0.3.0",
+ "sonos-sdk-discovery 0.3.0",
+ "sonos-sdk-stream 0.3.0",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "sonos-sdk-event-manager"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4547e3e69a20d0092123502c91dbfa9b510619dfca5b3cbefc8fceedf3abd1ad"
+dependencies = [
+ "dashmap",
+ "parking_lot",
+ "sonos-api 0.4.0",
+ "sonos-sdk-discovery 0.4.0",
+ "sonos-sdk-stream 0.4.0",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -2762,6 +2822,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sonos-sdk-soap-client"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee71ead1a920b345ecef171bed19ab28e39e2e980846c842339706f8e65f527c"
+dependencies = [
+ "thiserror 1.0.69",
+ "ureq",
+ "xmltree",
+]
+
+[[package]]
 name = "sonos-sdk-state"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2769,11 +2840,27 @@ checksum = "1cdbbc81adf672b9c01d99c37bda577496f1be1dd3ff759204f017c9f7c26b0c"
 dependencies = [
  "parking_lot",
  "serde",
- "sonos-api",
- "sonos-sdk-discovery",
- "sonos-sdk-event-manager",
- "sonos-sdk-state-store",
- "sonos-sdk-stream",
+ "sonos-api 0.3.0",
+ "sonos-sdk-discovery 0.3.0",
+ "sonos-sdk-event-manager 0.3.0",
+ "sonos-sdk-state-store 0.3.0",
+ "sonos-sdk-stream 0.3.0",
+ "tracing",
+]
+
+[[package]]
+name = "sonos-sdk-state"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b60389eb03d5ed90badf3fac7d98b46aa7b6edf3e859b9bbb5894fae3b573f84"
+dependencies = [
+ "parking_lot",
+ "serde",
+ "sonos-api 0.4.0",
+ "sonos-sdk-discovery 0.4.0",
+ "sonos-sdk-event-manager 0.4.0",
+ "sonos-sdk-state-store 0.4.0",
+ "sonos-sdk-stream 0.4.0",
  "tracing",
 ]
 
@@ -2782,6 +2869,12 @@ name = "sonos-sdk-state-store"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db916881ba9ed4ce782571c22b076ed4257e86b5b8e8f37fe493125cb4231459"
+
+[[package]]
+name = "sonos-sdk-state-store"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12f9a4934b2cb65dad4e6c74e39e2f99b21c15eb43aacc911cd4e9262e8b4974"
 
 [[package]]
 name = "sonos-sdk-stream"
@@ -2799,8 +2892,35 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sonos-api",
- "sonos-sdk-callback-server",
+ "sonos-api 0.3.0",
+ "sonos-sdk-callback-server 0.3.0",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "warp",
+]
+
+[[package]]
+name = "sonos-sdk-stream"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6e341df05f1bbcd6556268392fedd0fff1f3b7d067105e32e9072c44ccde179"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "crossbeam",
+ "dashmap",
+ "futures",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sonos-api 0.4.0",
+ "sonos-sdk-callback-server 0.4.0",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
