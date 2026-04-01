@@ -4,7 +4,7 @@
 //! ratatui's immediate-mode rendering. Three primitives:
 //!
 //! - `use_state<V>(key, default)` — Persistent local state across renders
-//! - `use_watch(property_handle)` — Subscribe to SDK property, return current value
+//! - `use_watch(property_handle)` — Subscribe to SDK property, read live cache value
 //! - `use_animation(key, active)` — Request periodic re-renders when active
 //!
 //! ## Calling Convention
@@ -220,13 +220,10 @@ impl Hooks {
 
     /// Subscribe to an SDK speaker property, returning the current value.
     ///
-    /// Each frame, creates a fresh `WatchHandle` via `prop.watch()` to get
-    /// an up-to-date snapshot. The old handle is replaced (dropped → grace
-    /// period starts → new handle re-acquires → grace period cancelled).
-    /// This is the SDK's intended pattern: "Re-watch each frame to refresh
-    /// the snapshot."
-    ///
-    /// Falls back to `prop.get()` if `watch()` fails.
+    /// The `WatchHandle` is an RAII subscription-lifetime token — created once
+    /// and reused across frames to avoid subscription churn. The live value is
+    /// read each frame via `prop.get()`, which reads from the SDK's
+    /// `StateManager` cache (updated by UPnP NOTIFY events).
     pub fn use_watch<P>(&mut self, prop: &PropertyHandle<P>) -> Option<P>
     where
         P: SonosProperty + Clone + 'static,
@@ -234,29 +231,26 @@ impl Hooks {
         let key = format!("{}:{}", prop.speaker_id(), P::KEY);
         self.accessed_watches.insert(key.clone());
 
-        // Create a fresh watch handle each frame to get updated values.
-        // WatchHandle is a snapshot — value is set at creation and never updates.
-        // Replacing the old handle drops it (grace period starts), then the new
-        // handle re-acquires the subscription (grace period cancelled).
-        match prop.watch() {
-            Ok(wh) => {
-                let val = wh.value().cloned();
-                self.watches.insert(key, Box::new(wh));
-                val
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "use_watch failed for {}: {e}, falling back to get()",
-                    P::KEY
-                );
-                prop.get()
+        // Ensure subscription exists (create handle once, reuse across frames)
+        if let std::collections::hash_map::Entry::Vacant(entry) = self.watches.entry(key) {
+            match prop.watch() {
+                Ok(wh) => {
+                    entry.insert(Box::new(wh));
+                }
+                Err(e) => {
+                    tracing::warn!("use_watch failed for {}: {e}", P::KEY);
+                }
             }
         }
+
+        // Always read from the live cache — not the handle's snapshot
+        prop.get()
     }
 
     /// Subscribe to an SDK group property, returning the current value.
     ///
     /// Same as `use_watch` but for group-scoped properties (e.g., group volume).
+    /// Handle created once for subscription lifetime; `prop.get()` reads live cache.
     pub fn use_watch_group<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>
     where
         P: SonosProperty + Clone + 'static,
@@ -264,20 +258,18 @@ impl Hooks {
         let key = format!("group:{}:{}", prop.group_id(), P::KEY);
         self.accessed_watches.insert(key.clone());
 
-        match prop.watch() {
-            Ok(wh) => {
-                let val = wh.value().cloned();
-                self.watches.insert(key, Box::new(wh));
-                val
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "use_watch_group failed for {}: {e}, falling back to get()",
-                    P::KEY
-                );
-                prop.get()
+        if let std::collections::hash_map::Entry::Vacant(entry) = self.watches.entry(key) {
+            match prop.watch() {
+                Ok(wh) => {
+                    entry.insert(Box::new(wh));
+                }
+                Err(e) => {
+                    tracing::warn!("use_watch_group failed for {}: {e}", P::KEY);
+                }
             }
         }
+
+        prop.get()
     }
 
     // -----------------------------------------------------------------------
