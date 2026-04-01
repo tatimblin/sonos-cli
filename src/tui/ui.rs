@@ -12,7 +12,7 @@ use sonos_sdk::SonosSystem;
 
 use crate::tui::app::{App, GroupTab, HomeTab, Screen};
 use crate::tui::hooks::RenderContext;
-use crate::tui::screens::{home_groups, home_speakers};
+use crate::tui::screens::{home_groups, home_speakers, now_playing};
 
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
 pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
@@ -65,7 +65,7 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
         Screen::GroupView { group_id, tab } => {
             let group_id = group_id.clone();
             let tab = tab.clone();
-            render_group_view(frame, content_area, ctx.app, &group_id, &tab);
+            render_group_view(frame, content_area, ctx, &group_id, &tab);
         }
         Screen::SpeakerDetail { speaker_id } => {
             let speaker_id = speaker_id.clone();
@@ -203,7 +203,7 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
         Screen::GroupView {
             tab: GroupTab::NowPlaying,
             ..
-        } => "←→ Tabs   ⎋ Back",
+        } => "←→ Tabs   ↑↓ Volume   ␣ Play/Pause   n Next   p Prev   ⎋ Back",
         Screen::GroupView {
             tab: GroupTab::Speakers,
             ..
@@ -226,19 +226,29 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
 fn render_group_view(
     frame: &mut Frame,
     area: Rect,
-    app: &App,
-    _group_id: &sonos_sdk::GroupId,
+    ctx: &mut RenderContext,
+    group_id: &sonos_sdk::GroupId,
     tab: &GroupTab,
 ) {
-    let text = match tab {
-        GroupTab::NowPlaying => "Now Playing — Milestone 8",
-        GroupTab::Speakers => "Group Speakers — Milestone 8",
-        GroupTab::Queue => "Queue — Milestone 8",
-    };
-    let paragraph = Paragraph::new(text)
-        .alignment(Alignment::Center)
-        .style(app.theme.muted);
-    frame.render_widget(paragraph, area);
+    match tab {
+        GroupTab::NowPlaying => {
+            now_playing::render(frame, area, ctx, group_id);
+        }
+        GroupTab::Speakers => {
+            let text = "Group Speakers — Milestone 8";
+            let paragraph = Paragraph::new(text)
+                .alignment(Alignment::Center)
+                .style(ctx.app.theme.muted);
+            frame.render_widget(paragraph, area);
+        }
+        GroupTab::Queue => {
+            let text = "Queue — Milestone 8";
+            let paragraph = Paragraph::new(text)
+                .alignment(Alignment::Center)
+                .style(ctx.app.theme.muted);
+            frame.render_widget(paragraph, area);
+        }
+    }
 }
 
 fn render_speaker_detail(

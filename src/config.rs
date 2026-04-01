@@ -11,6 +11,8 @@ pub struct Config {
     pub default_group: Option<String>,
     /// TUI color theme: "dark" or "light"
     pub theme: String,
+    /// Album art rendering mode: "auto", "halfblock", or "off"
+    pub album_art_mode: String,
 }
 
 impl Default for Config {
@@ -18,6 +20,7 @@ impl Default for Config {
         Self {
             default_group: None,
             theme: "dark".to_string(),
+            album_art_mode: "auto".to_string(),
         }
     }
 }
