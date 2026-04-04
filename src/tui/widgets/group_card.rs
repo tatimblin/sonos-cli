@@ -4,6 +4,8 @@ use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use ratatui::Frame;
+use ratatui_image::protocol::StatefulProtocol;
+use ratatui_image::StatefulImage;
 
 use crate::tui::theme::Theme;
 use crate::tui::widgets::progress_bar;
@@ -60,8 +62,18 @@ impl PlaybackIcon {
 }
 
 /// Render a group card within the given area.
+///
+/// When `art_protocol` is `Some`, a 3×3 album art thumbnail is rendered in the
+/// track info area (lines 3–5). The image is rendered directly without a border
+/// for maximum visual density at small sizes.
 #[allow(clippy::too_many_lines)]
-pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, theme: &Theme) {
+pub fn render_group_card(
+    frame: &mut Frame,
+    area: Rect,
+    data: &GroupCardData,
+    theme: &Theme,
+    art_protocol: Option<&mut StatefulProtocol>,
+) {
     let (border_type, border_style) = if data.selected {
         (BorderType::Thick, theme.card_border_selected)
     } else {
@@ -87,6 +99,11 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
     if inner.height == 0 || inner.width < 10 {
         return;
     }
+
+    // Show mini album art when protocol is available and card is wide enough.
+    let show_art = art_protocol.is_some() && inner.height >= 7 && inner.width >= 30;
+    // Track info indent: wider when art is shown to leave room for 3×3 image.
+    let track_indent = if show_art { "     " } else { "  " };
 
     let w = inner.width as usize;
 
@@ -116,20 +133,23 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
     // Line 2: empty
     let line2 = Line::raw("");
 
-    // Line 3: track title (indented)
+    // Line 3: track title (indented; wider indent when mini art is shown)
     let title = if data.track_title.is_empty() {
         "Nothing playing"
     } else {
         &data.track_title
     };
-    let line3 = Line::from(Span::styled(format!("  {title}"), theme.track_info));
+    let line3 = Line::from(Span::styled(
+        format!("{track_indent}{title}"),
+        theme.track_info,
+    ));
 
-    // Line 4: artist (indented)
+    // Line 4: artist (indented; wider indent when mini art is shown)
     let line4 = if data.track_artist.is_empty() {
         Line::raw("")
     } else {
         Line::from(Span::styled(
-            format!("  {}", data.track_artist),
+            format!("{track_indent}{}", data.track_artist),
             theme.muted,
         ))
     };
@@ -206,6 +226,16 @@ pub fn render_group_card(frame: &mut Frame, area: Rect, data: &GroupCardData, th
     let lines = vec![line1, line2, line3, line4, line5, line6, line7];
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
+
+    // Overlay mini album art (3×3) in the track info area (lines 3–5).
+    // Rendered after the Paragraph so the image overwrites the indent spaces.
+    if show_art {
+        if let Some(proto) = art_protocol {
+            let art_area = Rect::new(inner.x, inner.y + 2, 3, 3);
+            let image = StatefulImage::new(None);
+            frame.render_stateful_widget(image, art_area, proto);
+        }
+    }
 }
 
 /// Render a placeholder for an unavailable group.

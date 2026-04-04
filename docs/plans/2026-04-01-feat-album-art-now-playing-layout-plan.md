@@ -1,7 +1,7 @@
 ---
 title: "feat: Add album art widget and Now Playing tab layout"
 type: feat
-status: active
+status: completed
 date: 2026-04-01
 origin: docs/brainstorms/2026-02-26-sonos-tui-brainstorm.md
 milestone: "Milestone 8: TUI — Group View"
@@ -265,10 +265,10 @@ image = "0.25"
 - [x] Responsive: skip album art when content width < 50, metadata-only layout
 
 ### Phase 3: Mini-Player Album Art
-- [ ] 3×3 album art rendered on the left side of the existing mini-player bar
-- [ ] Separate `StatefulProtocol` instance for the mini-player size
-- [ ] Debounce: 300ms delay before fetching art when focused group changes
-- [ ] Falls back to no-art mini-player layout when `album_art_mode = "off"` or terminal too narrow
+- [x] 3×3 album art rendered on the left side of the existing mini-player bar
+- [x] Separate `StatefulProtocol` instance for the mini-player size
+- [x] Debounce: 300ms delay before fetching art when focused group changes
+- [x] Falls back to no-art mini-player layout when `album_art_mode = "off"` or terminal too narrow
 
 ## Success Metrics
 
