@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/tatimblin/sonos-cli/compare/v0.1.2...v0.2.0) - 2026-04-05
+
+### Added
+
+- *(tui)* shared SpeakerList widget with pick-up/drop regrouping ([#45](https://github.com/tatimblin/sonos-cli/pull/45))
+- *(tui)* add album art and Now Playing tab ([#44](https://github.com/tatimblin/sonos-cli/pull/44))
+
+### Fixed
+
+- align sonos-sdk dev-dependency version with main dependency
+
 ## [0.1.2](https://github.com/tatimblin/sonos-cli/compare/v0.1.1...v0.1.2) - 2026-03-29
 
 ### Added
