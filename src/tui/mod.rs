@@ -23,7 +23,7 @@ pub fn run(config: Config) -> Result<()> {
     // Detect terminal image protocol BEFORE entering raw mode.
     // from_query_stdio() sends escape sequences to discover font size and
     // graphics protocol support — must happen before ratatui::init().
-    let picker = if config.album_art_mode == "off" {
+    let picker = if config.album_art_mode.is_off() {
         None
     } else {
         match Picker::from_query_stdio() {

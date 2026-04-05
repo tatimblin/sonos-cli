@@ -5,13 +5,59 @@
 //! or `None` for a placeholder. Used at 20×20 in Now Playing, 3×3 in the
 //! mini-player, and potentially 1×1 in the queue.
 
+use std::cell::RefCell;
+
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use ratatui::Frame;
+use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::StatefulImage;
+
+use crate::tui::image_loader::ImageLoader;
+
+/// Hook-friendly state for album art protocol lifecycle.
+///
+/// Tracks the current album art URI and holds the `StatefulProtocol` used for
+/// rendering. Detects URI changes, invalidates stale protocols, and lazily
+/// creates new ones from the image cache.
+#[derive(Default)]
+pub struct ArtProtocolState {
+    uri: Option<String>,
+    pub protocol: Option<StatefulProtocol>,
+}
+
+impl ArtProtocolState {
+    /// Update protocol when URI changes. Creates protocol from cached image.
+    ///
+    /// Call this each render frame with the current `art_uri`. Handles:
+    /// - URI change detection (invalidates old protocol)
+    /// - Lazy protocol creation from `ImageLoader` cache + `Picker`
+    pub fn ensure_protocol(
+        &mut self,
+        art_uri: &Option<String>,
+        image_loader: &ImageLoader,
+        picker: &RefCell<Option<Picker>>,
+    ) {
+        let uri_changed = self.uri.as_deref() != art_uri.as_deref();
+        if uri_changed {
+            self.uri = art_uri.clone();
+            self.protocol = None;
+        }
+
+        if self.protocol.is_none() {
+            if let Some(ref uri) = art_uri {
+                if let Some(img) = image_loader.get(uri) {
+                    if let Some(ref mut p) = *picker.borrow_mut() {
+                        self.protocol = Some(p.new_resize_protocol(img.clone()));
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Render album art or a placeholder within the given area.
 ///

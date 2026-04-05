@@ -9,7 +9,7 @@
 //! that only have `&self` access.
 
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::IpAddr;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -40,7 +40,7 @@ struct LoadResult {
 pub struct ImageLoader {
     cache: HashMap<String, DynamicImage>,
     /// Insertion order for LRU eviction.
-    insertion_order: Vec<String>,
+    insertion_order: VecDeque<String>,
     /// URIs currently being fetched (RefCell for &self access from render).
     pending: RefCell<HashSet<String>>,
     result_rx: mpsc::Receiver<LoadResult>,
@@ -62,7 +62,7 @@ impl ImageLoader {
 
         Self {
             cache: HashMap::new(),
-            insertion_order: Vec::new(),
+            insertion_order: VecDeque::new(),
             pending: RefCell::new(HashSet::new()),
             result_rx,
             request_tx,
@@ -103,7 +103,7 @@ impl ImageLoader {
             self.pending.borrow_mut().remove(&result.uri);
             if let Some(img) = result.image {
                 self.evict_if_full();
-                self.insertion_order.push(result.uri.clone());
+                self.insertion_order.push_back(result.uri.clone());
                 self.cache.insert(result.uri, img);
                 loaded = true;
             }
@@ -116,16 +116,9 @@ impl ImageLoader {
         self.cache.get(uri)
     }
 
-    /// Check if a URI is being fetched.
-    #[allow(dead_code)]
-    pub fn is_pending(&self, uri: &str) -> bool {
-        self.pending.borrow().contains(uri)
-    }
-
     fn evict_if_full(&mut self) {
         while self.cache.len() >= MAX_CACHE_SIZE {
-            if let Some(oldest) = self.insertion_order.first().cloned() {
-                self.insertion_order.remove(0);
+            if let Some(oldest) = self.insertion_order.pop_front() {
                 self.cache.remove(&oldest);
             } else {
                 break;

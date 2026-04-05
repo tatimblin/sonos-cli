@@ -4,34 +4,17 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
-use ratatui_image::protocol::StatefulProtocol;
 use sonos_sdk::{GroupId, PlaybackState};
 
 use crate::tui::hooks::{ProgressState, RenderContext};
-use crate::tui::widgets::{album_art, progress_bar, volume_bar};
+use crate::tui::widgets::album_art::{self, ArtProtocolState};
+use crate::tui::widgets::{progress_bar, volume_bar};
 
 /// Minimum content width to show album art. Below this, metadata-only layout.
 const MIN_ART_WIDTH: u16 = 50;
 
 /// Album art column width (including border).
 const ART_COL_WIDTH: u16 = 24;
-
-/// Hook state for album art: tracks the URI and holds the render protocol.
-struct AlbumArtHookState {
-    /// The URI this protocol was created for (change detection).
-    uri: Option<String>,
-    /// The ratatui-image protocol for rendering.
-    protocol: Option<StatefulProtocol>,
-}
-
-impl Default for AlbumArtHookState {
-    fn default() -> Self {
-        Self {
-            uri: None,
-            protocol: None,
-        }
-    }
-}
 
 /// Render the Now Playing tab content.
 pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, group_id: &GroupId) {
@@ -154,6 +137,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, group_id: 
             &track_artist,
             &track_album,
             volume,
+            members.len(),
             &speaker_count_text,
         );
     } else {
@@ -166,6 +150,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, group_id: 
             &track_artist,
             &track_album,
             volume,
+            members.len(),
             &speaker_count_text,
         );
     }
@@ -189,29 +174,10 @@ fn render_art_column(
     ctx: &mut RenderContext,
     art_uri: &Option<String>,
 ) {
-    // Get the image from cache and create/update the protocol
-    let art_key = "now_playing:album_art";
     let art_state = ctx
         .hooks
-        .use_state::<AlbumArtHookState>(art_key, AlbumArtHookState::default);
-
-    // Check if URI changed → need new protocol
-    let uri_changed = art_state.uri.as_deref() != art_uri.as_deref();
-    if uri_changed {
-        art_state.uri = art_uri.clone();
-        art_state.protocol = None; // will be recreated below
-    }
-
-    // If we have a URI and an image in cache but no protocol, create one
-    if art_state.protocol.is_none() {
-        if let Some(ref uri) = art_uri {
-            if let Some(img) = ctx.app.image_loader.get(uri) {
-                if let Some(ref mut picker) = *ctx.app.picker.borrow_mut() {
-                    art_state.protocol = Some(picker.new_resize_protocol(img.clone()));
-                }
-            }
-        }
-    }
+        .use_state::<ArtProtocolState>("now_playing:album_art", ArtProtocolState::default);
+    art_state.ensure_protocol(art_uri, &ctx.app.image_loader, &ctx.app.picker);
 
     let border_style = ctx.app.theme.card_border;
     let placeholder_style = ctx.app.theme.muted;
@@ -235,6 +201,7 @@ fn render_metadata_column(
     artist: &str,
     album: &str,
     volume: u16,
+    speaker_count: usize,
     speaker_text: &str,
 ) {
     let theme = &ctx.app.theme;
@@ -289,7 +256,7 @@ fn render_metadata_column(
     lines.push(Line::from(vec![
         Span::raw("🔊×"),
         Span::styled(
-            format!("{}  ", speaker_text.chars().count().min(99)),
+            format!("{speaker_count}  "),
             theme.muted,
         ),
         Span::styled(speaker_text.to_string(), theme.muted),
@@ -344,33 +311,23 @@ fn render_controls(
             .saturating_sub(time_left_width + time_right_width)
             .min(100);
 
-        let progress_clamped = progress.clamp(0.0, 1.0);
-        let filled = (bar_width as f64 * progress_clamped) as usize;
-        let empty = bar_width.saturating_sub(filled);
-
-        // Pre-computed bar strings from group_card (same constants)
-        const PROG_FILLED: &str = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-        const PROG_EMPTY: &str = "────────────────────────────────────────────────────────────────────────────────────────────────────────";
-        const PROG_CHAR_BYTES: usize = 3;
-
-        let filled = filled.min(100);
-        let empty = empty.min(100);
-
-        let bar_line = Line::from(vec![
+        let bar_spans = progress_bar::render_bar_spans(
+            progress,
+            bar_width,
+            Some("╺"),
+            theme.progress_filled,
+            theme.progress_cursor,
+            theme.progress_empty,
+        );
+        let mut line_spans = vec![
             Span::styled(elapsed_str, theme.progress_time),
             Span::raw("  "),
-            Span::styled(
-                &PROG_FILLED[..filled * PROG_CHAR_BYTES],
-                theme.progress_filled,
-            ),
-            Span::styled("╺", theme.progress_cursor),
-            Span::styled(
-                &PROG_EMPTY[..empty * PROG_CHAR_BYTES],
-                theme.progress_empty,
-            ),
-            Span::raw("  "),
-            Span::styled(duration_str, theme.progress_time),
-        ]);
+        ];
+        line_spans.extend(bar_spans);
+        line_spans.push(Span::raw("  "));
+        line_spans.push(Span::styled(duration_str, theme.progress_time));
+
+        let bar_line = Line::from(line_spans);
         let bar_paragraph = Paragraph::new(bar_line).alignment(Alignment::Center);
         let bar_row = Rect::new(area.x, area.y + 1, area.width, 1);
         frame.render_widget(bar_paragraph, bar_row);

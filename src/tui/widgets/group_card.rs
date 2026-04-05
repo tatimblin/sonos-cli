@@ -9,18 +9,9 @@ use ratatui_image::StatefulImage;
 
 use crate::tui::theme::Theme;
 use crate::tui::widgets::progress_bar;
+use crate::tui::widgets::volume_bar;
 
-// Pre-computed bar strings — sliced per-frame instead of allocating via `.repeat()`.
-// All chars below are 3 bytes in UTF-8. 100 chars covers any reasonable terminal width.
-const VOL_FILLED: &str = "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■";
-const VOL_EMPTY: &str = "····································································································";
-const PROG_FILLED: &str = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-const PROG_EMPTY: &str = "────────────────────────────────────────────────────────────────────────────────────────────────────────";
 const SPACES: &str = "                                                                                                    ";
-
-const VOL_FILLED_CHAR_BYTES: usize = 3; // ■ U+25A0
-const VOL_EMPTY_CHAR_BYTES: usize = 2; // · U+00B7
-const PROG_CHAR_BYTES: usize = 3; // ━ U+2501, ─ U+2500
 
 /// Data needed to render a single group card.
 pub struct GroupCardData {
@@ -164,34 +155,24 @@ pub fn render_group_card(
     // prefix: "  " + icon(1) + "  " = 5 display cols
     let prog_prefix_width = 5;
     let prog_bar_width = w.saturating_sub(prog_prefix_width + time_text.len());
-    let progress = data.progress.clamp(0.0, 1.0);
-    let cursor_pos = (prog_bar_width as f64 * progress) as usize;
     let has_track = !data.track_title.is_empty();
-    let filled_count = cursor_pos.min(prog_bar_width);
-    let cursor_width = if has_track { 1 } else { 0 };
-    let empty_count = prog_bar_width.saturating_sub(filled_count + cursor_width);
-    let cursor = if has_track && filled_count < prog_bar_width {
-        "●"
-    } else {
-        ""
-    };
-    let filled_count = filled_count.min(100);
-    let empty_count = empty_count.min(100);
-    let line6 = Line::from(vec![
+    let cursor = if has_track { Some("●") } else { None };
+    let bar_spans = progress_bar::render_bar_spans(
+        data.progress,
+        prog_bar_width,
+        cursor,
+        theme.progress_filled,
+        theme.progress_cursor,
+        theme.progress_empty,
+    );
+    let mut line6_spans = vec![
         Span::raw("  "),
         Span::styled(data.playback_state.symbol(), icon_style),
         Span::raw("  "),
-        Span::styled(
-            &PROG_FILLED[..filled_count * PROG_CHAR_BYTES],
-            theme.progress_filled,
-        ),
-        Span::styled(cursor, theme.progress_cursor),
-        Span::styled(
-            &PROG_EMPTY[..empty_count * PROG_CHAR_BYTES],
-            theme.progress_empty,
-        ),
-        Span::styled(time_text, theme.progress_time),
-    ]);
+    ];
+    line6_spans.extend(bar_spans);
+    line6_spans.push(Span::styled(time_text, theme.progress_time));
+    let line6 = Line::from(line6_spans);
 
     // Line 7: Speaker text          🔊 ████░░░░
     // Each half gets max 50% of the width.
@@ -213,11 +194,11 @@ pub fn render_group_card(
         Span::raw(&SPACES[..spk_pad]),
         Span::raw("🔊 "),
         Span::styled(
-            &VOL_FILLED[..vol_filled * VOL_FILLED_CHAR_BYTES],
+            &volume_bar::FILLED[..vol_filled * volume_bar::FILLED_CHAR_BYTES],
             theme.volume_filled,
         ),
         Span::styled(
-            &VOL_EMPTY[..vol_empty * VOL_EMPTY_CHAR_BYTES],
+            &volume_bar::EMPTY[..vol_empty * volume_bar::EMPTY_CHAR_BYTES],
             theme.volume_empty,
         ),
         Span::styled(vol_label, theme.muted),
