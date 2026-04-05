@@ -4,20 +4,15 @@ use serde::Deserialize;
 use std::path::PathBuf;
 
 /// Album art rendering mode.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AlbumArtMode {
+    #[default]
     Auto,
     Off,
     /// Catch-all for unrecognized values — behaves like Auto.
     #[serde(other)]
     Other,
-}
-
-impl Default for AlbumArtMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl AlbumArtMode {
