@@ -133,22 +133,14 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Esc => {
             // Check for pick-up mode first — Esc cancels pick-up before navigating
-            let in_pick_up = match app.navigation.current() {
-                Screen::Home { speakers_state, .. } => speakers_state.pick_up.is_some(),
-                Screen::GroupView { speakers_state, .. } => speakers_state.pick_up.is_some(),
-                _ => false,
-            };
+            let in_pick_up = app
+                .navigation
+                .current()
+                .speakers_state()
+                .is_some_and(|s| s.pick_up.is_some());
             if in_pick_up {
-                match app.navigation.current_mut() {
-                    Screen::Home {
-                        ref mut speakers_state,
-                        ..
-                    } => speakers_state.pick_up = None,
-                    Screen::GroupView {
-                        ref mut speakers_state,
-                        ..
-                    } => speakers_state.pick_up = None,
-                    _ => {}
+                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
+                    state.pick_up = None;
                 }
                 return;
             }

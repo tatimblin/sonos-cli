@@ -12,7 +12,7 @@ use sonos_sdk::SonosSystem;
 
 use crate::tui::app::{App, GroupTab, HomeTab, Screen};
 use crate::tui::hooks::RenderContext;
-use crate::tui::screens::{home_groups, home_speakers, now_playing};
+use crate::tui::screens::{home_groups, now_playing};
 use crate::tui::widgets::speaker_list::{self, SpeakerListMode};
 
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
@@ -60,7 +60,8 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
             }
             HomeTab::Speakers => {
                 let speakers_state = speakers_state.clone();
-                home_speakers::render(frame, content_area, ctx, &speakers_state);
+                let mode = SpeakerListMode::FullList;
+                speaker_list::render(frame, content_area, ctx, &mode, &speakers_state);
             }
         },
         Screen::GroupView {

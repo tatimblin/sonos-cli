@@ -69,7 +69,7 @@ impl Navigation {
                 tab: HomeTab::default(),
                 tab_focused: false,
                 groups_state: HomeGroupsState::default(),
-                speakers_state: HomeSpeakersState::default(),
+                speakers_state: SpeakerListScreenState::default(),
             }],
         }
     }
@@ -109,7 +109,7 @@ pub enum Screen {
         tab: HomeTab,
         tab_focused: bool,
         groups_state: HomeGroupsState,
-        speakers_state: HomeSpeakersState,
+        speakers_state: SpeakerListScreenState,
     },
     GroupView {
         group_id: GroupId,
@@ -136,8 +136,23 @@ pub struct SpeakerListScreenState {
     pub pick_up: Option<PickUpState>,
 }
 
-/// UI state for the Home > Speakers tab (alias for shared state).
-pub type HomeSpeakersState = SpeakerListScreenState;
+impl Screen {
+    pub fn speakers_state(&self) -> Option<&SpeakerListScreenState> {
+        match self {
+            Screen::Home { speakers_state, .. } => Some(speakers_state),
+            Screen::GroupView { speakers_state, .. } => Some(speakers_state),
+            _ => None,
+        }
+    }
+
+    pub fn speakers_state_mut(&mut self) -> Option<&mut SpeakerListScreenState> {
+        match self {
+            Screen::Home { speakers_state, .. } => Some(speakers_state),
+            Screen::GroupView { speakers_state, .. } => Some(speakers_state),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum HomeTab {
