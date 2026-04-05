@@ -39,9 +39,12 @@ pub struct Theme {
     pub speaker_cursor: Style,
     pub speaker_name: Style,
 
-    // Modal
+    // Modal (retained for future milestones)
+    #[allow(dead_code)]
     pub modal_border: Style,
+    #[allow(dead_code)]
     pub modal_title: Style,
+    #[allow(dead_code)]
     pub modal_selected: Style,
 
     // General

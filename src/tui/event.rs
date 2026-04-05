@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use crate::tui::app::{App, HomeTab, Screen};
+use crate::tui::app::{App, Screen};
 use crate::tui::handlers;
 use crate::tui::hooks::{Hooks, RenderContext};
 use crate::tui::ui;
@@ -132,23 +132,25 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Esc => {
-            // Check for modal first in speakers tab
-            if let Screen::Home {
-                tab: HomeTab::Speakers,
-                ref speakers_state,
-                ..
-            } = app.navigation.current()
-            {
-                if speakers_state.modal.is_some() {
-                    if let Screen::Home {
+            // Check for pick-up mode first — Esc cancels pick-up before navigating
+            let in_pick_up = match app.navigation.current() {
+                Screen::Home { speakers_state, .. } => speakers_state.pick_up.is_some(),
+                Screen::GroupView { speakers_state, .. } => speakers_state.pick_up.is_some(),
+                _ => false,
+            };
+            if in_pick_up {
+                match app.navigation.current_mut() {
+                    Screen::Home {
                         ref mut speakers_state,
                         ..
-                    } = app.navigation.current_mut()
-                    {
-                        speakers_state.modal = None;
-                    }
-                    return;
+                    } => speakers_state.pick_up = None,
+                    Screen::GroupView {
+                        ref mut speakers_state,
+                        ..
+                    } => speakers_state.pick_up = None,
+                    _ => {}
                 }
+                return;
             }
 
             if !app.navigation.pop() {
@@ -164,9 +166,12 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Home {
             tab, tab_focused, ..
         } => handlers::home::handle_home_key(app, key, &tab, tab_focused),
-        Screen::GroupView { group_id, tab } => {
-            handlers::group::handle_group_key(app, key, &group_id, &tab)
-        }
+        Screen::GroupView {
+            group_id,
+            tab,
+            tab_focused,
+            ..
+        } => handlers::group::handle_group_key(app, key, &group_id, &tab, tab_focused),
         Screen::SpeakerDetail { .. } => handlers::group::handle_speaker_key(app, key),
     }
 }

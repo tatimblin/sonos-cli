@@ -8,6 +8,7 @@ use crate::config::Config;
 use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
 use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
+use crate::tui::widgets::speaker_list::PickUpState;
 
 /// Top-level TUI state. Owns the SDK handle and all UI state.
 ///
@@ -113,6 +114,8 @@ pub enum Screen {
     GroupView {
         group_id: GroupId,
         tab: GroupTab,
+        tab_focused: bool,
+        speakers_state: SpeakerListScreenState,
     },
     #[allow(dead_code)] // used in future milestones
     SpeakerDetail {
@@ -126,21 +129,15 @@ pub struct HomeGroupsState {
     pub selected_index: usize,
 }
 
-/// UI state for the Home > Speakers tab.
+/// Shared UI state for any speaker list (Home > Speakers or GroupView > Speakers).
 #[derive(Clone, Debug, Default)]
-pub struct HomeSpeakersState {
+pub struct SpeakerListScreenState {
     pub selected_index: usize,
-    /// Active modal (e.g. group picker for move-to-group).
-    pub modal: Option<ModalState>,
+    pub pick_up: Option<PickUpState>,
 }
 
-/// State for a modal overlay (e.g. group picker).
-#[derive(Clone, Debug)]
-pub struct ModalState {
-    pub title: String,
-    pub items: Vec<String>,
-    pub selected_index: usize,
-}
+/// UI state for the Home > Speakers tab (alias for shared state).
+pub type HomeSpeakersState = SpeakerListScreenState;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum HomeTab {

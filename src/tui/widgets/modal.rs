@@ -1,14 +1,25 @@
 //! Modal overlay — centered bordered list for pickers and confirmations.
+//!
+//! Retained for future milestones (queue picker, etc.).
 
 use ratatui::layout::{Alignment, Constraint, Flex, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
-use crate::tui::app::ModalState;
 use crate::tui::theme::Theme;
 
+/// State for a modal overlay (e.g. group picker).
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct ModalState {
+    pub title: String,
+    pub items: Vec<String>,
+    pub selected_index: usize,
+}
+
 /// Render a modal overlay centered in the terminal.
+#[allow(dead_code)]
 pub fn render_modal(frame: &mut Frame, area: Rect, modal: &ModalState, theme: &Theme) {
     let modal_width = 40.min(area.width.saturating_sub(4));
     let modal_height = (modal.items.len() as u16 + 4).min(area.height.saturating_sub(2));
