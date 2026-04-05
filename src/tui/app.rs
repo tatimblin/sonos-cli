@@ -1,6 +1,11 @@
 //! TUI application state and navigation types.
 
+use std::cell::RefCell;
+
+use ratatui_image::picker::Picker;
+
 use crate::config::Config;
+use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
 use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
 
@@ -19,10 +24,16 @@ pub struct App {
     pub status_message: Option<String>,
     /// Terminal width cached from last render/resize, used for grid navigation.
     pub terminal_width: u16,
+    /// Terminal image protocol picker, detected before entering raw mode.
+    /// `None` when album art is disabled or terminal detection failed.
+    /// `RefCell` because `new_resize_protocol()` requires `&mut Picker`.
+    pub picker: RefCell<Option<Picker>>,
+    /// Background image fetcher and cache for album art.
+    pub image_loader: ImageLoader,
 }
 
 impl App {
-    pub fn new(config: Config, theme: Theme) -> anyhow::Result<Self> {
+    pub fn new(config: Config, theme: Theme, picker: Option<Picker>) -> anyhow::Result<Self> {
         let system = SonosSystem::new()?;
         Ok(Self {
             system,
@@ -33,6 +44,8 @@ impl App {
             theme,
             status_message: None,
             terminal_width: 80, // updated on first render/resize
+            picker: RefCell::new(picker),
+            image_loader: ImageLoader::new(),
         })
     }
 }

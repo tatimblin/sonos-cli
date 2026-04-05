@@ -1,5 +1,7 @@
 //! Home > Groups tab — responsive grid of live group cards.
 
+use std::time::{Duration, Instant};
+
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
@@ -7,10 +9,29 @@ use sonos_sdk::PlaybackState;
 
 use crate::tui::app::HomeGroupsState;
 use crate::tui::hooks::{ProgressState, RenderContext};
+use crate::tui::widgets::album_art::ArtProtocolState;
 use crate::tui::widgets::group_card::{self, GroupCardData, PlaybackIcon};
 
 /// Card height (border + 7 content lines).
 const CARD_HEIGHT: u16 = 9;
+
+/// Debounce delay before fetching album art for a newly selected group.
+const ART_DEBOUNCE: Duration = Duration::from_millis(300);
+
+/// Tracks when the selected group last changed, for debounce.
+struct FocusDebounce {
+    last_index: usize,
+    changed_at: Instant,
+}
+
+impl Default for FocusDebounce {
+    fn default() -> Self {
+        Self {
+            last_index: 0,
+            changed_at: Instant::now(),
+        }
+    }
+}
 
 /// Render the Groups tab content.
 pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &HomeGroupsState) {
@@ -23,6 +44,23 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
         frame.render_widget(paragraph, area);
         return;
     }
+
+    // Mini album art: enabled when a terminal image protocol is available.
+    let show_mini_art = ctx.app.picker.borrow().is_some();
+
+    // Track selection changes for debounce (only used when mini art is enabled).
+    let selection_stable = if show_mini_art {
+        let debounce = ctx
+            .hooks
+            .use_state::<FocusDebounce>("home:art_debounce", FocusDebounce::default);
+        if debounce.last_index != state.selected_index {
+            debounce.last_index = state.selected_index;
+            debounce.changed_at = Instant::now();
+        }
+        debounce.changed_at.elapsed() >= ART_DEBOUNCE
+    } else {
+        false
+    };
 
     let cols = if area.width >= 100 { 2usize } else { 1 };
     let rows = groups.len().div_ceil(cols);
@@ -89,6 +127,19 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
                 })
                 .unwrap_or_default();
 
+            // Extract album art URI for mini-player art.
+            let art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
+
+            // Request album art fetch (debounced for the selected group).
+            if show_mini_art {
+                if let Some(ref uri) = art_uri {
+                    let should_fetch = if selected { true } else { selection_stable };
+                    if should_fetch {
+                        ctx.app.image_loader.request(uri, coordinator.ip);
+                    }
+                }
+            }
+
             let volume = group_volume.map(|v| v.value()).unwrap_or(0);
 
             let is_playing = playback_state
@@ -143,7 +194,19 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
                 selected,
             };
 
-            group_card::render_group_card(frame, *col_area, &data, &ctx.app.theme);
+            // Render card with or without mini album art.
+            let art_protocol = if show_mini_art {
+                let art_key = format!("{group_id_str}:mini_art");
+                let art_state = ctx
+                    .hooks
+                    .use_state::<ArtProtocolState>(&art_key, ArtProtocolState::default);
+                art_state.ensure_protocol(&art_uri, &ctx.app.image_loader, &ctx.app.picker);
+                art_state.protocol.as_mut()
+            } else {
+                None
+            };
+
+            group_card::render_group_card(frame, *col_area, &data, &ctx.app.theme, art_protocol);
         }
     }
 }

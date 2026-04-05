@@ -3,6 +3,25 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
+/// Album art rendering mode.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlbumArtMode {
+    #[default]
+    Auto,
+    Off,
+    /// Catch-all for unrecognized values — behaves like Auto.
+    #[serde(other)]
+    Other,
+}
+
+impl AlbumArtMode {
+    /// Returns true when album art should be disabled.
+    pub fn is_off(&self) -> bool {
+        *self == Self::Off
+    }
+}
+
 /// User configuration loaded from config file with environment variable overrides.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -11,6 +30,8 @@ pub struct Config {
     pub default_group: Option<String>,
     /// TUI color theme: "dark" or "light"
     pub theme: String,
+    /// Album art rendering mode: "auto" or "off"
+    pub album_art_mode: AlbumArtMode,
 }
 
 impl Default for Config {
@@ -18,6 +39,7 @@ impl Default for Config {
         Self {
             default_group: None,
             theme: "dark".to_string(),
+            album_art_mode: AlbumArtMode::default(),
         }
     }
 }

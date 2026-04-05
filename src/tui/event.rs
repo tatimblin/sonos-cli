@@ -87,6 +87,11 @@ fn run_event_loop_inner(
             app.dirty = true;
         }
 
+        // 3b. Poll image loader for completed album art fetches.
+        if app.image_loader.poll() {
+            app.dirty = true;
+        }
+
         // 4. Animation tick — throttle to ~4fps (250ms) for progress bar smoothness
         if hooks.has_active_animations() {
             let should_animate = last_animation_render

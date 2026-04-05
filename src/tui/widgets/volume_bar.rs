@@ -6,11 +6,11 @@ use ratatui::text::{Line, Span};
 // Pre-computed bar strings — sliced per-frame instead of allocating via `.repeat()`.
 // 100 chars each covers any reasonable terminal width.
 // ■ = 3 bytes UTF-8, · = 2 bytes UTF-8.
-const FILLED: &str = "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■";
-const EMPTY: &str = "····································································································";
+pub(crate) const FILLED: &str = "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■";
+pub(crate) const EMPTY: &str = "····································································································";
 
-const FILLED_CHAR_BYTES: usize = 3; // ■ U+25A0
-const EMPTY_CHAR_BYTES: usize = 2; // · U+00B7
+pub(crate) const FILLED_CHAR_BYTES: usize = 3; // ■ U+25A0
+pub(crate) const EMPTY_CHAR_BYTES: usize = 2; // · U+00B7
 
 /// Render a volume bar as a `Line` within the given character width.
 ///
