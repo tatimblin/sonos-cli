@@ -12,7 +12,8 @@ use sonos_sdk::SonosSystem;
 
 use crate::tui::app::{App, GroupTab, HomeTab, Screen};
 use crate::tui::hooks::RenderContext;
-use crate::tui::screens::{home_groups, home_speakers, now_playing};
+use crate::tui::screens::{home_groups, now_playing};
+use crate::tui::widgets::speaker_list::{self, SpeakerListMode};
 
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
 pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
@@ -59,13 +60,20 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
             }
             HomeTab::Speakers => {
                 let speakers_state = speakers_state.clone();
-                home_speakers::render(frame, content_area, ctx, &speakers_state);
+                let mode = SpeakerListMode::FullList;
+                speaker_list::render(frame, content_area, ctx, &mode, &speakers_state);
             }
         },
-        Screen::GroupView { group_id, tab } => {
+        Screen::GroupView {
+            group_id,
+            tab,
+            speakers_state,
+            ..
+        } => {
             let group_id = group_id.clone();
             let tab = tab.clone();
-            render_group_view(frame, content_area, ctx, &group_id, &tab);
+            let speakers_state = speakers_state.clone();
+            render_group_view(frame, content_area, ctx, &group_id, &tab, &speakers_state);
         }
         Screen::SpeakerDetail { speaker_id } => {
             let speaker_id = speaker_id.clone();
@@ -153,13 +161,15 @@ fn build_tab_spans(screen: &Screen, theme: &crate::tui::theme::Theme) -> Vec<Spa
             ];
             render_tab_labels(&tabs, *tab_focused, theme)
         }
-        Screen::GroupView { tab, .. } => {
+        Screen::GroupView {
+            tab, tab_focused, ..
+        } => {
             let tabs = [
                 ("NowPlaying", *tab == GroupTab::NowPlaying),
                 ("Speakers", *tab == GroupTab::Speakers),
                 ("Queue", *tab == GroupTab::Queue),
             ];
-            render_tab_labels(&tabs, false, theme)
+            render_tab_labels(&tabs, *tab_focused, theme)
         }
         Screen::SpeakerDetail { .. } => vec![],
     }
@@ -199,7 +209,7 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
         Screen::Home {
             tab: HomeTab::Speakers,
             ..
-        } => "↑↓ Navigate   n New group   d Ungroup   ⏎ Move   ⎋ Quit",
+        } => "↑↓ Navigate   ←→ Volume   ⏎ Open   ␣ Move   ⎋ Quit",
         Screen::GroupView {
             tab: GroupTab::NowPlaying,
             ..
@@ -207,7 +217,7 @@ fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
         Screen::GroupView {
             tab: GroupTab::Speakers,
             ..
-        } => "←→ Tabs   ⏎ Open speaker   ⎋ Back",
+        } => "↑↓ Navigate   ←→ Volume   ⏎ Open   ␣ Move   ⎋ Back",
         Screen::GroupView {
             tab: GroupTab::Queue,
             ..
@@ -229,17 +239,17 @@ fn render_group_view(
     ctx: &mut RenderContext,
     group_id: &sonos_sdk::GroupId,
     tab: &GroupTab,
+    speakers_state: &crate::tui::app::SpeakerListScreenState,
 ) {
     match tab {
         GroupTab::NowPlaying => {
             now_playing::render(frame, area, ctx, group_id);
         }
         GroupTab::Speakers => {
-            let text = "Group Speakers — Milestone 8";
-            let paragraph = Paragraph::new(text)
-                .alignment(Alignment::Center)
-                .style(ctx.app.theme.muted);
-            frame.render_widget(paragraph, area);
+            let mode = SpeakerListMode::GroupScoped {
+                group_id: group_id.clone(),
+            };
+            speaker_list::render(frame, area, ctx, &mode, speakers_state);
         }
         GroupTab::Queue => {
             let text = "Queue — Milestone 8";

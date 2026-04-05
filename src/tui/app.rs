@@ -7,6 +7,7 @@ use ratatui_image::picker::Picker;
 use crate::config::Config;
 use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
+use crate::tui::widgets::speaker_list::PickUpState;
 use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
 
 /// Top-level TUI state. Owns the SDK handle and all UI state.
@@ -68,7 +69,7 @@ impl Navigation {
                 tab: HomeTab::default(),
                 tab_focused: false,
                 groups_state: HomeGroupsState::default(),
-                speakers_state: HomeSpeakersState::default(),
+                speakers_state: SpeakerListScreenState::default(),
             }],
         }
     }
@@ -108,16 +109,16 @@ pub enum Screen {
         tab: HomeTab,
         tab_focused: bool,
         groups_state: HomeGroupsState,
-        speakers_state: HomeSpeakersState,
+        speakers_state: SpeakerListScreenState,
     },
     GroupView {
         group_id: GroupId,
         tab: GroupTab,
+        tab_focused: bool,
+        speakers_state: SpeakerListScreenState,
     },
     #[allow(dead_code)] // used in future milestones
-    SpeakerDetail {
-        speaker_id: SpeakerId,
-    },
+    SpeakerDetail { speaker_id: SpeakerId },
 }
 
 /// UI state for the Home > Groups tab.
@@ -126,20 +127,29 @@ pub struct HomeGroupsState {
     pub selected_index: usize,
 }
 
-/// UI state for the Home > Speakers tab.
+/// Shared UI state for any speaker list (Home > Speakers or GroupView > Speakers).
 #[derive(Clone, Debug, Default)]
-pub struct HomeSpeakersState {
+pub struct SpeakerListScreenState {
     pub selected_index: usize,
-    /// Active modal (e.g. group picker for move-to-group).
-    pub modal: Option<ModalState>,
+    pub pick_up: Option<PickUpState>,
 }
 
-/// State for a modal overlay (e.g. group picker).
-#[derive(Clone, Debug)]
-pub struct ModalState {
-    pub title: String,
-    pub items: Vec<String>,
-    pub selected_index: usize,
+impl Screen {
+    pub fn speakers_state(&self) -> Option<&SpeakerListScreenState> {
+        match self {
+            Screen::Home { speakers_state, .. } => Some(speakers_state),
+            Screen::GroupView { speakers_state, .. } => Some(speakers_state),
+            _ => None,
+        }
+    }
+
+    pub fn speakers_state_mut(&mut self) -> Option<&mut SpeakerListScreenState> {
+        match self {
+            Screen::Home { speakers_state, .. } => Some(speakers_state),
+            Screen::GroupView { speakers_state, .. } => Some(speakers_state),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

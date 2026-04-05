@@ -39,11 +39,6 @@ pub struct Theme {
     pub speaker_cursor: Style,
     pub speaker_name: Style,
 
-    // Modal
-    pub modal_border: Style,
-    pub modal_title: Style,
-    pub modal_selected: Style,
-
     // General
     pub accent: Style,
     pub error: Style,
@@ -89,13 +84,6 @@ impl Theme {
             speaker_cursor: Style::new().fg(Color::Cyan),
             speaker_name: Style::new().fg(Color::Gray),
 
-            modal_border: Style::new().fg(Color::White),
-            modal_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
-            modal_selected: Style::new()
-                .fg(Color::Black)
-                .bg(Color::White)
-                .add_modifier(Modifier::BOLD),
-
             accent: Style::new().fg(Color::Cyan),
             error: Style::new().fg(Color::Red),
         }
@@ -129,13 +117,6 @@ impl Theme {
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
             speaker_cursor: Style::new().fg(Color::Blue),
             speaker_name: Style::new().fg(Color::DarkGray),
-
-            modal_border: Style::new().fg(Color::Black),
-            modal_title: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
-            modal_selected: Style::new()
-                .fg(Color::White)
-                .bg(Color::Black)
-                .add_modifier(Modifier::BOLD),
 
             accent: Style::new().fg(Color::Blue),
             error: Style::new().fg(Color::Red),
@@ -171,13 +152,6 @@ impl Theme {
             speaker_cursor: Style::new().fg(Color::Cyan),
             speaker_name: Style::new().fg(Color::LightMagenta),
 
-            modal_border: Style::new().fg(Color::Magenta),
-            modal_title: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            modal_selected: Style::new()
-                .fg(Color::Black)
-                .bg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-
             accent: Style::new().fg(Color::Cyan),
             error: Style::new().fg(Color::LightRed),
         }
@@ -212,13 +186,6 @@ impl Theme {
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
             speaker_cursor: Style::new().fg(orange),
             speaker_name: Style::new().fg(Color::Gray),
-
-            modal_border: Style::new().fg(orange),
-            modal_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
-            modal_selected: Style::new()
-                .fg(Color::Black)
-                .bg(orange)
-                .add_modifier(Modifier::BOLD),
 
             accent: Style::new().fg(orange),
             error: Style::new().fg(Color::Red),
