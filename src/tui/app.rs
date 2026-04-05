@@ -17,6 +17,7 @@ pub struct App {
     pub navigation: Navigation,
     pub should_quit: bool,
     pub dirty: bool,
+    #[allow(dead_code)] // used in future milestones
     pub config: Config,
     pub theme: Theme,
     /// Inline status message (e.g. errors from speaker actions). Cleared on next key press.

@@ -47,6 +47,12 @@ pub struct ImageLoader {
     request_tx: mpsc::Sender<LoadRequest>,
 }
 
+impl Default for ImageLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImageLoader {
     pub fn new() -> Self {
         let (request_tx, request_rx) = mpsc::channel::<LoadRequest>();
@@ -136,7 +142,7 @@ fn build_url(uri: &str, speaker_ip: IpAddr) -> String {
     if uri.starts_with("http://") || uri.starts_with("https://") {
         uri.to_string()
     } else {
-        format!("http://{}:1400{}", speaker_ip, uri)
+        format!("http://{speaker_ip}:1400{uri}")
     }
 }
 
