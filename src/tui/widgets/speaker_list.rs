@@ -137,6 +137,40 @@ fn group_for_entry(entries: &[ListEntry], index: usize) -> Option<GroupId> {
     None
 }
 
+/// Build display order for pick-up mode: the picked-up speaker is removed from its
+/// original position and inserted at the drop position, so it visually moves through
+/// the list with other entries shifting to fill the gap.
+fn build_display_order(entries: &[ListEntry], pick_up: &Option<PickUpState>) -> Vec<usize> {
+    let Some(pick_up) = pick_up else {
+        return (0..entries.len()).collect();
+    };
+
+    let orig_idx = entries.iter().position(|e| {
+        matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id)
+    });
+
+    let Some(orig_idx) = orig_idx else {
+        return (0..entries.len()).collect();
+    };
+
+    if orig_idx == pick_up.drop_index {
+        return (0..entries.len()).collect();
+    }
+
+    let mut order: Vec<usize> = (0..entries.len()).collect();
+    order.remove(orig_idx);
+
+    let insert_at = if orig_idx < pick_up.drop_index {
+        pick_up.drop_index - 1
+    } else {
+        pick_up.drop_index
+    };
+    let insert_at = insert_at.min(order.len());
+    order.insert(insert_at, orig_idx);
+
+    order
+}
+
 // ============================================================================
 // Rendering
 // ============================================================================
@@ -179,12 +213,15 @@ pub fn render(
     for entry in &entries {
         match entry {
             ListEntry::SpeakerRow(speaker_id) => {
-                let vol = ctx
-                    .app
-                    .system
-                    .speaker_by_id(speaker_id)
+                let speaker = ctx.app.system.speaker_by_id(speaker_id);
+                let vol = speaker
+                    .as_ref()
                     .and_then(|s| ctx.hooks.use_watch(&s.volume))
                     .map(|v| v.value() as u16);
+                // Subscribe to topology changes so the list refreshes after regrouping
+                if let Some(ref s) = speaker {
+                    ctx.hooks.use_watch(&s.group_membership);
+                }
                 speaker_volumes.push(vol);
                 group_volumes.push(None);
                 group_playback_states.push(None);
@@ -230,20 +267,26 @@ pub fn render(
     let selected_index = state.selected_index.min(entries.len().saturating_sub(1));
     let is_pick_up = state.pick_up.is_some();
     let pick_up_speaker_id = state.pick_up.as_ref().map(|p| p.speaker_id.clone());
-    let drop_index = state.pick_up.as_ref().map(|p| p.drop_index);
+
+    // In pick-up mode, reorder entries so the picked-up speaker visually moves
+    // to the drop position with other entries shifting to fill the gap.
+    let display_order = build_display_order(&entries, &state.pick_up);
 
     // Build lines
     let mut lines: Vec<Line> = Vec::new();
 
-    for (i, entry) in entries.iter().enumerate() {
+    for &orig_idx in &display_order {
+        let entry = &entries[orig_idx];
+
+        // In pick-up mode, the picked-up speaker is the cursor.
+        // In normal mode, selected_index is the cursor.
         let is_selected = if is_pick_up {
-            drop_index == Some(i)
+            pick_up_speaker_id
+                .as_ref()
+                .is_some_and(|pid| matches!(entry, ListEntry::SpeakerRow(sid) if sid == pid))
         } else {
-            i == selected_index
+            orig_idx == selected_index
         };
-        let is_picked_up_row = pick_up_speaker_id
-            .as_ref()
-            .is_some_and(|pid| matches!(entry, ListEntry::SpeakerRow(sid) if sid == pid));
 
         match entry {
             ListEntry::GroupHeader(group_id) => {
@@ -256,13 +299,13 @@ pub fn render(
                     .unwrap_or_else(|| "Unknown Group".to_string());
 
                 // Play state icon
-                let (icon, icon_style) = match &group_playback_states[i] {
+                let (icon, icon_style) = match &group_playback_states[orig_idx] {
                     Some(PlaybackState::Playing) => ("\u{25b6} ", ctx.app.theme.playing_icon),
                     Some(PlaybackState::Paused) => ("\u{23f8} ", ctx.app.theme.paused_icon),
                     _ => ("\u{25a0} ", ctx.app.theme.stopped_icon),
                 };
 
-                let track_info = group_track_info[i]
+                let track_info = group_track_info[orig_idx]
                     .as_deref()
                     .unwrap_or("");
 
@@ -283,7 +326,7 @@ pub fn render(
                 }
 
                 // Volume
-                if let Some(vol) = group_volumes[i] {
+                if let Some(vol) = group_volumes[orig_idx] {
                     if is_selected {
                         spans.push(Span::raw("  "));
                         let vol_line = volume_bar::render_volume_bar(
@@ -314,9 +357,7 @@ pub fn render(
 
                 let cursor = if is_selected { "  \u{25b8} " } else { "    " };
 
-                let name_style = if is_picked_up_row {
-                    ctx.app.theme.muted // dimmed when picked up
-                } else if is_selected {
+                let name_style = if is_selected {
                     ctx.app.theme.speaker_cursor
                 } else {
                     ctx.app.theme.speaker_name
@@ -328,8 +369,8 @@ pub fn render(
                 ];
 
                 // Volume
-                if let Some(vol) = speaker_volumes[i] {
-                    if is_selected && !is_picked_up_row {
+                if let Some(vol) = speaker_volumes[orig_idx] {
+                    if is_selected {
                         spans.push(Span::raw("  "));
                         let vol_line = volume_bar::render_volume_bar(
                             vol,

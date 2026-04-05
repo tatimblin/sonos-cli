@@ -552,7 +552,7 @@ The per-group detail experience. Three tabs.
 
 ### Now Playing Tab
 
-- [ ] Album art rendering (left side, ~20x20 chars):
+- [x] Album art rendering (left side, ~20x20 chars):
   - Use `ratatui-image` crate with `Picker::from_query_stdio()` for auto-detection
   - Sixel/Kitty protocol for capable terminals (iTerm2, Kitty, WezTerm)
   - Half-block fallback (`▀▄` with truecolor) — broadly compatible
