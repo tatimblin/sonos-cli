@@ -7,8 +7,8 @@ use ratatui_image::picker::Picker;
 use crate::config::Config;
 use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
-use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
 use crate::tui::widgets::speaker_list::PickUpState;
+use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
 
 /// Top-level TUI state. Owns the SDK handle and all UI state.
 ///
@@ -118,9 +118,7 @@ pub enum Screen {
         speakers_state: SpeakerListScreenState,
     },
     #[allow(dead_code)] // used in future milestones
-    SpeakerDetail {
-        speaker_id: SpeakerId,
-    },
+    SpeakerDetail { speaker_id: SpeakerId },
 }
 
 /// UI state for the Home > Groups tab.

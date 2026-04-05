@@ -162,9 +162,10 @@ fn build_display_order(entries: &[ListEntry], pick_up: &Option<PickUpState>) -> 
         return identity();
     };
 
-    let Some(orig_idx) = entries.iter().position(|e| {
-        matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id)
-    }) else {
+    let Some(orig_idx) = entries
+        .iter()
+        .position(|e| matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id))
+    else {
         return identity();
     };
 
@@ -340,7 +341,10 @@ pub fn render(
 
                 if !track_info.is_empty() {
                     spans.push(Span::raw("  "));
-                    spans.push(Span::styled(track_info.to_string(), ctx.app.theme.track_info));
+                    spans.push(Span::styled(
+                        track_info.to_string(),
+                        ctx.app.theme.track_info,
+                    ));
                 }
 
                 if let Some(vol) = data.group_volume {
@@ -430,15 +434,17 @@ pub fn render(
 }
 
 /// Append volume bar (when selected) or percentage text to a span list.
-fn append_volume_spans(spans: &mut Vec<Span>, vol: u16, is_selected: bool, width: u16, theme: &Theme) {
+fn append_volume_spans(
+    spans: &mut Vec<Span>,
+    vol: u16,
+    is_selected: bool,
+    width: u16,
+    theme: &Theme,
+) {
     spans.push(Span::raw("  "));
     if is_selected {
-        let vol_line = volume_bar::render_volume_bar(
-            vol,
-            width,
-            theme.volume_filled,
-            theme.volume_empty,
-        );
+        let vol_line =
+            volume_bar::render_volume_bar(vol, width, theme.volume_filled, theme.volume_empty);
         spans.extend(vol_line.spans);
     } else {
         spans.push(Span::styled(format!("{vol}%"), theme.muted));
@@ -625,11 +631,7 @@ fn enter_add_speaker_mode(app: &mut App, mode: &SpeakerListMode) {
     }
 }
 
-fn handle_pick_up_key(
-    app: &mut App,
-    key: KeyEvent,
-    entries: &[ListEntry],
-) -> SpeakerListAction {
+fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
     let pick_up = match app.navigation.current().speakers_state() {
         Some(s) => match s.pick_up.clone() {
             Some(p) => p,
@@ -684,10 +686,8 @@ fn handle_pick_up_key(
                                         .coordinator()
                                         .map(|c| c.name.clone())
                                         .unwrap_or_else(|| "group".to_string());
-                                    app.status_message = Some(format!(
-                                        "{} moved to {}",
-                                        speaker.name, group_name
-                                    ));
+                                    app.status_message =
+                                        Some(format!("{} moved to {}", speaker.name, group_name));
                                 }
                                 Err(e) => {
                                     app.status_message = Some(format!("error: {e}"));
@@ -695,17 +695,14 @@ fn handle_pick_up_key(
                             }
                         }
                     }
-                    None => {
-                        match speaker.leave_group() {
-                            Ok(_) => {
-                                app.status_message =
-                                    Some(format!("{} ungrouped", speaker.name));
-                            }
-                            Err(e) => {
-                                app.status_message = Some(format!("error: {e}"));
-                            }
+                    None => match speaker.leave_group() {
+                        Ok(_) => {
+                            app.status_message = Some(format!("{} ungrouped", speaker.name));
                         }
-                    }
+                        Err(e) => {
+                            app.status_message = Some(format!("error: {e}"));
+                        }
+                    },
                 }
             }
 
