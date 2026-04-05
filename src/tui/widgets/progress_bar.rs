@@ -88,7 +88,14 @@ mod tests {
 
     #[test]
     fn bar_spans_zero_progress() {
-        let spans = render_bar_spans(0.0, 10, Some("●"), Style::default(), Style::default(), Style::default());
+        let spans = render_bar_spans(
+            0.0,
+            10,
+            Some("●"),
+            Style::default(),
+            Style::default(),
+            Style::default(),
+        );
         assert_eq!(spans.len(), 3);
         // filled should be empty string, cursor present, empty should fill
         assert_eq!(spans[0].content.as_ref(), "");
@@ -97,7 +104,14 @@ mod tests {
 
     #[test]
     fn bar_spans_full_progress() {
-        let spans = render_bar_spans(1.0, 10, Some("●"), Style::default(), Style::default(), Style::default());
+        let spans = render_bar_spans(
+            1.0,
+            10,
+            Some("●"),
+            Style::default(),
+            Style::default(),
+            Style::default(),
+        );
         assert_eq!(spans.len(), 3);
         // empty should be empty string
         assert_eq!(spans[2].content.as_ref(), "");
@@ -105,7 +119,14 @@ mod tests {
 
     #[test]
     fn bar_spans_no_cursor() {
-        let spans = render_bar_spans(0.5, 10, None, Style::default(), Style::default(), Style::default());
+        let spans = render_bar_spans(
+            0.5,
+            10,
+            None,
+            Style::default(),
+            Style::default(),
+            Style::default(),
+        );
         assert_eq!(spans.len(), 2); // no cursor span
     }
 }

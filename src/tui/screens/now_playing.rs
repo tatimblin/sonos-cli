@@ -47,9 +47,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, group_id: 
         .use_animation(&format!("{group_id_str}:now_playing:tick"), is_playing);
 
     // --- Album art: request fetch if URI changed ---
-    let art_uri = current_track
-        .as_ref()
-        .and_then(|t| t.album_art_uri.clone());
+    let art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
 
     if let Some(ref uri) = art_uri {
         ctx.app.image_loader.request(uri, coordinator.ip);
@@ -124,7 +122,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, group_id: 
         let horizontal = Layout::horizontal([
             Constraint::Length(art_width),
             Constraint::Length(2), // gap
-            Constraint::Min(20),  // metadata
+            Constraint::Min(20),   // metadata
         ])
         .split(top_area);
 
@@ -227,7 +225,10 @@ fn render_metadata_column(
 
     // Artist
     if !artist.is_empty() {
-        lines.push(Line::from(Span::styled(artist.to_string(), theme.track_info)));
+        lines.push(Line::from(Span::styled(
+            artist.to_string(),
+            theme.track_info,
+        )));
     }
 
     // Album (muted)
@@ -255,10 +256,7 @@ fn render_metadata_column(
     // Speaker count
     lines.push(Line::from(vec![
         Span::raw("🔊×"),
-        Span::styled(
-            format!("{speaker_count}  "),
-            theme.muted,
-        ),
+        Span::styled(format!("{speaker_count}  "), theme.muted),
         Span::styled(speaker_text.to_string(), theme.muted),
     ]));
 

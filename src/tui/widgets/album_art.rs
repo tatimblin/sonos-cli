@@ -96,12 +96,7 @@ pub fn render_album_art(
 }
 
 /// Render a placeholder box with a centered music note.
-fn render_placeholder(
-    frame: &mut Frame,
-    area: Rect,
-    border_style: Style,
-    text_style: Style,
-) {
+fn render_placeholder(frame: &mut Frame, area: Rect, border_style: Style, text_style: Style) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)

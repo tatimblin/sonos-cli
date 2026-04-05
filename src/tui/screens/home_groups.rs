@@ -128,18 +128,12 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
                 .unwrap_or_default();
 
             // Extract album art URI for mini-player art.
-            let art_uri = current_track
-                .as_ref()
-                .and_then(|t| t.album_art_uri.clone());
+            let art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
 
             // Request album art fetch (debounced for the selected group).
             if show_mini_art {
                 if let Some(ref uri) = art_uri {
-                    let should_fetch = if selected {
-                        true
-                    } else {
-                        selection_stable
-                    };
+                    let should_fetch = if selected { true } else { selection_stable };
                     if should_fetch {
                         ctx.app.image_loader.request(uri, coordinator.ip);
                     }
@@ -212,13 +206,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext, state: &Ho
                 None
             };
 
-            group_card::render_group_card(
-                frame,
-                *col_area,
-                &data,
-                &ctx.app.theme,
-                art_protocol,
-            );
+            group_card::render_group_card(frame, *col_area, &data, &ctx.app.theme, art_protocol);
         }
     }
 }
