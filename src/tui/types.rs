@@ -7,13 +7,6 @@ use sonos_sdk::{GroupId, PlaybackState, SonosSystem, SpeakerId};
 pub enum ListEntry {
     GroupHeader(GroupId),
     SpeakerRow(SpeakerId),
-    UngroupedHeader,
-}
-
-impl ListEntry {
-    pub fn is_selectable(&self) -> bool {
-        !matches!(self, ListEntry::UngroupedHeader)
-    }
 }
 
 /// State for a speaker being moved between groups.
@@ -31,6 +24,10 @@ pub enum SpeakerListAction {
 }
 
 /// Build the flat list of entries from the current system state.
+///
+/// All groups get headers — including standalone speakers (Sonos treats every
+/// speaker as belonging to a group). Multi-member groups are listed first,
+/// then standalone groups.
 pub fn build_list_entries(system: &SonosSystem) -> Vec<ListEntry> {
     let groups = system.groups();
     let mut entries = Vec::new();
@@ -46,17 +43,14 @@ pub fn build_list_entries(system: &SonosSystem) -> Vec<ListEntry> {
         }
     }
 
-    // Standalone speakers
-    let standalones: Vec<_> = groups
-        .iter()
-        .filter(|g| g.is_standalone())
-        .filter_map(|g| g.coordinator())
-        .collect();
-
-    if !standalones.is_empty() {
-        entries.push(ListEntry::UngroupedHeader);
-        for speaker in standalones {
-            entries.push(ListEntry::SpeakerRow(speaker.id.clone()));
+    // Standalone groups — each gets a GroupHeader + single SpeakerRow
+    for group in &groups {
+        if !group.is_standalone() {
+            continue;
+        }
+        entries.push(ListEntry::GroupHeader(group.id.clone()));
+        if let Some(coord) = group.coordinator() {
+            entries.push(ListEntry::SpeakerRow(coord.id.clone()));
         }
     }
 
@@ -69,10 +63,8 @@ pub fn group_for_entry(entries: &[ListEntry], index: usize) -> Option<GroupId> {
         return None;
     }
     for i in (0..=index).rev() {
-        match &entries[i] {
-            ListEntry::GroupHeader(gid) => return Some(gid.clone()),
-            ListEntry::UngroupedHeader => return None,
-            _ => continue,
+        if let ListEntry::GroupHeader(gid) = &entries[i] {
+            return Some(gid.clone());
         }
     }
     None
@@ -94,6 +86,8 @@ pub struct EntryRenderData {
     pub group_volume: Option<u16>,
     pub playback_state: Option<PlaybackState>,
     pub track_info: Option<String>,
+    /// True when this speaker row is the last member of its group (renders `└` connector).
+    pub is_last_in_group: bool,
 }
 
 /// Action returned from settings key handling so callers can respond.
