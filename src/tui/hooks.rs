@@ -53,7 +53,6 @@ pub struct RenderContext<'a> {
 ///
 /// Two hooks with the same string key but different value types get separate
 /// storage slots (keyed by `TypeId`).
-#[allow(dead_code)] // retained for bottom player bar
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 struct HookKey {
     type_id: TypeId,
@@ -78,7 +77,6 @@ impl HookKey {
 /// Stores a snapshot of position + wall-clock timestamp. While playing,
 /// `interpolated_position_ms()` advances the position based on elapsed time,
 /// capped at 10s to limit drift from system sleep/stalls.
-#[allow(dead_code)] // retained for bottom player bar
 #[derive(Clone, Debug)]
 pub struct ProgressState {
     pub last_position_ms: u64,
@@ -98,7 +96,6 @@ impl Default for ProgressState {
     }
 }
 
-#[allow(dead_code)] // retained for bottom player bar
 impl ProgressState {
     /// Update from SDK position and playback data.
     pub fn update(&mut self, position_ms: u64, duration_ms: u64, is_playing: bool) {
@@ -206,7 +203,6 @@ impl Hooks {
     ///
     /// **Must be called last** — the returned `&mut V` borrows `&mut self`,
     /// preventing other hook calls until the reference is dropped.
-    #[allow(dead_code)] // retained for bottom player bar
     pub fn use_state<V: 'static>(&mut self, key: &str, default: impl FnOnce() -> V) -> &mut V {
         let hook_key = HookKey::new::<V>(key);
         self.accessed_states.insert(hook_key.clone());
@@ -293,7 +289,6 @@ impl Hooks {
     /// When `active` is true, the event loop's global animation timer will
     /// mark the app as dirty every ~250ms, triggering re-renders for smooth
     /// progress bar animation.
-    #[allow(dead_code)] // retained for bottom player bar
     pub fn use_animation(&mut self, key: &str, active: bool) {
         let key = key.to_string();
         self.accessed_animations.insert(key.clone());

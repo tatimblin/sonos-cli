@@ -26,10 +26,8 @@ pub struct App {
     /// Terminal image protocol picker, detected before entering raw mode.
     /// `None` when album art is disabled or terminal detection failed.
     /// `RefCell` because `new_resize_protocol()` requires `&mut Picker`.
-    #[allow(dead_code)] // retained for bottom player bar
     pub picker: RefCell<Option<Picker>>,
     /// Background image fetcher and cache for album art.
-    #[allow(dead_code)] // retained for bottom player bar
     pub image_loader: ImageLoader,
 }
 

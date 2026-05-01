@@ -4,12 +4,23 @@ use ratatui::layout::Rect;
 use ratatui::Frame;
 
 use crate::tui::helpers;
-use crate::tui::hooks::RenderContext;
-use crate::tui::types::{build_list_entries, EntryRenderData, ListEntry, SpeakerListData};
-use crate::tui::widgets::speaker_list;
+use crate::tui::hooks::{ProgressState, RenderContext};
+use crate::tui::types::{
+    build_list_entries, group_for_entry, BottomBarData, EntryRenderData, ListEntry, SpeakerListData,
+};
+use crate::tui::widgets::album_art::ArtProtocolState;
+use crate::tui::widgets::{bottom_bar, speaker_list};
 
-/// Render the Speakers tab content.
-pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
+/// Render the Speakers tab content area and bottom bar.
+///
+/// `content_area` is for the speaker list; `bar_area` is for the bottom player bar.
+/// When `bar_area` is `None` (terminal too small), the bottom bar is suppressed.
+pub fn render(
+    frame: &mut Frame,
+    content_area: Rect,
+    bar_area: Option<Rect>,
+    ctx: &mut RenderContext,
+) {
     let entries = build_list_entries(&ctx.app.system);
 
     let mut entry_data: Vec<EntryRenderData> = Vec::with_capacity(entries.len());
@@ -88,5 +99,135 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
         status_message: ctx.app.status_message.clone(),
     };
 
-    speaker_list::render(frame, area, &data, &ctx.app.theme);
+    speaker_list::render(frame, content_area, &data, &ctx.app.theme);
+
+    // Bottom bar: assemble data for the focused group's coordinator
+    if let Some(bar_rect) = bar_area {
+        let mut bar_data = assemble_bottom_bar(
+            &data.entries,
+            data.selected_index,
+            bar_rect.width >= 100,
+            ctx,
+        );
+        bottom_bar::render(frame, bar_rect, &mut bar_data, &ctx.app.theme);
+
+        // Put the protocol back into hook state so it persists across frames
+        if bar_data.album_art_protocol.is_some() {
+            let art_state = ctx
+                .hooks
+                .use_state::<ArtProtocolState>("bottom_bar_art", ArtProtocolState::default);
+            art_state.protocol = bar_data.album_art_protocol.take();
+        }
+    }
+}
+
+/// Assemble `BottomBarData` from the focused group's coordinator.
+fn assemble_bottom_bar(
+    entries: &[ListEntry],
+    selected_index: usize,
+    is_wide: bool,
+    ctx: &mut RenderContext,
+) -> BottomBarData {
+    // Find the group for the currently focused entry
+    let group_id = group_for_entry(entries, selected_index);
+
+    // For standalone speakers (ungrouped section), resolve via the speaker's own group
+    let resolved_group_id = group_id.or_else(|| {
+        if selected_index < entries.len() {
+            if let ListEntry::SpeakerRow(sid) = &entries[selected_index] {
+                return ctx
+                    .app
+                    .system
+                    .speaker_by_id(sid)
+                    .and_then(|s| s.group())
+                    .map(|g| g.id.clone());
+            }
+        }
+        None
+    });
+
+    let group = resolved_group_id
+        .as_ref()
+        .and_then(|gid| ctx.app.system.group_by_id(gid));
+    let coordinator = group.as_ref().and_then(|g| g.coordinator());
+
+    // Group name
+    let group_name = coordinator
+        .as_ref()
+        .map(|c| c.name.clone())
+        .unwrap_or_else(|| "No Group".to_string());
+
+    // Watch playback properties from the coordinator
+    let playback_state = coordinator
+        .as_ref()
+        .and_then(|c| ctx.hooks.use_watch(&c.playback_state));
+
+    let current_track = coordinator
+        .as_ref()
+        .and_then(|c| ctx.hooks.use_watch(&c.current_track));
+
+    let position = coordinator
+        .as_ref()
+        .and_then(|c| ctx.hooks.use_watch(&c.position));
+
+    // Group volume
+    let volume = group
+        .as_ref()
+        .and_then(|g| ctx.hooks.use_watch_group(&g.volume))
+        .map(|v| v.value())
+        .unwrap_or(0);
+
+    // Animation: enable progress interpolation when playing
+    let is_playing = playback_state.as_ref().is_some_and(|ps| ps.is_playing());
+    ctx.hooks.use_animation("bottom_bar_progress", is_playing);
+
+    // Progress interpolation via use_state
+    let pos_ms = position.as_ref().map(|p| p.position_ms).unwrap_or(0);
+    let dur_ms = position.as_ref().map(|p| p.duration_ms).unwrap_or(0);
+
+    let progress_state = ctx
+        .hooks
+        .use_state::<ProgressState>("bottom_bar_progress", ProgressState::default);
+    progress_state.update(pos_ms, dur_ms, is_playing);
+
+    let interpolated_pos = progress_state.interpolated_position_ms();
+    let progress = if dur_ms > 0 {
+        (interpolated_pos as f64 / dur_ms as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    // Extract track metadata
+    let track_title = current_track.as_ref().and_then(|t| t.title.clone());
+    let track_artist = current_track.as_ref().and_then(|t| t.artist.clone());
+    let album_art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
+
+    // Request album art loading if we have a URI and a coordinator IP
+    if let Some(ref uri) = album_art_uri {
+        if let Some(ref coord) = coordinator {
+            ctx.app.image_loader.request(uri, coord.ip);
+        }
+    }
+
+    // Manage art protocol state via use_state — must be called after use_watch/use_animation.
+    // We take the protocol out temporarily for rendering; it gets put back after render
+    // (see caller). If not put back, ensure_protocol recreates it from the image cache.
+    let art_state = ctx
+        .hooks
+        .use_state::<ArtProtocolState>("bottom_bar_art", ArtProtocolState::default);
+    art_state.ensure_protocol(&album_art_uri, &ctx.app.image_loader, &ctx.app.picker);
+    let protocol = art_state.protocol.take();
+
+    BottomBarData {
+        group_name,
+        track_title,
+        track_artist,
+        album_art_protocol: protocol,
+        playback_state,
+        progress,
+        position_ms: interpolated_pos,
+        duration_ms: dur_ms,
+        volume,
+        is_wide,
+    }
 }

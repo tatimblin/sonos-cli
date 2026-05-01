@@ -1,5 +1,6 @@
 //! Shared types used across TUI layers (widgets, screens, handlers).
 
+use ratatui_image::protocol::StatefulProtocol;
 use sonos_sdk::{GroupId, PlaybackState, SonosSystem, SpeakerId};
 
 /// A single row in the flat speaker list. Navigation and rendering dispatch on this.
@@ -76,6 +77,20 @@ pub fn group_for_entry(entries: &[ListEntry], index: usize) -> Option<GroupId> {
         }
     }
     None
+}
+
+/// Pre-computed render data for the bottom player bar widget.
+pub struct BottomBarData {
+    pub group_name: String,
+    pub track_title: Option<String>,
+    pub track_artist: Option<String>,
+    pub album_art_protocol: Option<StatefulProtocol>,
+    pub playback_state: Option<PlaybackState>,
+    pub progress: f64,
+    pub position_ms: u64,
+    pub duration_ms: u64,
+    pub volume: u16,
+    pub is_wide: bool,
 }
 
 /// Pre-computed render data for the speaker list widget.

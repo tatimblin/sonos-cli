@@ -23,7 +23,9 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &The
         return;
     }
 
-    let selected_index = data.selected_index.min(data.entries.len().saturating_sub(1));
+    let selected_index = data
+        .selected_index
+        .min(data.entries.len().saturating_sub(1));
     let is_pick_up = data.pick_up.is_some();
     let pick_up_speaker_id = data.pick_up.as_ref().map(|p| p.speaker_id.clone());
 
@@ -112,9 +114,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &The
             .entries
             .iter()
             .zip(data.entry_data.iter())
-            .find(|(e, _)| {
-                matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id)
-            })
+            .find(|(e, _)| matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id))
             .map(|(_, d)| d.name.as_str())
             .unwrap_or("Speaker");
         lines.push(Line::raw(""));
