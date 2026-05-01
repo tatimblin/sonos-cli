@@ -115,24 +115,38 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    match key.code {
-        KeyCode::Char('q') => {
-            app.should_quit = true;
-            return;
-        }
-        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.should_quit = true;
-            return;
-        }
-        KeyCode::Esc => {
-            if app.navigation.speakers_state.pick_up.is_some() {
+    // During pick-up mode, only Up/Down/Space/Esc are active — swallow everything else.
+    // Esc cancels pick-up; Ctrl-C still quits as an emergency exit.
+    if app.navigation.speakers_state.pick_up.is_some() {
+        match key.code {
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.should_quit = true;
+                return;
+            }
+            KeyCode::Esc => {
                 app.navigation.speakers_state.pick_up = None;
                 return;
             }
-            app.should_quit = true;
-            return;
+            // Forward Up/Down/Space to the handler; swallow everything else
+            KeyCode::Up | KeyCode::Down | KeyCode::Char(' ') => {}
+            _ => return,
         }
-        _ => {}
+    } else {
+        match key.code {
+            KeyCode::Char('q') => {
+                app.should_quit = true;
+                return;
+            }
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.should_quit = true;
+                return;
+            }
+            KeyCode::Esc => {
+                app.should_quit = true;
+                return;
+            }
+            _ => {}
+        }
     }
 
     match app.navigation.tab {
