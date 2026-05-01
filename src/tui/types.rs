@@ -96,6 +96,28 @@ pub struct EntryRenderData {
     pub track_info: Option<String>,
 }
 
+/// Action returned from settings key handling so callers can respond.
+pub enum SettingsAction {
+    Handled,
+    FocusTabBar,
+}
+
+/// A single row in the settings form.
+pub struct SettingsItem {
+    pub label: &'static str,
+    pub value: String,
+    pub options: Vec<String>,
+}
+
+/// Pre-computed render data for the settings widget.
+pub struct SettingsData {
+    pub items: Vec<SettingsItem>,
+    pub selected_row: usize,
+    pub dropdown_open: bool,
+    pub dropdown_index: usize,
+    pub status_message: Option<String>,
+}
+
 /// Build display order for pick-up mode: the picked-up speaker is removed from its
 /// original position and inserted at the drop position, so it visually moves through
 /// the list with other entries shifting to fill the gap.

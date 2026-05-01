@@ -2,5 +2,6 @@
 
 pub mod album_art;
 pub mod progress_bar;
+pub mod settings;
 pub mod speaker_list;
 pub mod volume_bar;
