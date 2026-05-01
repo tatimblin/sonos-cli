@@ -13,14 +13,10 @@ pub struct Theme {
     pub legend: Style,
     pub muted: Style,
 
-    // Cards / bottom bar
-    #[allow(dead_code)] // retained for bottom player bar
-    pub card_border: Style,
-    #[allow(dead_code)] // retained for bottom player bar
-    pub card_border_selected: Style,
-    #[allow(dead_code)] // retained for bottom player bar
-    pub card_title: Style,
+    // Track info
     pub track_info: Style,
+    pub bottom_bar_border: Style,
+    pub bottom_bar_controls: Style,
 
     // Playback state icons
     pub playing_icon: Style,
@@ -32,13 +28,9 @@ pub struct Theme {
     pub volume_empty: Style,
 
     // Progress bar
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_filled: Style,
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_empty: Style,
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_cursor: Style,
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_time: Style,
 
     // Speakers tab
@@ -68,10 +60,9 @@ impl Theme {
             legend: Style::new().fg(Color::DarkGray),
             muted: Style::new().fg(Color::DarkGray),
 
-            card_border: Style::new().fg(Color::DarkGray),
-            card_border_selected: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
-            card_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::Gray),
+            bottom_bar_border: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::White),
 
             playing_icon: Style::new().fg(Color::Green),
             paused_icon: Style::new().fg(Color::Yellow),
@@ -102,10 +93,9 @@ impl Theme {
             legend: Style::new().fg(Color::Gray),
             muted: Style::new().fg(Color::Gray),
 
-            card_border: Style::new().fg(Color::Gray),
-            card_border_selected: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
-            card_title: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::DarkGray),
+            bottom_bar_border: Style::new().fg(Color::Gray),
+            bottom_bar_controls: Style::new().fg(Color::Black),
 
             playing_icon: Style::new().fg(Color::Green),
             paused_icon: Style::new().fg(Color::Yellow),
@@ -136,10 +126,9 @@ impl Theme {
             legend: Style::new().fg(Color::DarkGray),
             muted: Style::new().fg(Color::DarkGray),
 
-            card_border: Style::new().fg(Color::DarkGray),
-            card_border_selected: Style::new().fg(Color::Magenta).add_modifier(Modifier::BOLD),
-            card_title: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::LightMagenta),
+            bottom_bar_border: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::Cyan),
 
             playing_icon: Style::new().fg(Color::Green),
             paused_icon: Style::new().fg(Color::Yellow),
@@ -171,10 +160,9 @@ impl Theme {
             legend: Style::new().fg(Color::DarkGray),
             muted: Style::new().fg(Color::DarkGray),
 
-            card_border: Style::new().fg(Color::DarkGray),
-            card_border_selected: Style::new().fg(orange).add_modifier(Modifier::BOLD),
-            card_title: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             track_info: Style::new().fg(Color::Gray),
+            bottom_bar_border: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::White),
 
             playing_icon: Style::new().fg(orange),
             paused_icon: Style::new().fg(Color::Yellow),

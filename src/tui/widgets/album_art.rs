@@ -3,8 +3,6 @@
 //! Size-agnostic: renders whatever fits in the given `Rect`. The caller
 //! provides a `StatefulProtocol` (from `ratatui-image`) for image rendering,
 //! or `None` for a placeholder.
-// Retained for bottom player bar — currently unused after TUI simplification.
-#![allow(dead_code)]
 
 use std::cell::RefCell;
 

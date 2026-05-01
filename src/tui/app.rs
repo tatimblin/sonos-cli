@@ -26,10 +26,8 @@ pub struct App {
     /// Terminal image protocol picker, detected before entering raw mode.
     /// `None` when album art is disabled or terminal detection failed.
     /// `RefCell` because `new_resize_protocol()` requires `&mut Picker`.
-    #[allow(dead_code)] // retained for bottom player bar
     pub picker: RefCell<Option<Picker>>,
     /// Background image fetcher and cache for album art.
-    #[allow(dead_code)] // retained for bottom player bar
     pub image_loader: ImageLoader,
 }
 
@@ -56,6 +54,18 @@ pub struct Navigation {
     pub tab: Tab,
     pub tab_focused: bool,
     pub speakers_state: SpeakerListScreenState,
+    pub settings_state: SettingsScreenState,
+}
+
+/// UI state for the Settings screen dropdown form.
+#[derive(Clone, Debug, Default)]
+pub struct SettingsScreenState {
+    /// Which row (0 = theme, 1 = default group, 2 = album art) is selected.
+    pub selected_row: usize,
+    /// Whether the dropdown for the selected row is open.
+    pub dropdown_open: bool,
+    /// Index within the open dropdown's option list.
+    pub dropdown_index: usize,
 }
 
 impl Navigation {
