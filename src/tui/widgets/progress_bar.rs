@@ -1,4 +1,6 @@
 //! Track progress bar utilities.
+// Retained for bottom player bar — currently unused after TUI simplification.
+#![allow(dead_code)]
 
 use ratatui::style::Style;
 use ratatui::text::Span;

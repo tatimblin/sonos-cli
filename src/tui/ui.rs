@@ -1,19 +1,14 @@
 //! TUI rendering — framed layout with header, content, separators, and key legend.
-//!
-//! Screen rendering is delegated to `tui/screens/` modules. Widget rendering
-//! lives in `tui/widgets/`.
 
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
-use sonos_sdk::SonosSystem;
 
-use crate::tui::app::{App, GroupTab, HomeTab, Screen};
+use crate::tui::app::{App, Navigation, Tab};
 use crate::tui::hooks::RenderContext;
-use crate::tui::screens::{home_groups, now_playing};
-use crate::tui::widgets::speaker_list::{self, SpeakerListMode};
+use crate::tui::widgets::speaker_list;
 
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
 pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
@@ -47,37 +42,16 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
         area.height.saturating_sub(4),
     );
 
-    match ctx.app.navigation.current() {
-        Screen::Home {
-            tab,
-            groups_state,
-            speakers_state,
-            ..
-        } => match tab {
-            HomeTab::Groups => {
-                let groups_state = groups_state.clone();
-                home_groups::render(frame, content_area, ctx, &groups_state);
-            }
-            HomeTab::Speakers => {
-                let speakers_state = speakers_state.clone();
-                let mode = SpeakerListMode::FullList;
-                speaker_list::render(frame, content_area, ctx, &mode, &speakers_state);
-            }
-        },
-        Screen::GroupView {
-            group_id,
-            tab,
-            speakers_state,
-            ..
-        } => {
-            let group_id = group_id.clone();
-            let tab = tab.clone();
-            let speakers_state = speakers_state.clone();
-            render_group_view(frame, content_area, ctx, &group_id, &tab, &speakers_state);
+    match ctx.app.navigation.tab {
+        Tab::Speakers => {
+            let state = ctx.app.navigation.speakers_state.clone();
+            speaker_list::render(frame, content_area, ctx, &state);
         }
-        Screen::SpeakerDetail { speaker_id } => {
-            let speaker_id = speaker_id.clone();
-            render_speaker_detail(frame, content_area, ctx.app, &speaker_id);
+        Tab::Settings => {
+            let paragraph = Paragraph::new("Settings \u{2014} coming soon")
+                .alignment(Alignment::Center)
+                .style(ctx.app.theme.muted);
+            frame.render_widget(paragraph, content_area);
         }
     }
 
@@ -100,7 +74,7 @@ fn draw_separator(frame: &mut Frame, y: u16, left: u16, right: u16, style: Style
     let buf = frame.buffer_mut();
     for x in left..=right {
         if let Some(cell) = buf.cell_mut((x, y)) {
-            cell.set_char('─').set_style(style);
+            cell.set_char('\u{2500}').set_style(style);
         }
     }
 }
@@ -110,10 +84,8 @@ fn draw_separator(frame: &mut Frame, y: u16, left: u16, right: u16, style: Style
 // ---------------------------------------------------------------------------
 
 fn render_header(frame: &mut Frame, area: Rect, app: &App) {
-    let screen = app.navigation.current();
-
-    let logo = build_logo(screen, &app.system);
-    let tab_spans = build_tab_spans(screen, &app.theme);
+    let logo = "\u{266a}  S O N O S";
+    let tab_spans = build_tab_spans(&app.navigation, &app.theme);
 
     let logo_width = logo.chars().count();
     let tab_width: usize = tab_spans.iter().map(|s| s.content.chars().count()).sum();
@@ -127,52 +99,12 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(paragraph, area);
 }
 
-fn build_logo(screen: &Screen, system: &SonosSystem) -> String {
-    let base = "♪  S O N O S";
-
-    match screen {
-        Screen::Home { .. } => base.to_string(),
-        Screen::GroupView { group_id, .. } => {
-            let name = system
-                .group_by_id(group_id)
-                .and_then(|g| g.coordinator())
-                .map(|c| c.name.clone())
-                .unwrap_or_else(|| "Group".to_string());
-            format!("{base}  ›  {name}")
-        }
-        Screen::SpeakerDetail { speaker_id } => {
-            let name = system
-                .speaker_by_id(speaker_id)
-                .map(|s| s.name.clone())
-                .unwrap_or_else(|| "Speaker".to_string());
-            format!("{base}  ›  {name}")
-        }
-    }
-}
-
-fn build_tab_spans(screen: &Screen, theme: &crate::tui::theme::Theme) -> Vec<Span<'static>> {
-    match screen {
-        Screen::Home {
-            tab, tab_focused, ..
-        } => {
-            let tabs = [
-                ("Groups", *tab == HomeTab::Groups),
-                ("Speakers", *tab == HomeTab::Speakers),
-            ];
-            render_tab_labels(&tabs, *tab_focused, theme)
-        }
-        Screen::GroupView {
-            tab, tab_focused, ..
-        } => {
-            let tabs = [
-                ("NowPlaying", *tab == GroupTab::NowPlaying),
-                ("Speakers", *tab == GroupTab::Speakers),
-                ("Queue", *tab == GroupTab::Queue),
-            ];
-            render_tab_labels(&tabs, *tab_focused, theme)
-        }
-        Screen::SpeakerDetail { .. } => vec![],
-    }
+fn build_tab_spans(nav: &Navigation, theme: &crate::tui::theme::Theme) -> Vec<Span<'static>> {
+    let tabs = [
+        ("Speakers", nav.tab == Tab::Speakers),
+        ("Settings", nav.tab == Tab::Settings),
+    ];
+    render_tab_labels(&tabs, nav.tab_focused, theme)
 }
 
 fn render_tab_labels(
@@ -201,74 +133,11 @@ fn render_tab_labels(
 // ---------------------------------------------------------------------------
 
 fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
-    let text = match app.navigation.current() {
-        Screen::Home {
-            tab: HomeTab::Groups,
-            ..
-        } => "↑↓←→ Navigate   ⏎ Open   ␣ Play/Pause   ⎋ Quit",
-        Screen::Home {
-            tab: HomeTab::Speakers,
-            ..
-        } => "↑↓ Navigate   ←→ Volume   ⏎ Open   ␣ Move   ⎋ Quit",
-        Screen::GroupView {
-            tab: GroupTab::NowPlaying,
-            ..
-        } => "←→ Tabs   ↑↓ Volume   ␣ Play/Pause   n Next   p Prev   ⎋ Back",
-        Screen::GroupView {
-            tab: GroupTab::Speakers,
-            ..
-        } => "↑↓ Navigate   ←→ Volume   ⏎ Open   ␣ Move   ⎋ Back",
-        Screen::GroupView {
-            tab: GroupTab::Queue,
-            ..
-        } => "←→ Tabs   ⎋ Back",
-        Screen::SpeakerDetail { .. } => "⎋ Back",
+    let text = match app.navigation.tab {
+        Tab::Speakers => "\u{2191}\u{2193} Navigate   \u{2190}\u{2192} Volume   \u{2423} Pick up/Drop   ? Help   \u{238b} Quit",
+        Tab::Settings => "\u{2190}\u{2192} Tabs   \u{238b} Quit",
     };
 
     let paragraph = Paragraph::new(text).style(app.theme.legend);
-    frame.render_widget(paragraph, area);
-}
-
-// ---------------------------------------------------------------------------
-// Screen stubs — replaced with real content in M8+
-// ---------------------------------------------------------------------------
-
-fn render_group_view(
-    frame: &mut Frame,
-    area: Rect,
-    ctx: &mut RenderContext,
-    group_id: &sonos_sdk::GroupId,
-    tab: &GroupTab,
-    speakers_state: &crate::tui::app::SpeakerListScreenState,
-) {
-    match tab {
-        GroupTab::NowPlaying => {
-            now_playing::render(frame, area, ctx, group_id);
-        }
-        GroupTab::Speakers => {
-            let mode = SpeakerListMode::GroupScoped {
-                group_id: group_id.clone(),
-            };
-            speaker_list::render(frame, area, ctx, &mode, speakers_state);
-        }
-        GroupTab::Queue => {
-            let text = "Queue — Milestone 8";
-            let paragraph = Paragraph::new(text)
-                .alignment(Alignment::Center)
-                .style(ctx.app.theme.muted);
-            frame.render_widget(paragraph, area);
-        }
-    }
-}
-
-fn render_speaker_detail(
-    frame: &mut Frame,
-    area: Rect,
-    app: &App,
-    _speaker_id: &sonos_sdk::SpeakerId,
-) {
-    let paragraph = Paragraph::new("Speaker Detail — Milestone 9")
-        .alignment(Alignment::Center)
-        .style(app.theme.muted);
     frame.render_widget(paragraph, area);
 }

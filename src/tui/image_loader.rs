@@ -44,6 +44,7 @@ pub struct ImageLoader {
     /// URIs currently being fetched (RefCell for &self access from render).
     pending: RefCell<HashSet<String>>,
     result_rx: mpsc::Receiver<LoadResult>,
+    #[allow(dead_code)] // retained for bottom player bar
     request_tx: mpsc::Sender<LoadRequest>,
 }
 
@@ -79,6 +80,7 @@ impl ImageLoader {
     ///
     /// Callable from render functions with `&self`. The fetch happens in a
     /// background thread; call `poll()` from the event loop to collect results.
+    #[allow(dead_code)] // retained for bottom player bar
     pub fn request(&self, uri: &str, speaker_ip: IpAddr) {
         if self.cache.contains_key(uri) {
             return;
@@ -117,7 +119,7 @@ impl ImageLoader {
         loaded
     }
 
-    /// Get a cached image by URI.
+    #[allow(dead_code)] // retained for bottom player bar
     pub fn get(&self, uri: &str) -> Option<&DynamicImage> {
         self.cache.get(uri)
     }
@@ -138,6 +140,7 @@ impl ImageLoader {
 /// Sonos speakers return `album_art_uri` as either:
 /// - A relative path: `/getaa?s=1&u=...` → prepend `http://{ip}:1400`
 /// - An absolute URL: `http://...` → use as-is
+#[allow(dead_code)] // retained for bottom player bar
 fn build_url(uri: &str, speaker_ip: IpAddr) -> String {
     if uri.starts_with("http://") || uri.starts_with("https://") {
         uri.to_string()

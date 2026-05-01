@@ -13,9 +13,12 @@ pub struct Theme {
     pub legend: Style,
     pub muted: Style,
 
-    // Group cards
+    // Cards / bottom bar
+    #[allow(dead_code)] // retained for bottom player bar
     pub card_border: Style,
+    #[allow(dead_code)] // retained for bottom player bar
     pub card_border_selected: Style,
+    #[allow(dead_code)] // retained for bottom player bar
     pub card_title: Style,
     pub track_info: Style,
 
@@ -29,9 +32,13 @@ pub struct Theme {
     pub volume_empty: Style,
 
     // Progress bar
+    #[allow(dead_code)] // retained for bottom player bar
     pub progress_filled: Style,
+    #[allow(dead_code)] // retained for bottom player bar
     pub progress_empty: Style,
+    #[allow(dead_code)] // retained for bottom player bar
     pub progress_cursor: Style,
+    #[allow(dead_code)] // retained for bottom player bar
     pub progress_time: Style,
 
     // Speakers tab

@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use crate::tui::app::{App, Screen};
+use crate::tui::app::{App, Tab};
 use crate::tui::handlers;
 use crate::tui::hooks::{Hooks, RenderContext};
 use crate::tui::ui;
@@ -33,10 +33,6 @@ fn run_event_loop_inner(
 ) -> anyhow::Result<()> {
     let change_iter = app.system.iter();
     tracing::debug!("TUI event loop started, got change_iter");
-
-    // Get initial terminal width
-    let initial_size = terminal.size()?;
-    app.terminal_width = initial_size.width;
 
     // Hooks system — owns widget state, watch handles, and animation registrations
     let mut hooks = Hooks::new();
@@ -73,8 +69,7 @@ fn run_event_loop_inner(
                     handle_key(app, key);
                     app.dirty = true;
                 }
-                Event::Resize(w, _) => {
-                    app.terminal_width = w;
+                Event::Resize(_, _) => {
                     app.dirty = true;
                 }
                 _ => {}
@@ -112,18 +107,16 @@ fn run_event_loop_inner(
 }
 
 // ---------------------------------------------------------------------------
-// Key handling — global first, then screen-specific
+// Key handling — global first, then tab-specific
 // ---------------------------------------------------------------------------
 
 fn handle_key(app: &mut App, key: KeyEvent) {
-    // Ignore key releases — only handle presses
     if key.kind != event::KeyEventKind::Press {
         return;
     }
 
-    // Global keys (work on every screen)
     match key.code {
-        KeyCode::Char('q') if app.navigation.at_root() => {
+        KeyCode::Char('q') => {
             app.should_quit = true;
             return;
         }
@@ -132,38 +125,18 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             return;
         }
         KeyCode::Esc => {
-            // Check for pick-up mode first — Esc cancels pick-up before navigating
-            let in_pick_up = app
-                .navigation
-                .current()
-                .speakers_state()
-                .is_some_and(|s| s.pick_up.is_some());
-            if in_pick_up {
-                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                    state.pick_up = None;
-                }
+            if app.navigation.speakers_state.pick_up.is_some() {
+                app.navigation.speakers_state.pick_up = None;
                 return;
             }
-
-            if !app.navigation.pop() {
-                app.should_quit = true;
-            }
+            app.should_quit = true;
             return;
         }
         _ => {}
     }
 
-    // Screen-specific keys
-    match app.navigation.current().clone() {
-        Screen::Home {
-            tab, tab_focused, ..
-        } => handlers::home::handle_home_key(app, key, &tab, tab_focused),
-        Screen::GroupView {
-            group_id,
-            tab,
-            tab_focused,
-            ..
-        } => handlers::group::handle_group_key(app, key, &group_id, &tab, tab_focused),
-        Screen::SpeakerDetail { .. } => handlers::group::handle_speaker_key(app, key),
+    match app.navigation.tab {
+        Tab::Speakers => handlers::home::handle_key(app, key),
+        Tab::Settings => {}
     }
 }
