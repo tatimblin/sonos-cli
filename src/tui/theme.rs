@@ -15,6 +15,8 @@ pub struct Theme {
 
     // Track info
     pub track_info: Style,
+    pub bottom_bar_border: Style,
+    pub bottom_bar_controls: Style,
 
     // Playback state icons
     pub playing_icon: Style,
@@ -26,13 +28,9 @@ pub struct Theme {
     pub volume_empty: Style,
 
     // Progress bar
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_filled: Style,
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_empty: Style,
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_cursor: Style,
-    #[allow(dead_code)] // retained for bottom player bar
     pub progress_time: Style,
 
     // Speakers tab
@@ -63,6 +61,8 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             track_info: Style::new().fg(Color::Gray),
+            bottom_bar_border: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::White),
 
             playing_icon: Style::new().fg(Color::Green),
             paused_icon: Style::new().fg(Color::Yellow),
@@ -94,6 +94,8 @@ impl Theme {
             muted: Style::new().fg(Color::Gray),
 
             track_info: Style::new().fg(Color::DarkGray),
+            bottom_bar_border: Style::new().fg(Color::Gray),
+            bottom_bar_controls: Style::new().fg(Color::Black),
 
             playing_icon: Style::new().fg(Color::Green),
             paused_icon: Style::new().fg(Color::Yellow),
@@ -125,6 +127,8 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             track_info: Style::new().fg(Color::LightMagenta),
+            bottom_bar_border: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::Cyan),
 
             playing_icon: Style::new().fg(Color::Green),
             paused_icon: Style::new().fg(Color::Yellow),
@@ -157,6 +161,8 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             track_info: Style::new().fg(Color::Gray),
+            bottom_bar_border: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::White),
 
             playing_icon: Style::new().fg(orange),
             paused_icon: Style::new().fg(Color::Yellow),

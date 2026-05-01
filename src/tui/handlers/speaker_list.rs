@@ -1,4 +1,5 @@
-//! Speaker list key handling — navigation, volume adjustment, pick-up/drop regrouping.
+//! Speaker list key handling — navigation, volume adjustment, pick-up/drop regrouping,
+//! and playback controls (play/pause, next, previous).
 
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -89,6 +90,18 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
             }
             SpeakerListAction::Handled
         }
+        KeyCode::Char('p') => {
+            handle_play_pause(app, entries, selected);
+            SpeakerListAction::Handled
+        }
+        KeyCode::Char('n') => {
+            handle_playback_action(app, entries, selected, PlaybackAction::Next);
+            SpeakerListAction::Handled
+        }
+        KeyCode::Char('b') => {
+            handle_playback_action(app, entries, selected, PlaybackAction::Previous);
+            SpeakerListAction::Handled
+        }
         _ => SpeakerListAction::Handled,
     }
 }
@@ -112,6 +125,81 @@ fn handle_volume_adjust(app: &mut App, entries: &[ListEntry], selected: usize, d
                 }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Playback controls
+// ---------------------------------------------------------------------------
+
+enum PlaybackAction {
+    Next,
+    Previous,
+}
+
+/// Resolve the coordinator speaker for the group containing the selected entry.
+fn resolve_coordinator(
+    app: &App,
+    entries: &[ListEntry],
+    selected: usize,
+) -> Option<sonos_sdk::Speaker> {
+    // Try group header first
+    let group_id = group_for_entry(entries, selected);
+
+    let group = group_id
+        .and_then(|gid| app.system.group_by_id(&gid))
+        .or_else(|| {
+            // Standalone speaker: resolve via the speaker's own group
+            if selected < entries.len() {
+                if let ListEntry::SpeakerRow(sid) = &entries[selected] {
+                    return app.system.speaker_by_id(sid).and_then(|s| s.group());
+                }
+            }
+            None
+        });
+
+    group.and_then(|g| g.coordinator())
+}
+
+fn handle_play_pause(app: &mut App, entries: &[ListEntry], selected: usize) {
+    let Some(coordinator) = resolve_coordinator(app, entries, selected) else {
+        return;
+    };
+
+    // Toggle: if playing, pause; otherwise play
+    let is_playing = coordinator
+        .playback_state
+        .get()
+        .is_some_and(|ps| ps.is_playing());
+
+    let result = if is_playing {
+        coordinator.pause()
+    } else {
+        coordinator.play()
+    };
+
+    if let Err(e) = result {
+        app.status_message = Some(format!("error: {e}"));
+    }
+}
+
+fn handle_playback_action(
+    app: &mut App,
+    entries: &[ListEntry],
+    selected: usize,
+    action: PlaybackAction,
+) {
+    let Some(coordinator) = resolve_coordinator(app, entries, selected) else {
+        return;
+    };
+
+    let result = match action {
+        PlaybackAction::Next => coordinator.next(),
+        PlaybackAction::Previous => coordinator.previous(),
+    };
+
+    if let Err(e) = result {
+        app.status_message = Some(format!("error: {e}"));
     }
 }
 
