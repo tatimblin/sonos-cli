@@ -1,6 +1,6 @@
 //! Shared types used across TUI layers (widgets, screens, handlers).
 
-use sonos_sdk::{GroupId, SonosSystem, SpeakerId};
+use sonos_sdk::{GroupId, PlaybackState, SonosSystem, SpeakerId};
 
 /// A single row in the flat speaker list. Navigation and rendering dispatch on this.
 #[derive(Clone, Debug, PartialEq)]
@@ -76,6 +76,24 @@ pub fn group_for_entry(entries: &[ListEntry], index: usize) -> Option<GroupId> {
         }
     }
     None
+}
+
+/// Pre-computed render data for the speaker list widget.
+pub struct SpeakerListData {
+    pub entries: Vec<ListEntry>,
+    pub entry_data: Vec<EntryRenderData>,
+    pub selected_index: usize,
+    pub pick_up: Option<PickUpState>,
+    pub status_message: Option<String>,
+}
+
+/// Per-entry display data, pre-resolved by the screen layer.
+pub struct EntryRenderData {
+    pub name: String,
+    pub speaker_volume: Option<u16>,
+    pub group_volume: Option<u16>,
+    pub playback_state: Option<PlaybackState>,
+    pub track_info: Option<String>,
 }
 
 /// Build display order for pick-up mode: the picked-up speaker is removed from its
