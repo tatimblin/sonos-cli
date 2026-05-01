@@ -14,7 +14,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
 
     let mut entry_data: Vec<EntryRenderData> = Vec::with_capacity(entries.len());
 
-    for entry in &entries {
+    for (i, entry) in entries.iter().enumerate() {
         match entry {
             ListEntry::SpeakerRow(speaker_id) => {
                 let speaker = ctx.app.system.speaker_by_id(speaker_id);
@@ -29,12 +29,17 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
                 let name = speaker
                     .map(|s| s.name.clone())
                     .unwrap_or_else(|| "Unknown".to_string());
+
+                // Determine if this is the last speaker in its group
+                let is_last = !matches!(entries.get(i + 1), Some(ListEntry::SpeakerRow(_)));
+
                 entry_data.push(EntryRenderData {
                     name,
                     speaker_volume: vol,
                     group_volume: None,
                     playback_state: None,
                     track_info: None,
+                    is_last_in_group: is_last,
                 });
             }
             ListEntry::GroupHeader(group_id) => {
@@ -65,25 +70,19 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
                     group_volume: gvol,
                     playback_state: pb,
                     track_info: track,
-                });
-            }
-            ListEntry::UngroupedHeader => {
-                entry_data.push(EntryRenderData {
-                    name: String::new(),
-                    speaker_volume: None,
-                    group_volume: None,
-                    playback_state: None,
-                    track_info: None,
+                    is_last_in_group: false,
                 });
             }
         }
     }
 
     let state = &ctx.app.navigation.speakers_state;
+    // Clamp selected_index after topology changes (entries may have shrunk)
+    let selected_index = state.selected_index.min(entries.len().saturating_sub(1));
     let data = SpeakerListData {
         entries,
         entry_data,
-        selected_index: state.selected_index,
+        selected_index,
         pick_up: state.pick_up.clone(),
         status_message: ctx.app.status_message.clone(),
     };
