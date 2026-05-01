@@ -1,8 +1,5 @@
-//! Shared speaker list widget — renders grouped speakers with volume, playback state,
-//! and pick-up/drop regrouping. Used by both Home > Speakers and GroupView > Speakers tabs.
-//!
-//! Unlike render-only widgets (`volume_bar`, `group_card`), this is an interactive widget
-//! that encapsulates both rendering and key handling for reuse across two screens.
+//! Speaker list widget — renders grouped speakers with volume, playback state,
+//! and pick-up/drop regrouping.
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
@@ -20,21 +17,11 @@ use crate::tui::widgets::volume_bar;
 // Types
 // ============================================================================
 
-/// Controls which speakers appear in the list.
-#[derive(Clone, Debug)]
-pub enum SpeakerListMode {
-    /// Show all groups with nested speakers (Home > Speakers tab).
-    FullList,
-    /// Show only this group's members + "Add Speaker" row (GroupView > Speakers tab).
-    GroupScoped { group_id: GroupId },
-}
-
 /// A single row in the flat list. Navigation and rendering dispatch on this.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ListEntry {
     GroupHeader(GroupId),
     SpeakerRow(SpeakerId),
-    AddSpeaker,
     UngroupedHeader,
 }
 
@@ -55,8 +42,6 @@ pub struct PickUpState {
 /// Action returned from `handle_key` so callers can respond.
 pub enum SpeakerListAction {
     Handled,
-    NavigateToGroup(GroupId),
-    NavigateToSpeaker(SpeakerId),
     FocusTabBar,
 }
 
@@ -73,25 +58,7 @@ struct EntryRenderData {
 // ============================================================================
 
 /// Build the flat list of entries from the current system state.
-pub fn build_list_entries(
-    system: &SonosSystem,
-    mode: &SpeakerListMode,
-    pick_up: &Option<PickUpState>,
-) -> Vec<ListEntry> {
-    match mode {
-        SpeakerListMode::FullList => build_full_list(system),
-        SpeakerListMode::GroupScoped { group_id } => {
-            if pick_up.is_some() {
-                // When picking up in scoped mode, expand to full list
-                build_full_list(system)
-            } else {
-                build_scoped_list(system, group_id)
-            }
-        }
-    }
-}
-
-fn build_full_list(system: &SonosSystem) -> Vec<ListEntry> {
+pub fn build_list_entries(system: &SonosSystem) -> Vec<ListEntry> {
     let groups = system.groups();
     let mut entries = Vec::new();
 
@@ -123,25 +90,11 @@ fn build_full_list(system: &SonosSystem) -> Vec<ListEntry> {
     entries
 }
 
-fn build_scoped_list(system: &SonosSystem, group_id: &GroupId) -> Vec<ListEntry> {
-    let mut entries = Vec::new();
-
-    if let Some(group) = system.group_by_id(group_id) {
-        for member in group.members() {
-            entries.push(ListEntry::SpeakerRow(member.id.clone()));
-        }
-    }
-
-    entries.push(ListEntry::AddSpeaker);
-    entries
-}
-
 /// Determine which group a list entry at `index` belongs to.
 fn group_for_entry(entries: &[ListEntry], index: usize) -> Option<GroupId> {
     if index >= entries.len() {
         return None;
     }
-    // Walk backwards from index to find the nearest GroupHeader
     for i in (0..=index).rev() {
         match &entries[i] {
             ListEntry::GroupHeader(gid) => return Some(gid.clone()),
@@ -196,7 +149,6 @@ pub fn render(
     frame: &mut Frame,
     area: Rect,
     ctx: &mut RenderContext,
-    mode: &SpeakerListMode,
     state: &SpeakerListScreenState,
 ) {
     let speakers = ctx.app.system.speakers();
@@ -209,7 +161,7 @@ pub fn render(
         return;
     }
 
-    let entries = build_list_entries(&ctx.app.system, mode, &state.pick_up);
+    let entries = build_list_entries(&ctx.app.system);
 
     if entries.is_empty() {
         let paragraph = Paragraph::new("No speakers in group")
@@ -230,7 +182,6 @@ pub fn render(
                     .as_ref()
                     .and_then(|s| ctx.hooks.use_watch(&s.volume))
                     .map(|v| v.value() as u16);
-                // Subscribe to topology changes so the list refreshes after regrouping
                 if let Some(ref s) = speaker {
                     ctx.hooks.use_watch(&s.group_membership);
                 }
@@ -271,7 +222,7 @@ pub fn render(
                     track_info: track,
                 });
             }
-            _ => {
+            ListEntry::UngroupedHeader => {
                 render_data.push(EntryRenderData {
                     speaker_volume: None,
                     group_volume: None,
@@ -286,21 +237,16 @@ pub fn render(
     let is_pick_up = state.pick_up.is_some();
     let pick_up_speaker_id = state.pick_up.as_ref().map(|p| p.speaker_id.clone());
 
-    // In pick-up mode, reorder entries so the picked-up speaker visually moves
-    // to the drop position with other entries shifting to fill the gap.
     let display_order = build_display_order(&entries, &state.pick_up);
 
     let vol_width = 16.min(area.width.saturating_sub(50));
 
-    // Build lines
     let mut lines: Vec<Line> = Vec::new();
 
     for &orig_idx in &display_order {
         let entry = &entries[orig_idx];
         let data = &render_data[orig_idx];
 
-        // In pick-up mode, the picked-up speaker is the cursor.
-        // In normal mode, selected_index is the cursor.
         let is_selected = if is_pick_up {
             pick_up_speaker_id
                 .as_ref()
@@ -319,7 +265,6 @@ pub fn render(
                     .map(|c| c.name.clone())
                     .unwrap_or_else(|| "Unknown Group".to_string());
 
-                // Play state icon
                 let (icon, icon_style) = match &data.playback_state {
                     Some(PlaybackState::Playing) => ("\u{25b6} ", ctx.app.theme.playing_icon),
                     Some(PlaybackState::Paused) => ("\u{23f8} ", ctx.app.theme.paused_icon),
@@ -380,17 +325,6 @@ pub fn render(
 
                 lines.push(Line::from(spans));
             }
-            ListEntry::AddSpeaker => {
-                let style = if is_selected {
-                    ctx.app.theme.speaker_cursor
-                } else {
-                    ctx.app.theme.muted
-                };
-                lines.push(Line::from(vec![Span::styled(
-                    "    + Add speaker...",
-                    style,
-                )]));
-            }
             ListEntry::UngroupedHeader => {
                 lines.push(Line::raw(""));
                 lines.push(Line::from(vec![Span::styled(
@@ -401,7 +335,6 @@ pub fn render(
         }
     }
 
-    // Status message for pick-up mode
     if let Some(ref pick_up) = state.pick_up {
         let name = ctx
             .app
@@ -416,7 +349,6 @@ pub fn render(
         )]));
     }
 
-    // Render status message if present (non-pick-up)
     if state.pick_up.is_none() {
         if let Some(ref msg) = ctx.app.status_message {
             lines.push(Line::raw(""));
@@ -456,13 +388,9 @@ fn append_volume_spans(
 // ============================================================================
 
 /// Handle a key event for the speaker list. Returns an action for the caller.
-pub fn handle_key(app: &mut App, key: KeyEvent, mode: &SpeakerListMode) -> SpeakerListAction {
-    let pick_up = app
-        .navigation
-        .current()
-        .speakers_state()
-        .and_then(|s| s.pick_up.clone());
-    let entries = build_list_entries(&app.system, mode, &pick_up);
+pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction {
+    let pick_up = app.navigation.speakers_state.pick_up.clone();
+    let entries = build_list_entries(&app.system);
 
     if entries.is_empty() {
         return SpeakerListAction::Handled;
@@ -472,7 +400,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent, mode: &SpeakerListMode) -> Speak
         return handle_pick_up_key(app, key, &entries);
     }
 
-    handle_normal_key(app, key, mode, &entries)
+    handle_normal_key(app, key, &entries)
 }
 
 fn next_selectable(entries: &[ListEntry], from: usize) -> Option<usize> {
@@ -483,26 +411,17 @@ fn prev_selectable(entries: &[ListEntry], from: usize) -> Option<usize> {
     (0..from).rev().find(|&i| entries[i].is_selectable())
 }
 
-fn handle_normal_key(
-    app: &mut App,
-    key: KeyEvent,
-    mode: &SpeakerListMode,
-    entries: &[ListEntry],
-) -> SpeakerListAction {
+fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
     let selected = app
         .navigation
-        .current()
-        .speakers_state()
-        .map(|s| s.selected_index)
-        .unwrap_or(0)
+        .speakers_state
+        .selected_index
         .min(entries.len().saturating_sub(1));
 
     match key.code {
         KeyCode::Up => {
             if let Some(prev) = prev_selectable(entries, selected) {
-                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                    state.selected_index = prev;
-                }
+                app.navigation.speakers_state.selected_index = prev;
             } else {
                 return SpeakerListAction::FocusTabBar;
             }
@@ -510,9 +429,7 @@ fn handle_normal_key(
         }
         KeyCode::Down => {
             if let Some(next) = next_selectable(entries, selected) {
-                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                    state.selected_index = next;
-                }
+                app.navigation.speakers_state.selected_index = next;
             }
             SpeakerListAction::Handled
         }
@@ -524,51 +441,24 @@ fn handle_normal_key(
             handle_volume_adjust(app, entries, selected, 2);
             SpeakerListAction::Handled
         }
-        KeyCode::Enter => {
-            if selected >= entries.len() {
-                return SpeakerListAction::Handled;
-            }
-            match &entries[selected] {
-                ListEntry::GroupHeader(group_id) => {
-                    SpeakerListAction::NavigateToGroup(group_id.clone())
-                }
-                ListEntry::SpeakerRow(speaker_id) => {
-                    SpeakerListAction::NavigateToSpeaker(speaker_id.clone())
-                }
-                ListEntry::AddSpeaker => {
-                    enter_add_speaker_mode(app, mode);
-                    SpeakerListAction::Handled
-                }
-                _ => SpeakerListAction::Handled,
-            }
-        }
         KeyCode::Char(' ') => {
             if selected >= entries.len() {
                 return SpeakerListAction::Handled;
             }
-            match &entries[selected] {
-                ListEntry::SpeakerRow(speaker_id) => {
-                    let original_group = app
-                        .system
-                        .speaker_by_id(speaker_id)
-                        .and_then(|s| s.group())
-                        .map(|g| g.id.clone());
+            if let ListEntry::SpeakerRow(speaker_id) = &entries[selected] {
+                let original_group = app
+                    .system
+                    .speaker_by_id(speaker_id)
+                    .and_then(|s| s.group())
+                    .map(|g| g.id.clone());
 
-                    if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                        state.pick_up = Some(PickUpState {
-                            speaker_id: speaker_id.clone(),
-                            original_group_id: original_group,
-                            drop_index: selected,
-                        });
-                    }
-                    SpeakerListAction::Handled
-                }
-                ListEntry::AddSpeaker => {
-                    enter_add_speaker_mode(app, mode);
-                    SpeakerListAction::Handled
-                }
-                _ => SpeakerListAction::Handled,
+                app.navigation.speakers_state.pick_up = Some(PickUpState {
+                    speaker_id: speaker_id.clone(),
+                    original_group_id: original_group,
+                    drop_index: selected,
+                });
             }
+            SpeakerListAction::Handled
         }
         _ => SpeakerListAction::Handled,
     }
@@ -597,82 +487,37 @@ fn handle_volume_adjust(app: &mut App, entries: &[ListEntry], selected: usize, d
     }
 }
 
-fn enter_add_speaker_mode(app: &mut App, mode: &SpeakerListMode) {
-    // In GroupScoped mode, "Add Speaker" expands the list to show all speakers.
-    // We enter pick-up mode with the first non-member speaker pre-selected.
-    if let SpeakerListMode::GroupScoped { group_id } = mode {
-        let full_entries = build_full_list(&app.system);
-        let first_outside = full_entries
-            .iter()
-            .enumerate()
-            .find(|(_, e)| {
-                if let ListEntry::SpeakerRow(sid) = e {
-                    app.system
-                        .speaker_by_id(sid)
-                        .and_then(|s| s.group())
-                        .map(|g| g.id != *group_id)
-                        .unwrap_or(true)
-                } else {
-                    false
-                }
-            })
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-
-        if let Some(ListEntry::SpeakerRow(speaker_id)) = full_entries.get(first_outside) {
-            if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                state.pick_up = Some(PickUpState {
-                    speaker_id: speaker_id.clone(),
-                    original_group_id: None,
-                    drop_index: first_outside,
-                });
-            }
-        }
-    }
-}
-
 fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
-    let pick_up = match app.navigation.current().speakers_state() {
-        Some(s) => match s.pick_up.clone() {
-            Some(p) => p,
-            None => return SpeakerListAction::Handled,
-        },
+    let pick_up = match app.navigation.speakers_state.pick_up.clone() {
+        Some(p) => p,
         None => return SpeakerListAction::Handled,
     };
 
-    // Clamp drop_index to current entries in case topology changed
     let drop_index = pick_up.drop_index.min(entries.len().saturating_sub(1));
 
     match key.code {
         KeyCode::Up => {
             if let Some(prev) = prev_selectable(entries, drop_index) {
-                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                    if let Some(ref mut pu) = state.pick_up {
-                        pu.drop_index = prev;
-                    }
+                if let Some(ref mut pu) = app.navigation.speakers_state.pick_up {
+                    pu.drop_index = prev;
                 }
             }
             SpeakerListAction::Handled
         }
         KeyCode::Down => {
             if let Some(next) = next_selectable(entries, drop_index) {
-                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                    if let Some(ref mut pu) = state.pick_up {
-                        pu.drop_index = next;
-                    }
+                if let Some(ref mut pu) = app.navigation.speakers_state.pick_up {
+                    pu.drop_index = next;
                 }
             }
             SpeakerListAction::Handled
         }
         KeyCode::Char(' ') => {
-            // Drop the speaker
             let target_group = group_for_entry(entries, drop_index);
             let same_group = pick_up.original_group_id.as_ref() == target_group.as_ref();
 
             if same_group {
-                if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                    state.pick_up = None;
-                }
+                app.navigation.speakers_state.pick_up = None;
                 return SpeakerListAction::Handled;
             }
 
@@ -706,15 +551,11 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                 }
             }
 
-            if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                state.pick_up = None;
-            }
+            app.navigation.speakers_state.pick_up = None;
             SpeakerListAction::Handled
         }
         KeyCode::Esc => {
-            if let Some(state) = app.navigation.current_mut().speakers_state_mut() {
-                state.pick_up = None;
-            }
+            app.navigation.speakers_state.pick_up = None;
             SpeakerListAction::Handled
         }
         _ => SpeakerListAction::Handled,
