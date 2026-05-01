@@ -3,6 +3,7 @@
 use ratatui::layout::Rect;
 use ratatui::Frame;
 
+use crate::tui::helpers;
 use crate::tui::hooks::RenderContext;
 use crate::tui::types::{build_list_entries, EntryRenderData, ListEntry, SpeakerListData};
 use crate::tui::widgets::speaker_list;
@@ -49,15 +50,10 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
                     .as_ref()
                     .and_then(|c| ctx.hooks.use_watch(&c.playback_state));
 
-                let track = coordinator
+                let current_track = coordinator
                     .as_ref()
-                    .and_then(|c| ctx.hooks.use_watch(&c.current_track))
-                    .filter(|t| !t.is_empty())
-                    .map(|t| {
-                        let title = t.title.as_deref().unwrap_or("Unknown");
-                        let artist = t.artist.as_deref().unwrap_or("Unknown");
-                        format!("{title} \u{00b7} {artist}")
-                    });
+                    .and_then(|c| ctx.hooks.use_watch(&c.current_track));
+                let track = helpers::track_summary(&current_track);
 
                 let name = coordinator
                     .map(|c| c.name.clone())
