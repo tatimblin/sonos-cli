@@ -3,7 +3,8 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::app::{App, Tab};
-use crate::tui::widgets::speaker_list::{self, SpeakerListAction};
+use crate::tui::types::SpeakerListAction;
+use crate::tui::widgets::speaker_list;
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
     app.status_message = None;

@@ -8,6 +8,7 @@ mod handlers;
 pub mod hooks;
 pub mod image_loader;
 mod theme;
+pub mod types;
 mod ui;
 mod widgets;
 

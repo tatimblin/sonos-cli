@@ -10,6 +10,7 @@ use crate::tui::app::{App, Navigation, Tab};
 use crate::tui::hooks::RenderContext;
 use crate::tui::widgets::speaker_list;
 
+
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
 pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
     let area = frame.area();
