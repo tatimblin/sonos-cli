@@ -106,7 +106,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
 
     let progress_bar_width = text_w.saturating_sub(vol_width + time_label_width + 4) as usize;
     let artist_max =
-        text_w.saturating_sub(vol_width + time_label_width as u16 + progress_bar_width as u16 + 4);
+        text_w.saturating_sub(vol_width + time_label_width + progress_bar_width as u16 + 4);
     let artist_display = truncate_str(artist, artist_max as usize);
     let artist_chars = artist_display.chars().count() as u16;
 
