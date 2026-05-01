@@ -5,20 +5,20 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::app::App;
 use crate::tui::types::{
-    build_list_entries, group_for_entry, ListEntry, PickUpState, SpeakerListAction,
+    build_list_entries, group_for_entry, DropZoneKind, ListEntry, PickUpState, SpeakerListAction,
 };
 
 /// Handle a key event for the speaker list. Returns an action for the caller.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction {
-    let pick_up = app.navigation.speakers_state.pick_up.clone();
-    let entries = build_list_entries(&app.system);
+    let is_pick_up = app.navigation.speakers_state.pick_up.is_some();
 
-    if entries.is_empty() {
-        return SpeakerListAction::Handled;
+    if is_pick_up {
+        return handle_pick_up_key(app, key);
     }
 
-    if pick_up.is_some() {
-        return handle_pick_up_key(app, key, &entries);
+    let entries = build_list_entries(&app.system);
+    if entries.is_empty() {
+        return SpeakerListAction::Handled;
     }
 
     handle_normal_key(app, key, &entries)
@@ -76,16 +76,27 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
                 return SpeakerListAction::Handled;
             }
             if let ListEntry::SpeakerRow(speaker_id) = &entries[selected] {
-                let original_group = app
-                    .system
-                    .speaker_by_id(speaker_id)
+                let speaker = app.system.speaker_by_id(speaker_id);
+                let original_group = speaker
+                    .as_ref()
                     .and_then(|s| s.group())
                     .map(|g| g.id.clone());
+                let speaker_name = speaker
+                    .map(|s| s.name.clone())
+                    .unwrap_or_else(|| "Speaker".to_string());
+
+                // Find the initial zone index: match the speaker's current group
+                let groups = app.system.groups();
+                let initial_zone = original_group
+                    .as_ref()
+                    .and_then(|og| groups.iter().position(|g| g.id == *og))
+                    .unwrap_or(0);
 
                 app.navigation.speakers_state.pick_up = Some(PickUpState {
                     speaker_id: speaker_id.clone(),
+                    speaker_name,
                     original_group_id: original_group,
-                    drop_index: selected,
+                    active_zone_index: initial_zone,
                 });
             }
             SpeakerListAction::Handled
@@ -203,43 +214,58 @@ fn handle_playback_action(
     }
 }
 
-fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
+fn handle_pick_up_key(app: &mut App, key: KeyEvent) -> SpeakerListAction {
     let pick_up = match app.navigation.speakers_state.pick_up.clone() {
         Some(p) => p,
         None => return SpeakerListAction::Handled,
     };
 
-    let drop_index = pick_up.drop_index.min(entries.len().saturating_sub(1));
+    // Build the current zone list to navigate
+    let groups = app.system.groups();
+    let zone_count = groups.len() + 1; // +1 for "Add new group"
+    let active = pick_up.active_zone_index.min(zone_count.saturating_sub(1));
 
     match key.code {
         KeyCode::Up => {
-            if let Some(prev) = prev_entry(drop_index) {
+            if active > 0 {
                 if let Some(ref mut pu) = app.navigation.speakers_state.pick_up {
-                    pu.drop_index = prev;
+                    pu.active_zone_index = active - 1;
                 }
             }
             SpeakerListAction::Handled
         }
         KeyCode::Down => {
-            if let Some(next) = next_entry(entries, drop_index) {
+            if active + 1 < zone_count {
                 if let Some(ref mut pu) = app.navigation.speakers_state.pick_up {
-                    pu.drop_index = next;
+                    pu.active_zone_index = active + 1;
                 }
             }
             SpeakerListAction::Handled
         }
         KeyCode::Char(' ') => {
-            let target_group = group_for_entry(entries, drop_index);
-            let same_group = pick_up.original_group_id.as_ref() == target_group.as_ref();
+            // Determine the target zone kind
+            let target_kind = if active < groups.len() {
+                DropZoneKind::ExistingGroup(groups[active].id.clone())
+            } else {
+                DropZoneKind::NewGroup
+            };
+
+            // Check if dropping on the same group (no-op)
+            let same_group = match (&target_kind, &pick_up.original_group_id) {
+                (DropZoneKind::ExistingGroup(target_gid), Some(orig_gid)) => target_gid == orig_gid,
+                _ => false,
+            };
 
             if same_group {
+                // Space-Space = safe no-op, just cancel pick-up
                 app.navigation.speakers_state.pick_up = None;
                 return SpeakerListAction::Handled;
             }
 
+            // Perform the drop
             if let Some(speaker) = app.system.speaker_by_id(&pick_up.speaker_id) {
-                match target_group {
-                    Some(target_gid) => {
+                match target_kind {
+                    DropZoneKind::ExistingGroup(target_gid) => {
                         if let Some(group) = app.system.group_by_id(&target_gid) {
                             match group.add_speaker(&speaker) {
                                 Ok(()) => {
@@ -254,11 +280,16 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                                     app.status_message = Some(format!("error: {e}"));
                                 }
                             }
+                        } else {
+                            // Target group dissolved during pick-up
+                            app.status_message =
+                                Some("error: target group no longer exists".to_string());
                         }
                     }
-                    None => match speaker.leave_group() {
+                    DropZoneKind::NewGroup => match speaker.leave_group() {
                         Ok(_) => {
-                            app.status_message = Some(format!("{} ungrouped", speaker.name));
+                            app.status_message =
+                                Some(format!("{} is now standalone", speaker.name));
                         }
                         Err(e) => {
                             app.status_message = Some(format!("error: {e}"));
@@ -267,13 +298,25 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                 }
             }
 
+            // Find the speaker in the rebuilt list and set cursor there
+            let new_entries = build_list_entries(&app.system);
+            let new_index = new_entries
+                .iter()
+                .position(|e| matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id))
+                .unwrap_or(0);
+            app.navigation.speakers_state.selected_index = new_index;
             app.navigation.speakers_state.pick_up = None;
+
             SpeakerListAction::Handled
         }
         KeyCode::Esc => {
+            // Esc restores original selected_index (already preserved)
             app.navigation.speakers_state.pick_up = None;
             SpeakerListAction::Handled
         }
-        _ => SpeakerListAction::Handled,
+        _ => {
+            // All other keys swallowed during pick-up
+            SpeakerListAction::Handled
+        }
     }
 }

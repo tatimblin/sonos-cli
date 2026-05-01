@@ -14,8 +14,44 @@ pub enum ListEntry {
 #[derive(Clone, Debug)]
 pub struct PickUpState {
     pub speaker_id: SpeakerId,
+    pub speaker_name: String,
     pub original_group_id: Option<GroupId>,
-    pub drop_index: usize,
+    pub active_zone_index: usize,
+}
+
+/// The kind of drop zone target.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DropZoneKind {
+    /// An existing group to drop into.
+    ExistingGroup(GroupId),
+    /// Create a new standalone group (leave current group).
+    NewGroup,
+}
+
+/// A single drop zone in the pick-up view.
+#[derive(Clone, Debug)]
+pub struct DropZone {
+    pub kind: DropZoneKind,
+    /// Group name (coordinator name) for display. "Add new group" for NewGroup.
+    pub group_name: String,
+    /// Names of remaining members (excluding the picked-up speaker).
+    pub remaining_members: Vec<String>,
+    /// Inner height of the zone (equals original member count).
+    pub inner_height: usize,
+}
+
+/// Pre-computed render data for drop zone mode.
+pub struct DropZoneData {
+    pub zones: Vec<DropZone>,
+    pub active_zone_index: usize,
+    pub speaker_name: String,
+    pub status_message: Option<String>,
+}
+
+/// Screen data enum — normal speaker list or pick-up drop zone view.
+pub enum SpeakerScreenData {
+    Normal(SpeakerListData),
+    PickUp(DropZoneData),
 }
 
 /// Action returned from speaker list key handling so callers can respond.
@@ -85,12 +121,11 @@ pub struct BottomBarData {
     pub is_wide: bool,
 }
 
-/// Pre-computed render data for the speaker list widget.
+/// Pre-computed render data for the speaker list widget (normal mode).
 pub struct SpeakerListData {
     pub entries: Vec<ListEntry>,
     pub entry_data: Vec<EntryRenderData>,
     pub selected_index: usize,
-    pub pick_up: Option<PickUpState>,
     pub status_message: Option<String>,
 }
 
@@ -125,39 +160,4 @@ pub struct SettingsData {
     pub dropdown_open: bool,
     pub dropdown_index: usize,
     pub status_message: Option<String>,
-}
-
-/// Build display order for pick-up mode: the picked-up speaker is removed from its
-/// original position and inserted at the drop position, so it visually moves through
-/// the list with other entries shifting to fill the gap.
-pub fn build_display_order(entries: &[ListEntry], pick_up: &Option<PickUpState>) -> Vec<usize> {
-    let identity = || (0..entries.len()).collect();
-
-    let Some(pick_up) = pick_up else {
-        return identity();
-    };
-
-    let Some(orig_idx) = entries
-        .iter()
-        .position(|e| matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id))
-    else {
-        return identity();
-    };
-
-    if orig_idx == pick_up.drop_index {
-        return identity();
-    }
-
-    let mut order: Vec<usize> = (0..entries.len()).collect();
-    order.remove(orig_idx);
-
-    let insert_at = if orig_idx < pick_up.drop_index {
-        pick_up.drop_index - 1
-    } else {
-        pick_up.drop_index
-    };
-    let insert_at = insert_at.min(order.len());
-    order.insert(insert_at, orig_idx);
-
-    order
 }
