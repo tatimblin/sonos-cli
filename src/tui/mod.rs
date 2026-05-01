@@ -7,6 +7,7 @@ mod event;
 mod handlers;
 pub mod hooks;
 pub mod image_loader;
+mod screens;
 mod theme;
 pub mod types;
 mod ui;
