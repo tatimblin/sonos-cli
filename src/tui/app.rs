@@ -7,7 +7,7 @@ use ratatui_image::picker::Picker;
 use crate::config::Config;
 use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
-use crate::tui::widgets::speaker_list::PickUpState;
+use crate::tui::types::PickUpState;
 use sonos_sdk::SonosSystem;
 
 /// Top-level TUI state. Owns the SDK handle and all UI state.

@@ -38,8 +38,14 @@ src/
   cli/
     mod.rs          ← clap Commands enum + run() → calls SDK methods directly
   tui/
-    app.rs          ← App state; crossterm event loop; keypress → SDK calls
-    screens/        ← ratatui components: Home, Group, Speaker screens
+    app.rs          ← App state, Navigation, Tab enum
+    types.rs        ← shared types across layers (ListEntry, PickUpState, data structs)
+    helpers.rs      ← shared data helpers (track_summary)
+    hooks.rs        ← reactive state: use_watch, use_animation, use_state
+    ui.rs           ← header + footer + screen dispatch (no screen logic)
+    screens/        ← data assembly: hooks → widget data structs → widget calls
+    widgets/        ← render-only components: take data + theme, output to frame
+    handlers/       ← key handling + SDK mutations
 ```
 
 ## Non-Negotiable Architectural Rules
@@ -74,6 +80,7 @@ Follow `docs/references/contributing-agent-guide.md` for the complete workflow w
 | `docs/references/cli-guidelines.md` | clig.dev rules applied to this project |
 | `docs/references/cli-commands.md` | Per-command reference — syntax, flags, examples, output, errors for all 27 commands |
 | `docs/references/contributing-agent-guide.md` | Step-by-step workflow for AI agents: branching, commits, PRs, CI validation, versioning |
+| `docs/references/tui-architecture.md` | TUI three-layer architecture, hooks system, how to add screens/widgets/handlers |
 
 ## Brainstorm Sources
 

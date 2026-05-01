@@ -8,7 +8,7 @@ use ratatui::Frame;
 
 use crate::tui::app::{App, Navigation, Tab};
 use crate::tui::hooks::RenderContext;
-use crate::tui::widgets::speaker_list;
+use crate::tui::screens;
 
 /// Top-level render dispatch. Draws header, separators, content, and key legend.
 pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
@@ -44,8 +44,7 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
 
     match ctx.app.navigation.tab {
         Tab::Speakers => {
-            let state = ctx.app.navigation.speakers_state.clone();
-            speaker_list::render(frame, content_area, ctx, &state);
+            screens::speakers::render(frame, content_area, ctx);
         }
         Tab::Settings => {
             let paragraph = Paragraph::new("Settings \u{2014} coming soon")
