@@ -115,6 +115,15 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Settings dropdown intercepts Esc before global quit
+    if app.navigation.tab == Tab::Settings
+        && key.code == KeyCode::Esc
+        && handlers::settings::is_dropdown_open(app)
+    {
+        handlers::home::handle_key(app, key);
+        return;
+    }
+
     match key.code {
         KeyCode::Char('q') => {
             app.should_quit = true;
@@ -135,8 +144,5 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         _ => {}
     }
 
-    match app.navigation.tab {
-        Tab::Speakers => handlers::home::handle_key(app, key),
-        Tab::Settings => {}
-    }
+    handlers::home::handle_key(app, key);
 }

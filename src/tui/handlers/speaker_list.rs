@@ -24,12 +24,21 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction {
     handle_normal_key(app, key, &entries)
 }
 
-fn next_selectable(entries: &[ListEntry], from: usize) -> Option<usize> {
-    ((from + 1)..entries.len()).find(|&i| entries[i].is_selectable())
+fn next_entry(entries: &[ListEntry], from: usize) -> Option<usize> {
+    let next = from + 1;
+    if next < entries.len() {
+        Some(next)
+    } else {
+        None
+    }
 }
 
-fn prev_selectable(entries: &[ListEntry], from: usize) -> Option<usize> {
-    (0..from).rev().find(|&i| entries[i].is_selectable())
+fn prev_entry(from: usize) -> Option<usize> {
+    if from > 0 {
+        Some(from - 1)
+    } else {
+        None
+    }
 }
 
 fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
@@ -41,7 +50,7 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
 
     match key.code {
         KeyCode::Up => {
-            if let Some(prev) = prev_selectable(entries, selected) {
+            if let Some(prev) = prev_entry(selected) {
                 app.navigation.speakers_state.selected_index = prev;
             } else {
                 return SpeakerListAction::FocusTabBar;
@@ -49,7 +58,7 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
             SpeakerListAction::Handled
         }
         KeyCode::Down => {
-            if let Some(next) = next_selectable(entries, selected) {
+            if let Some(next) = next_entry(entries, selected) {
                 app.navigation.speakers_state.selected_index = next;
             }
             SpeakerListAction::Handled
@@ -116,7 +125,6 @@ fn handle_volume_adjust(app: &mut App, entries: &[ListEntry], selected: usize, d
                 }
             }
         }
-        _ => {}
     }
 }
 
@@ -205,7 +213,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
 
     match key.code {
         KeyCode::Up => {
-            if let Some(prev) = prev_selectable(entries, drop_index) {
+            if let Some(prev) = prev_entry(drop_index) {
                 if let Some(ref mut pu) = app.navigation.speakers_state.pick_up {
                     pu.drop_index = prev;
                 }
@@ -213,7 +221,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
             SpeakerListAction::Handled
         }
         KeyCode::Down => {
-            if let Some(next) = next_selectable(entries, drop_index) {
+            if let Some(next) = next_entry(entries, drop_index) {
                 if let Some(ref mut pu) = app.navigation.speakers_state.pick_up {
                     pu.drop_index = next;
                 }

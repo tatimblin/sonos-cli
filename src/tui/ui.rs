@@ -1,6 +1,6 @@
 //! TUI rendering — framed layout with header, content, separators, and key legend.
 
-use ratatui::layout::{Alignment, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
@@ -89,10 +89,7 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
             screens::speakers::render(frame, content_area, bar_area, ctx);
         }
         Tab::Settings => {
-            let paragraph = Paragraph::new("Settings \u{2014} coming soon")
-                .alignment(Alignment::Center)
-                .style(ctx.app.theme.muted);
-            frame.render_widget(paragraph, content_area);
+            screens::settings::render(frame, content_area, ctx);
         }
     }
 
@@ -188,7 +185,13 @@ fn render_tab_labels(
 fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
     let text = match app.navigation.tab {
         Tab::Speakers => "\u{2191}\u{2193} Navigate   \u{2190}\u{2192} Volume   \u{2423} Pick up/Drop   p Play/Pause  n Next  b Prev   \u{238b} Quit",
-        Tab::Settings => "\u{2190}\u{2192} Tabs   \u{238b} Quit",
+        Tab::Settings => {
+            if app.navigation.settings_state.dropdown_open {
+                "\u{2191}\u{2193} Select  Enter Confirm  \u{238b} Cancel"
+            } else {
+                "\u{2191}\u{2193} Navigate  Enter Open  \u{2190}\u{2192} Tabs  \u{238b} Quit"
+            }
+        }
     };
 
     let paragraph = Paragraph::new(text).style(app.theme.legend);

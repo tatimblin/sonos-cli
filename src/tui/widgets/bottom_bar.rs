@@ -88,7 +88,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
     let pad2 = remaining.saturating_sub(pad1).max(1);
 
     let row0 = Line::from(vec![
-        Span::styled(title_display, theme.card_title),
+        Span::styled(title_display, theme.header),
         Span::raw(" ".repeat(pad1 as usize)),
         Span::styled(controls_str, theme.bottom_bar_controls),
         Span::raw(" ".repeat(pad2 as usize)),
@@ -186,7 +186,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
     let pad = text_w.saturating_sub(title_chars + group_width);
 
     let row0 = Line::from(vec![
-        Span::styled(title_display, theme.card_title),
+        Span::styled(title_display, theme.header),
         Span::raw(" ".repeat(pad as usize)),
         Span::styled(group.clone(), theme.track_info),
     ]);
