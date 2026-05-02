@@ -2650,7 +2650,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-api"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b8997da15334a136fed3f29af74cc21f2ff941483d578f9390c3c79284a81f1"
 dependencies = [
  "paste",
  "quick-xml",
@@ -2689,7 +2691,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce357a4c5be5d022bd8bf43351eb0000b180cdfa5a292bb4f14c90ef53b3ee09"
 dependencies = [
  "dirs",
  "serde",
@@ -2704,7 +2708,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-callback-server"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c64dc55258df85825f0fcf96fb3144acdf707072b0c940fa5d5fa56612513eb"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2720,7 +2726,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-discovery"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ecba1674315b83810e0888e18cddd048c8799dc590ac53e404640bab73ebdb3"
 dependencies = [
  "quick-xml",
  "reqwest",
@@ -2729,7 +2737,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-event-manager"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adf483a79699f00bea7d40e111d9b983345c4d7ac372af7b81f3ca53e0e7e1d4"
 dependencies = [
  "dashmap",
  "parking_lot",
@@ -2743,7 +2753,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-soap-client"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27396ff70850263ae6de042a9dd2c89c170ebe4a1192b242e5e21f235dfd1413"
 dependencies = [
  "thiserror 1.0.69",
  "ureq 2.12.1",
@@ -2752,7 +2764,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c0d897dbd3912d1d6a5d36cea145b9f3544e1d71ead00eafae706541fe62b03"
 dependencies = [
  "parking_lot",
  "serde",
@@ -2766,11 +2780,15 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state-store"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6631a5800cdb8fd29ce15a840095a571d2a7eda38dca0a7a33a5828f1662c835"
 
 [[package]]
 name = "sonos-sdk-stream"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52a901ae123db42e0095db6887eab75ef01e4740356282e689d9d571c6d0ab8b"
 dependencies = [
  "async-trait",
  "bytes",
@@ -4140,3 +4158,11 @@ checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
 dependencies = [
  "zune-core",
 ]
+
+[[patch.unused]]
+name = "sonos-sdk"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "sonos-sdk-state"
+version = "0.4.0"
