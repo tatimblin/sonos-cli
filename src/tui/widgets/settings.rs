@@ -31,12 +31,12 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SettingsData, theme: &Theme)
         let label = format!("{:>width$}:  ", item.label, width = LABEL_WIDTH);
 
         // Build value display
-        let value_display = format!("[ {} \u{25bc} ]", item.value);
+        let value_display = format!("[ {} {} ]", item.value, theme.glyphs.dropdown_indicator);
 
         let mut spans = Vec::new();
 
         if is_selected && !data.dropdown_open {
-            spans.push(Span::styled("\u{25c0} ", theme.accent));
+            spans.push(Span::styled(format!("{} ", theme.glyphs.settings_cursor), theme.accent));
         } else {
             spans.push(Span::raw("  "));
         }
@@ -59,7 +59,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SettingsData, theme: &Theme)
 
                 if is_active {
                     let line = Line::from(vec![Span::styled(
-                        format!("{prefix}\u{25b8} {option}"),
+                        format!("{prefix}{} {option}", theme.glyphs.dropdown_active),
                         theme.accent,
                     )]);
                     lines.push(line);

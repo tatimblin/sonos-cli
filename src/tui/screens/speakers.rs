@@ -95,14 +95,19 @@ pub fn render(
                         ctx.hooks.use_watch(&s.group_membership);
                     }
                     let name = speaker
+                        .as_ref()
                         .map(|s| s.name.clone())
                         .unwrap_or_else(|| "Unknown".to_string());
+                    let model = speaker
+                        .as_ref()
+                        .map(|s| s.model_name.clone());
 
                     // Determine if this is the last speaker in its group
                     let is_last = !matches!(entries.get(i + 1), Some(ListEntry::SpeakerRow(_)));
 
                     entry_data.push(EntryRenderData {
                         name,
+                        model_name: model,
                         speaker_volume: vol,
                         group_volume: None,
                         playback_state: None,
@@ -134,6 +139,7 @@ pub fn render(
 
                     entry_data.push(EntryRenderData {
                         name,
+                        model_name: None,
                         speaker_volume: None,
                         group_volume: gvol,
                         playback_state: pb,

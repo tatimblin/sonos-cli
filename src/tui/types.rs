@@ -132,6 +132,7 @@ pub struct SpeakerListData {
 /// Per-entry display data, pre-resolved by the screen layer.
 pub struct EntryRenderData {
     pub name: String,
+    pub model_name: Option<String>,
     pub speaker_volume: Option<u16>,
     pub group_volume: Option<u16>,
     pub playback_state: Option<PlaybackState>,

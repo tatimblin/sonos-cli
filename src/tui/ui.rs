@@ -67,6 +67,7 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
         area.y + 1,
         area.x,
         area.x + area.width - 1,
+        ctx.app.theme.glyphs.separator,
         ctx.app.theme.muted,
     );
 
@@ -100,6 +101,7 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
         content_sep_y,
         area.x,
         area.x + area.width - 1,
+        ctx.app.theme.glyphs.separator,
         ctx.app.theme.muted,
     );
 
@@ -110,6 +112,7 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
             area.y + area.height - 2,
             area.x,
             area.x + area.width - 1,
+            ctx.app.theme.glyphs.separator,
             ctx.app.theme.muted,
         );
     }
@@ -120,11 +123,11 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
 }
 
 /// Draw a full-width horizontal separator line.
-fn draw_separator(frame: &mut Frame, y: u16, left: u16, right: u16, style: Style) {
+fn draw_separator(frame: &mut Frame, y: u16, left: u16, right: u16, sep_char: char, style: Style) {
     let buf = frame.buffer_mut();
     for x in left..=right {
         if let Some(cell) = buf.cell_mut((x, y)) {
-            cell.set_char('\u{2500}').set_style(style);
+            cell.set_char(sep_char).set_style(style);
         }
     }
 }
@@ -134,7 +137,7 @@ fn draw_separator(frame: &mut Frame, y: u16, left: u16, right: u16, style: Style
 // ---------------------------------------------------------------------------
 
 fn render_header(frame: &mut Frame, area: Rect, app: &App) {
-    let logo = "\u{266a}  S O N O S";
+    let logo = app.theme.glyphs.logo;
     let tab_spans = build_tab_spans(&app.navigation, &app.theme);
 
     let logo_width = logo.chars().count();
@@ -162,6 +165,7 @@ fn render_tab_labels(
     focused: bool,
     theme: &crate::tui::theme::Theme,
 ) -> Vec<Span<'static>> {
+    let g = &theme.glyphs;
     let mut spans = Vec::new();
     for (i, (label, is_active)) in tabs.iter().enumerate() {
         if i > 0 {
@@ -169,7 +173,10 @@ fn render_tab_labels(
         }
         if *is_active {
             let style = if focused { theme.accent } else { theme.header };
-            spans.push(Span::styled(format!("[▸{label}]"), style));
+            spans.push(Span::styled(
+                format!("{}{}{label}{}", g.tab_active_left, g.tab_active_indicator, g.tab_active_right),
+                style,
+            ));
         } else {
             let style = theme.muted;
             spans.push(Span::styled(label.to_string(), style));
