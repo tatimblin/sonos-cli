@@ -136,24 +136,18 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     let leaders_after = leaders_total.saturating_sub(leaders_before);
 
                     spans.push(Span::styled(
-                        std::iter::repeat(g.leader_char)
-                            .take(leaders_before)
-                            .collect::<String>(),
+                        std::iter::repeat_n(g.leader_char, leaders_before).collect::<String>(),
                         theme.leader,
                     ));
                     spans.push(Span::styled(format!(" {track_text} "), theme.track_info));
                     spans.push(Span::styled(
-                        std::iter::repeat(g.leader_char)
-                            .take(leaders_after)
-                            .collect::<String>(),
+                        std::iter::repeat_n(g.leader_char, leaders_after).collect::<String>(),
                         theme.leader,
                     ));
                 } else {
                     // No track or not enough space: leaders fill to volume
                     spans.push(Span::styled(
-                        std::iter::repeat(g.leader_char)
-                            .take(available)
-                            .collect::<String>(),
+                        std::iter::repeat_n(g.leader_char, available).collect::<String>(),
                         theme.leader,
                     ));
                 }

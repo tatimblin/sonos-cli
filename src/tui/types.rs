@@ -30,6 +30,7 @@ pub enum DropZoneKind {
 
 /// A single drop zone in the pick-up view.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct DropZone {
     pub kind: DropZoneKind,
     /// Group name (coordinator name) for display. "Add new group" for NewGroup.
