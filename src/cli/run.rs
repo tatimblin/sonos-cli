@@ -136,7 +136,21 @@ fn cmd_groups(system: &SonosSystem) -> Result<String, CliError> {
                 .as_ref()
                 .map(|st| format!("{} {}", playback_icon(st), playback_label(st)))
                 .unwrap_or_default();
-            let track_str = track.as_ref().map(|t| t.display()).unwrap_or_default();
+            let track_str = track
+                .as_ref()
+                .map(|t| {
+                    let d = t.display();
+                    if d == "Unknown" {
+                        t.uri
+                            .as_deref()
+                            .filter(|u| !u.is_empty() && !u.starts_with("x-rincon:"))
+                            .map(|_| "Playing (no metadata)".to_string())
+                            .unwrap_or(d)
+                    } else {
+                        d
+                    }
+                })
+                .unwrap_or_default();
             let vol_str = vol.map(|v| format!("vol:{}", v.0)).unwrap_or_default();
 
             let mut parts = vec![coord_name];
@@ -215,7 +229,21 @@ fn cmd_status(
         .as_ref()
         .map(|st| format!("{} {}", playback_icon(st), playback_label(st)))
         .unwrap_or_else(|| "unknown".to_string());
-    let track_str = track.as_ref().map(|t| t.display()).unwrap_or_default();
+    let track_str = track
+        .as_ref()
+        .map(|t| {
+            let d = t.display();
+            if d == "Unknown" {
+                t.uri
+                    .as_deref()
+                    .filter(|u| !u.is_empty() && !u.starts_with("x-rincon:"))
+                    .map(|_| "Playing (no metadata)".to_string())
+                    .unwrap_or(d)
+            } else {
+                d
+            }
+        })
+        .unwrap_or_default();
     let pos_str = pos
         .as_ref()
         .map(|p| {

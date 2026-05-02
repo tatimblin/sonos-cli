@@ -36,7 +36,10 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SettingsData, theme: &Theme)
         let mut spans = Vec::new();
 
         if is_selected && !data.dropdown_open {
-            spans.push(Span::styled(format!("{} ", theme.glyphs.settings_cursor), theme.accent));
+            spans.push(Span::styled(
+                format!("{} ", theme.glyphs.settings_cursor),
+                theme.accent,
+            ));
         } else {
             spans.push(Span::raw("  "));
         }

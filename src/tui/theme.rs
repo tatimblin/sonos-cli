@@ -69,48 +69,48 @@ pub struct Glyphs {
 impl Glyphs {
     pub fn default_glyphs() -> Self {
         Self {
-            playing: "\u{25b6}",           // ▶
-            paused: "\u{23f8}",            // ⏸
-            stopped: "\u{25a0}",           // ■
+            playing: "\u{25b6}", // ▶
+            paused: "\u{23f8}",  // ⏸
+            stopped: "\u{25a0}", // ■
 
             connector_branch: "\u{251c}\u{2500} ", // ├─
             connector_last: "\u{2514}\u{2500} ",   // └─
 
-            cursor: "\u{276f}",            // ❯
+            cursor: "\u{276f}", // ❯
 
             leader_char: ':',
 
             model_separator: " \u{2022} ", // •
 
             divider_left: "+",
-            divider_fill: "\u{2500}",      // ─
+            divider_fill: "\u{2500}", // ─
             divider_right: "+",
 
-            zone_tl: "\u{256d}",           // ╭
-            zone_tr: "\u{256e}",           // ╮
-            zone_bl: "\u{2570}",           // ╰
-            zone_br: "\u{256f}",           // ╯
-            zone_horiz: "\u{2500}",        // ─
-            zone_vert: "\u{2502}",         // │
+            zone_tl: "\u{256d}",    // ╭
+            zone_tr: "\u{256e}",    // ╮
+            zone_bl: "\u{2570}",    // ╰
+            zone_br: "\u{256f}",    // ╯
+            zone_horiz: "\u{2500}", // ─
+            zone_vert: "\u{2502}",  // │
 
-            control_prev: "\u{23ee}",      // ⏮
-            control_next: "\u{23ed}",      // ⏭
+            control_prev: "\u{23ee}", // ⏮
+            control_next: "\u{23ed}", // ⏭
 
-            logo: "\u{266a}  S O N O S",   // ♪  S O N O S
+            logo: "\u{266a}  S O N O S", // ♪  S O N O S
 
             tab_active_left: "[",
             tab_active_right: "]",
             tab_active_indicator: "\u{25b8}", // ▸
 
             dropdown_indicator: "\u{25bc}", // ▼
-            dropdown_active: "\u{25b8}",   // ▸
-            settings_cursor: "\u{25c0}",   // ◀
+            dropdown_active: "\u{25b8}",    // ▸
+            settings_cursor: "\u{25c0}",    // ◀
 
-            separator: '\u{2500}',         // ─
+            separator: '\u{2500}', // ─
 
-            progress_cursor: "\u{257a}",   // ╺
+            progress_cursor: "\u{257a}", // ╺
 
-            music_note: "\u{266a}",        // ♪
+            music_note: "\u{266a}", // ♪
         }
     }
 }
@@ -190,9 +190,7 @@ impl Theme {
             progress_cursor: Style::new().fg(Color::White),
             progress_time: Style::new().fg(Color::DarkGray),
 
-            group_header: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            group_header: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             speaker_cursor: Style::new().fg(Color::Cyan),
             speaker_name: Style::new().fg(Color::Gray),
             leader: Style::new().fg(Color::DarkGray),

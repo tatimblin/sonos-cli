@@ -98,9 +98,7 @@ pub fn render(
                         .as_ref()
                         .map(|s| s.name.clone())
                         .unwrap_or_else(|| "Unknown".to_string());
-                    let model = speaker
-                        .as_ref()
-                        .map(|s| s.model_name.clone());
+                    let model = speaker.as_ref().map(|s| s.model_name.clone());
 
                     // Determine if this is the last speaker in its group
                     let is_last = !matches!(entries.get(i + 1), Some(ListEntry::SpeakerRow(_)));
@@ -261,8 +259,16 @@ fn assemble_bottom_bar(
         0.0
     };
 
-    // Extract track metadata
-    let track_title = current_track.as_ref().and_then(|t| t.title.clone());
+    // Extract track metadata with URI fallback
+    let track_title = current_track.as_ref().and_then(|t| {
+        t.title.clone().or_else(|| {
+            t.uri
+                .as_deref()
+                .map(helpers::uri_source_label)
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+        })
+    });
     let track_artist = current_track.as_ref().and_then(|t| t.artist.clone());
     let album_art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
 

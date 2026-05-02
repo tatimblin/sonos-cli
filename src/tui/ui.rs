@@ -174,7 +174,10 @@ fn render_tab_labels(
         if *is_active {
             let style = if focused { theme.accent } else { theme.header };
             spans.push(Span::styled(
-                format!("{}{}{label}{}", g.tab_active_left, g.tab_active_indicator, g.tab_active_right),
+                format!(
+                    "{}{}{label}{}",
+                    g.tab_active_left, g.tab_active_indicator, g.tab_active_right
+                ),
                 style,
             ));
         } else {
