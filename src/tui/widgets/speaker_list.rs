@@ -117,7 +117,8 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                 let track_chars = track_text.chars().count();
 
                 // Available space for leaders and track info
-                let fixed_chars = cursor_prefix_width + icon_chars + 1 + name_chars + 1 + vol_chars + 1;
+                let fixed_chars =
+                    cursor_prefix_width + icon_chars + 1 + name_chars + 1 + vol_chars + 1;
                 let available = total_width.saturating_sub(fixed_chars);
 
                 let mut spans = vec![
@@ -135,18 +136,24 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     let leaders_after = leaders_total.saturating_sub(leaders_before);
 
                     spans.push(Span::styled(
-                        std::iter::repeat(g.leader_char).take(leaders_before).collect::<String>(),
+                        std::iter::repeat(g.leader_char)
+                            .take(leaders_before)
+                            .collect::<String>(),
                         theme.leader,
                     ));
                     spans.push(Span::styled(format!(" {track_text} "), theme.track_info));
                     spans.push(Span::styled(
-                        std::iter::repeat(g.leader_char).take(leaders_after).collect::<String>(),
+                        std::iter::repeat(g.leader_char)
+                            .take(leaders_after)
+                            .collect::<String>(),
                         theme.leader,
                     ));
                 } else {
                     // No track or not enough space: leaders fill to volume
                     spans.push(Span::styled(
-                        std::iter::repeat(g.leader_char).take(available).collect::<String>(),
+                        std::iter::repeat(g.leader_char)
+                            .take(available)
+                            .collect::<String>(),
                         theme.leader,
                     ));
                 }
@@ -187,7 +194,14 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                 }
 
                 if let Some(vol) = entry_data.speaker_volume {
-                    append_volume_spans(&mut spans, vol, is_selected, vol_width, total_width, theme);
+                    append_volume_spans(
+                        &mut spans,
+                        vol,
+                        is_selected,
+                        vol_width,
+                        total_width,
+                        theme,
+                    );
                 }
 
                 lines.push(Line::from(spans));
@@ -359,12 +373,7 @@ fn center_label(label: &str, width: usize) -> String {
     }
     let pad_left = (width - label_len) / 2;
     let pad_right = width - label_len - pad_left;
-    format!(
-        "{}{}{}",
-        " ".repeat(pad_left),
-        label,
-        " ".repeat(pad_right)
-    )
+    format!("{}{}{}", " ".repeat(pad_left), label, " ".repeat(pad_right))
 }
 
 /// Compute a scroll offset so the active zone is visible.

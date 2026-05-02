@@ -15,8 +15,10 @@ pub fn uri_source_label(uri: &str) -> &str {
 /// Extract track title and artist as a "title — artist" string.
 /// Returns `None` if the track is empty or missing.
 pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
-    track.as_ref().filter(|t| !t.is_empty()).map(|t| {
-        match (&t.title, &t.artist) {
+    track
+        .as_ref()
+        .filter(|t| !t.is_empty())
+        .map(|t| match (&t.title, &t.artist) {
             (Some(title), Some(artist)) => format!("{title} \u{2014} {artist}"),
             (Some(title), None) => title.clone(),
             (None, Some(artist)) => artist.clone(),
@@ -27,8 +29,7 @@ pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
                 .filter(|s| !s.is_empty())
                 .unwrap_or("Unknown")
                 .to_string(),
-        }
-    })
+        })
 }
 
 #[cfg(test)]
@@ -94,10 +95,7 @@ mod tests {
             album_art_uri: None,
             uri: Some("x-sonos-vli:abc".into()),
         });
-        assert_eq!(
-            track_summary(&track),
-            Some("Playing (no metadata)".into())
-        );
+        assert_eq!(track_summary(&track), Some("Playing (no metadata)".into()));
     }
 
     #[test]

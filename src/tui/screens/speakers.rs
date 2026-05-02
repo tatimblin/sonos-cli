@@ -98,9 +98,7 @@ pub fn render(
                         .as_ref()
                         .map(|s| s.name.clone())
                         .unwrap_or_else(|| "Unknown".to_string());
-                    let model = speaker
-                        .as_ref()
-                        .map(|s| s.model_name.clone());
+                    let model = speaker.as_ref().map(|s| s.model_name.clone());
 
                     // Determine if this is the last speaker in its group
                     let is_last = !matches!(entries.get(i + 1), Some(ListEntry::SpeakerRow(_)));
