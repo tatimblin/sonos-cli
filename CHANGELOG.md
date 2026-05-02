@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/tatimblin/sonos-cli/compare/v0.2.0...v0.3.0) - 2026-05-02
+
+### Added
+
+- *(tui)* drop zone regrouping mode for speaker pick-up ([#58](https://github.com/tatimblin/sonos-cli/pull/58))
+- *(tui)* add persistent bottom player bar with playback controls ([#56](https://github.com/tatimblin/sonos-cli/pull/56))
+- *(tui)* enhanced speaker list with 2-line group headers and tree connectors ([#57](https://github.com/tatimblin/sonos-cli/pull/57))
+- *(tui)* add Settings tab with theme, default group, and album art controls ([#55](https://github.com/tatimblin/sonos-cli/pull/55))
+
+### Changed
+
+- *(tui)* separation of concerns — widgets, screens, handlers ([#54](https://github.com/tatimblin/sonos-cli/pull/54))
+
 ## [0.2.0](https://github.com/tatimblin/sonos-cli/compare/v0.1.2...v0.2.0) - 2026-04-05
 
 ### Added
