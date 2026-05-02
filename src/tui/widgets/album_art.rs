@@ -69,6 +69,7 @@ pub fn render_album_art(
     protocol: Option<&mut StatefulProtocol>,
     border_style: Style,
     placeholder_style: Style,
+    music_note: &str,
 ) {
     if area.width < 3 || area.height < 3 {
         return;
@@ -89,13 +90,19 @@ pub fn render_album_art(
             }
         }
         None => {
-            render_placeholder(frame, area, border_style, placeholder_style);
+            render_placeholder(frame, area, border_style, placeholder_style, music_note);
         }
     }
 }
 
 /// Render a placeholder box with a centered music note.
-fn render_placeholder(frame: &mut Frame, area: Rect, border_style: Style, text_style: Style) {
+fn render_placeholder(
+    frame: &mut Frame,
+    area: Rect,
+    border_style: Style,
+    text_style: Style,
+    note: &str,
+) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -107,11 +114,9 @@ fn render_placeholder(frame: &mut Frame, area: Rect, border_style: Style, text_s
         return;
     }
 
-    // Center the music note vertically and horizontally
-    let note = "♪";
     let center_y = inner.height / 2;
     let note_area = Rect::new(inner.x, inner.y + center_y, inner.width, 1);
-    let paragraph = Paragraph::new(Line::from(note))
+    let paragraph = Paragraph::new(Line::from(note.to_string()))
         .alignment(Alignment::Center)
         .style(text_style);
     frame.render_widget(paragraph, note_area);

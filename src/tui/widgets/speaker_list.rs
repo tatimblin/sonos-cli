@@ -7,13 +7,13 @@
 //! - **Normal**: flat list of group headers and speaker rows with volume bars
 //! - **Drop zone**: collapsed groups shown as bordered drop zones during pick-up
 //!
-//! Group headers span 2 visual lines:
-//!   Line 1: `▶ Group Name          60%  ◀` (icon + name + volume number + cursor)
-//!   Line 2: `  Song Title — Artist`        (track info, indented)
+//! Group headers are single-line with dot leader fill:
+//!   `▶ Bedroom ::::: BOY IN RED — Artist ::::::::::::: 30%`
+//!   `■ Kitchen ::::::::::::::::::::::::::::::::::::::: 21%`
 //!
-//! Speaker rows use tree connectors:
-//!   `├ Speaker Name        ■■■■■···· 40%  ◀` (non-last member, volume bar when selected)
-//!   `└ Speaker Name        50%`               (last member, volume number when not selected)
+//! Speaker rows use tree connectors with model names:
+//!   `├─ Bathroom • Sonos Connect:AMP                  46%`
+//!   `└─ Bedroom • Sonos Amp                           28%`
 
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
@@ -55,20 +55,34 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
     let viewport_height = area.height as usize;
     let vol_width = 16.min(area.width.saturating_sub(50));
     let total_width = area.width as usize;
+    let g = &theme.glyphs;
 
-    // Build visual lines with entry index tracking for scroll calculation.
-    // Each entry maps to one or more visual lines. We track which visual line
-    // each entry starts at, and how tall it is.
+    // Cursor prefix width: "❯ " = 2 chars for selected, "  " for others
+    let cursor_prefix_width = 2;
+
     let mut lines: Vec<Line> = Vec::new();
-    let mut entry_visual_starts: Vec<usize> = Vec::new(); // visual line where each display_order entry starts
+    let mut entry_visual_starts: Vec<usize> = Vec::new();
     let mut entry_visual_heights: Vec<usize> = Vec::new();
 
     for (idx, (entry, entry_data)) in data.entries.iter().zip(data.entry_data.iter()).enumerate() {
         let is_selected = idx == selected_index;
 
-        // Insert blank separator line between groups (not before the first entry)
+        // Insert blank separator + divider between groups (not before the first entry)
         let is_group_header = matches!(entry, ListEntry::GroupHeader(_));
         if idx > 0 && is_group_header {
+            lines.push(Line::raw(""));
+            // Divider line: +────────────────+
+            let divider_inner_w = total_width.saturating_sub(cursor_prefix_width + 2 + 2);
+            let divider = format!(
+                "{}{}{}",
+                g.divider_left,
+                g.divider_fill.repeat(divider_inner_w),
+                g.divider_right,
+            );
+            lines.push(Line::from(vec![
+                Span::raw(" ".repeat(cursor_prefix_width + 2)),
+                Span::styled(divider, theme.muted),
+            ]));
             lines.push(Line::raw(""));
         }
 
@@ -76,11 +90,12 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
 
         match entry {
             ListEntry::GroupHeader(_) => {
-                // Line 1: icon + name + volume number + cursor indicator
+                // Single-line header with dot leaders:
+                // [cursor] [icon] Name ::::: Track — Artist ::::: vol%
                 let (icon, icon_style) = match &entry_data.playback_state {
-                    Some(PlaybackState::Playing) => ("\u{25b6} ", theme.playing_icon),
-                    Some(PlaybackState::Paused) => ("\u{23f8} ", theme.paused_icon),
-                    _ => ("\u{25a0} ", theme.stopped_icon),
+                    Some(PlaybackState::Playing) => (g.playing, theme.playing_icon),
+                    Some(PlaybackState::Paused) => (g.paused, theme.paused_icon),
+                    _ => (g.stopped, theme.stopped_icon),
                 };
 
                 let name_style = if is_selected {
@@ -89,41 +104,64 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     theme.group_header
                 };
 
+                let cursor_str = if is_selected { g.cursor } else { " " };
+
                 let vol_text = format_volume(entry_data.group_volume);
+                let vol_chars = vol_text.chars().count();
+
+                // Fixed parts: cursor(1) + space(1) + icon(1) + space(1) + name + space(1) + vol + space(1)
+                let name_chars = entry_data.name.chars().count();
+                let icon_chars = icon.chars().count();
+
+                let track_text = entry_data.track_info.as_deref().unwrap_or("");
+                let track_chars = track_text.chars().count();
+
+                // Available space for leaders and track info
+                let fixed_chars = cursor_prefix_width + icon_chars + 1 + name_chars + 1 + vol_chars + 1;
+                let available = total_width.saturating_sub(fixed_chars);
 
                 let mut spans = vec![
-                    Span::styled(icon, icon_style),
+                    Span::styled(cursor_str, theme.speaker_cursor),
+                    Span::raw(" "),
+                    Span::styled(format!("{icon} "), icon_style),
                     Span::styled(entry_data.name.clone(), name_style),
+                    Span::raw(" "),
                 ];
 
-                spans.push(Span::styled(format!("  {vol_text}"), theme.muted));
+                if !track_text.is_empty() && available > track_chars + 4 {
+                    // Leaders before track, track, leaders after track, then volume
+                    let leaders_total = available.saturating_sub(track_chars + 2); // 2 spaces around track
+                    let leaders_before = 5.min(leaders_total / 2);
+                    let leaders_after = leaders_total.saturating_sub(leaders_before);
 
-                if is_selected {
-                    append_cursor_indicator(&mut spans, total_width, theme);
+                    spans.push(Span::styled(
+                        std::iter::repeat(g.leader_char).take(leaders_before).collect::<String>(),
+                        theme.leader,
+                    ));
+                    spans.push(Span::styled(format!(" {track_text} "), theme.track_info));
+                    spans.push(Span::styled(
+                        std::iter::repeat(g.leader_char).take(leaders_after).collect::<String>(),
+                        theme.leader,
+                    ));
+                } else {
+                    // No track or not enough space: leaders fill to volume
+                    spans.push(Span::styled(
+                        std::iter::repeat(g.leader_char).take(available).collect::<String>(),
+                        theme.leader,
+                    ));
                 }
+
+                spans.push(Span::styled(format!(" {vol_text}"), theme.muted));
 
                 lines.push(Line::from(spans));
-
-                // Line 2: track info (indented to align with name after icon)
-                let track_info = entry_data.track_info.as_deref().unwrap_or("");
-                if !track_info.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(track_info.to_string(), theme.track_info),
-                    ]));
-                } else {
-                    // Always emit 2 lines for group headers for consistent layout
-                    lines.push(Line::raw(""));
-                }
-
                 entry_visual_starts.push(start_line);
                 entry_visual_heights.push(lines.len() - start_line);
             }
             ListEntry::SpeakerRow(_) => {
                 let connector = if entry_data.is_last_in_group {
-                    "\u{2514} " // └
+                    g.connector_last
                 } else {
-                    "\u{251c} " // ├
+                    g.connector_branch
                 };
 
                 let name_style = if is_selected {
@@ -132,17 +170,24 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     theme.speaker_name
                 };
 
+                let cursor_str = if is_selected { g.cursor } else { " " };
+
                 let mut spans = vec![
+                    Span::styled(cursor_str, theme.speaker_cursor),
+                    Span::raw(" "),
+                    Span::styled(" ".repeat(2), theme.muted), // indent to align with group name
                     Span::styled(connector, theme.muted),
                     Span::styled(entry_data.name.clone(), name_style),
                 ];
 
-                if let Some(vol) = entry_data.speaker_volume {
-                    append_volume_spans(&mut spans, vol, is_selected, vol_width, theme);
+                // Model name
+                if let Some(ref model) = entry_data.model_name {
+                    spans.push(Span::styled(g.model_separator.to_string(), theme.muted));
+                    spans.push(Span::styled(model.clone(), theme.muted));
                 }
 
-                if is_selected {
-                    append_cursor_indicator(&mut spans, total_width, theme);
+                if let Some(vol) = entry_data.speaker_volume {
+                    append_volume_spans(&mut spans, vol, is_selected, vol_width, total_width, theme);
                 }
 
                 lines.push(Line::from(spans));
@@ -170,11 +215,11 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
         let top = entry_visual_starts[selected_index];
         let bottom = top + entry_visual_heights[selected_index];
 
-        // Include blank separator before group headers
+        // Include blank separator + divider before group headers
         let visible_top = if selected_index > 0
             && matches!(&data.entries[selected_index], ListEntry::GroupHeader(_))
         {
-            top.saturating_sub(1)
+            top.saturating_sub(3) // blank + divider + blank
         } else {
             top
         };
@@ -204,6 +249,7 @@ fn render_drop_zones(frame: &mut Frame, area: Rect, data: &DropZoneData, theme: 
         return;
     }
 
+    let g = &theme.glyphs;
     let mut lines: Vec<Line> = Vec::new();
 
     // Status line: "Picked up: {name}" left, "Space drop  Esc cancel" right
@@ -218,23 +264,12 @@ fn render_drop_zones(frame: &mut Frame, area: Rect, data: &DropZoneData, theme: 
 
     lines.push(Line::raw("")); // blank separator
 
-    // Inner width for zone content (minus border chars on each side)
-    let inner_w = width.saturating_sub(2);
+    // Inner width for zone content (minus border chars and indent)
+    let indent = 4; // align with speaker list indent
+    let inner_w = width.saturating_sub(indent + 2); // -2 for border chars
 
     for (i, zone) in data.zones.iter().enumerate() {
         let is_active = i == data.active_zone_index;
-
-        // Active: solid heavy border ┏━┓┃┗━┛
-        // Inactive: dashed light border ┎┄┒┆┖┄┚
-        let (tl, horiz, tr, vert, bl, br) = if is_active {
-            (
-                "\u{250F}", "\u{2501}", "\u{2513}", "\u{2503}", "\u{2517}", "\u{251B}",
-            )
-        } else {
-            (
-                "\u{250E}", "\u{2504}", "\u{2512}", "\u{2506}", "\u{2516}", "\u{2504}",
-            )
-        };
 
         let border_style = if is_active { theme.accent } else { theme.muted };
         let header_style = if is_active {
@@ -249,49 +284,44 @@ fn render_drop_zones(frame: &mut Frame, area: Rect, data: &DropZoneData, theme: 
             header_style,
         )]));
 
-        // Horizontal border fill (reused for top and bottom)
-        let horiz_fill = horiz.repeat(inner_w);
+        let horiz_fill = g.zone_horiz.repeat(inner_w);
 
-        // Top border
+        // Top border: ╭────────╮
         lines.push(Line::from(vec![
-            Span::styled(tl.to_string(), border_style),
+            Span::raw(" ".repeat(indent)),
+            Span::styled(g.zone_tl.to_string(), border_style),
             Span::styled(horiz_fill.clone(), border_style),
-            Span::styled(tr.to_string(), border_style),
+            Span::styled(g.zone_tr.to_string(), border_style),
         ]));
 
-        // Inner lines with stripe fill
+        // Inner lines
         let inner_height = zone.inner_height.max(1);
         let label = build_zone_label(zone);
         let content_style = if is_active { theme.accent } else { theme.muted };
 
         for row in 0..inner_height {
             let content = if row == 0 {
-                label_over_stripes(&label, inner_w)
+                center_label(&label, inner_w)
             } else {
-                stripe_line(inner_w)
-            };
-
-            let right_indicator = if is_active && row == 0 {
-                Span::styled("\u{25C0}", theme.accent)
-            } else {
-                Span::styled(vert.to_string(), border_style)
+                " ".repeat(inner_w)
             };
 
             lines.push(Line::from(vec![
-                Span::styled(vert.to_string(), border_style),
+                Span::raw(" ".repeat(indent)),
+                Span::styled(g.zone_vert.to_string(), border_style),
                 Span::styled(content, content_style),
-                right_indicator,
+                Span::styled(g.zone_vert.to_string(), border_style),
             ]));
         }
 
-        // Bottom border
+        // Bottom border: ╰────────╯
         lines.push(Line::from(vec![
-            Span::styled(bl.to_string(), border_style),
+            Span::raw(" ".repeat(indent)),
+            Span::styled(g.zone_bl.to_string(), border_style),
             Span::styled(horiz_fill, border_style),
-            Span::styled(br.to_string(), border_style),
+            Span::styled(g.zone_br.to_string(), border_style),
         ]));
 
-        // Spacing between zones
         lines.push(Line::raw(""));
     }
 
@@ -317,39 +347,24 @@ fn render_drop_zones(frame: &mut Frame, area: Rect, data: &DropZoneData, theme: 
 fn build_zone_label(zone: &DropZone) -> String {
     match &zone.kind {
         DropZoneKind::NewGroup => "Add new group".to_string(),
-        DropZoneKind::ExistingGroup(_) => {
-            if zone.remaining_members.is_empty() {
-                "Drop here (empty)".to_string()
-            } else {
-                let members = zone.remaining_members.join(" + ");
-                format!("Drop here \u{2014} {members}")
-            }
-        }
+        DropZoneKind::ExistingGroup(_) => "Drop Speaker".to_string(),
     }
 }
 
-/// Generate a stripe line of the given width using diagonal backslash characters.
-fn stripe_line(width: usize) -> String {
-    let pattern = "\u{2572} "; // followed by space
-    let repeated = pattern.repeat(width / 2 + 1);
-    repeated.chars().take(width).collect()
-}
-
-/// Generate a stripe line with a centered label cut into it.
-fn label_over_stripes(label: &str, width: usize) -> String {
-    if label.len() >= width {
+/// Center a label within a given width, padding with spaces.
+fn center_label(label: &str, width: usize) -> String {
+    let label_len = label.chars().count();
+    if label_len >= width {
         return label.chars().take(width).collect();
     }
-    let stripes = stripe_line(width);
-    let pad = (width.saturating_sub(label.len())) / 2;
-    let mut chars: Vec<char> = stripes.chars().collect();
-    for (i, ch) in label.chars().enumerate() {
-        let pos = pad + i;
-        if pos < chars.len() {
-            chars[pos] = ch;
-        }
-    }
-    chars.into_iter().collect()
+    let pad_left = (width - label_len) / 2;
+    let pad_right = width - label_len - pad_left;
+    format!(
+        "{}{}{}",
+        " ".repeat(pad_left),
+        label,
+        " ".repeat(pad_right)
+    )
 }
 
 /// Compute a scroll offset so the active zone is visible.
@@ -391,17 +406,6 @@ fn compute_scroll_offset(zones: &[DropZone], active_index: usize, viewport_heigh
 // Shared helpers
 // ===========================================================================
 
-/// Append right-aligned `◀` cursor indicator with padding to fill the row.
-fn append_cursor_indicator(spans: &mut Vec<Span>, total_width: usize, theme: &Theme) {
-    let content_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
-    let cursor_width = 2; // " ◀"
-    let pad = total_width.saturating_sub(content_width + cursor_width);
-    if pad > 0 {
-        spans.push(Span::raw(" ".repeat(pad)));
-    }
-    spans.push(Span::styled("\u{25c0}", theme.speaker_cursor));
-}
-
 /// Format volume as a fixed 4-char right-aligned string: `" 0%"`, `"60%"`, `"100%"`.
 fn format_volume(vol: Option<u16>) -> String {
     match vol {
@@ -410,21 +414,37 @@ fn format_volume(vol: Option<u16>) -> String {
     }
 }
 
-/// Append volume bar (when selected) or percentage text to a span list.
+/// Append right-aligned volume bar (when selected) or percentage text to a span list.
 fn append_volume_spans(
     spans: &mut Vec<Span>,
     vol: u16,
     is_selected: bool,
-    width: u16,
+    bar_width: u16,
+    total_width: usize,
     theme: &Theme,
 ) {
-    spans.push(Span::raw("  "));
+    // Calculate current content width
+    let content_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
+
     if is_selected {
+        // Right-align the volume bar
+        let vol_display_width = bar_width as usize;
+        let pad = total_width.saturating_sub(content_width + vol_display_width);
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
         let vol_line =
-            volume_bar::render_volume_bar(vol, width, theme.volume_filled, theme.volume_empty);
+            volume_bar::render_volume_bar(vol, bar_width, theme.volume_filled, theme.volume_empty);
         spans.extend(vol_line.spans);
     } else {
-        spans.push(Span::styled(format!("{vol:>3}%"), theme.muted));
+        // Right-align the volume percentage
+        let vol_text = format!("{vol:>3}%");
+        let vol_chars = vol_text.chars().count();
+        let pad = total_width.saturating_sub(content_width + vol_chars);
+        if pad > 0 {
+            spans.push(Span::raw(" ".repeat(pad)));
+        }
+        spans.push(Span::styled(vol_text, theme.muted));
     }
 }
 
@@ -437,33 +457,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn stripe_line_produces_alternating_pattern() {
-        let s = stripe_line(6);
-        assert_eq!(s, "\u{2572} \u{2572} \u{2572} ");
-    }
-
-    #[test]
-    fn stripe_line_odd_width() {
-        let s = stripe_line(5);
-        assert_eq!(s.chars().count(), 5);
-    }
-
-    #[test]
-    fn stripe_line_zero() {
-        let s = stripe_line(0);
-        assert!(s.is_empty());
-    }
-
-    #[test]
-    fn label_over_stripes_centers_text() {
-        let s = label_over_stripes("hi", 10);
+    fn center_label_centers_text() {
+        let s = center_label("hi", 10);
         assert_eq!(s.chars().count(), 10);
         assert!(s.contains("hi"));
     }
 
     #[test]
-    fn label_over_stripes_long_label() {
-        let s = label_over_stripes("this is a very long label", 10);
+    fn center_label_long_label() {
+        let s = center_label("this is a very long label", 10);
         assert_eq!(s.chars().count(), 10);
     }
 
@@ -479,28 +481,14 @@ mod tests {
     }
 
     #[test]
-    fn build_zone_label_empty_group() {
+    fn build_zone_label_existing_group() {
         let zone = DropZone {
             kind: DropZoneKind::ExistingGroup(sonos_sdk::GroupId::new("test:1")),
             group_name: "Living Room".to_string(),
             remaining_members: Vec::new(),
             inner_height: 1,
         };
-        assert_eq!(build_zone_label(&zone), "Drop here (empty)");
-    }
-
-    #[test]
-    fn build_zone_label_with_members() {
-        let zone = DropZone {
-            kind: DropZoneKind::ExistingGroup(sonos_sdk::GroupId::new("test:1")),
-            group_name: "Living Room".to_string(),
-            remaining_members: vec!["Kitchen".to_string(), "Bedroom".to_string()],
-            inner_height: 2,
-        };
-        assert_eq!(
-            build_zone_label(&zone),
-            "Drop here \u{2014} Kitchen + Bedroom"
-        );
+        assert_eq!(build_zone_label(&zone), "Drop Speaker");
     }
 
     #[test]

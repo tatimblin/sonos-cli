@@ -57,6 +57,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
         data.album_art_protocol.as_mut(),
         theme.bottom_bar_border,
         theme.muted,
+        theme.glyphs.music_note,
     );
 
     let text_x = area.x + art_width + 1;
@@ -78,7 +79,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
 
     let title_display = truncate_str(title, title_width as usize);
 
-    let controls_str = build_controls_str(data.playback_state.as_ref());
+    let controls_str = build_controls_str(data.playback_state.as_ref(), theme);
 
     // Distribute remaining space: half before controls, half after
     let title_chars = title_display.chars().count() as u16;
@@ -114,7 +115,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
     let bar_spans = progress_bar::render_bar_spans(
         data.progress,
         progress_bar_width.saturating_sub(1),
-        Some("\u{257A}"),
+        Some(theme.glyphs.progress_cursor),
         theme.progress_filled,
         theme.progress_cursor,
         theme.progress_empty,
@@ -124,7 +125,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
     let pad_after_artist = text_w.saturating_sub(artist_chars + bar_section_width + vol_width + 1);
 
     let mut row1_spans = vec![
-        Span::styled(artist_display, theme.track_info),
+        Span::styled(artist_display, theme.muted),
         Span::raw(" ".repeat(pad_after_artist as usize)),
         Span::styled(format!("{pos_str} "), theme.progress_time),
     ];
@@ -165,6 +166,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
         data.album_art_protocol.as_mut(),
         theme.bottom_bar_border,
         theme.muted,
+        theme.glyphs.music_note,
     );
 
     let text_x = area.x + art_width + 1;
@@ -207,7 +209,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
     );
 
     let mut row1_spans = vec![
-        Span::styled(artist_display, theme.track_info),
+        Span::styled(artist_display, theme.muted),
         Span::raw(" ".repeat(pad as usize)),
     ];
     row1_spans.extend(vol_line.spans);
@@ -222,7 +224,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
         let row2_x = area.x + 1;
         let row2_w = area.width.saturating_sub(2);
 
-        let controls_str = build_controls_str(data.playback_state.as_ref());
+        let controls_str = build_controls_str(data.playback_state.as_ref(), theme);
         let controls_width = 11u16;
 
         let pos_str = progress_bar::format_time(data.position_ms);
@@ -234,7 +236,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
         let bar_spans = progress_bar::render_bar_spans(
             data.progress,
             bar_width.saturating_sub(1),
-            Some("\u{257A}"),
+            Some(theme.glyphs.progress_cursor),
             theme.progress_filled,
             theme.progress_cursor,
             theme.progress_empty,
@@ -263,7 +265,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
 // ---------------------------------------------------------------------------
 
 fn render_minimal(frame: &mut Frame, area: Rect, data: &BottomBarData, theme: &Theme) {
-    let icon = playback_icon(data.playback_state.as_ref());
+    let icon = playback_icon(data.playback_state.as_ref(), theme);
     let title = data.track_title.as_deref().unwrap_or("No track");
     let group = &data.group_name;
 
@@ -278,17 +280,19 @@ fn render_minimal(frame: &mut Frame, area: Rect, data: &BottomBarData, theme: &T
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn playback_icon(state: Option<&PlaybackState>) -> &'static str {
+fn playback_icon<'a>(state: Option<&PlaybackState>, theme: &'a Theme) -> &'a str {
+    let g = &theme.glyphs;
     match state {
-        Some(PlaybackState::Playing) => "\u{25b6}", // ▶
-        Some(PlaybackState::Paused) => "\u{23f8}",  // ⏸
-        _ => "\u{25a0}",                            // ■
+        Some(PlaybackState::Playing) => g.playing,
+        Some(PlaybackState::Paused) => g.paused,
+        _ => g.stopped,
     }
 }
 
-fn build_controls_str(state: Option<&PlaybackState>) -> String {
-    let play_pause = playback_icon(state);
-    format!(" \u{23ee}  {play_pause}  \u{23ed} ") // ⏮  ▶  ⏭
+fn build_controls_str(state: Option<&PlaybackState>, theme: &Theme) -> String {
+    let g = &theme.glyphs;
+    let play_pause = playback_icon(state, theme);
+    format!(" {}  {play_pause}  {} ", g.control_prev, g.control_next)
 }
 
 /// Truncate a string to fit within `max_chars` characters, appending ellipsis if needed.
@@ -339,24 +343,34 @@ mod tests {
 
     #[test]
     fn playback_icon_playing() {
-        assert_eq!(playback_icon(Some(&PlaybackState::Playing)), "\u{25b6}");
+        let theme = Theme::dark();
+        assert_eq!(
+            playback_icon(Some(&PlaybackState::Playing), &theme),
+            theme.glyphs.playing
+        );
     }
 
     #[test]
     fn playback_icon_paused() {
-        assert_eq!(playback_icon(Some(&PlaybackState::Paused)), "\u{23f8}");
+        let theme = Theme::dark();
+        assert_eq!(
+            playback_icon(Some(&PlaybackState::Paused), &theme),
+            theme.glyphs.paused
+        );
     }
 
     #[test]
     fn playback_icon_none() {
-        assert_eq!(playback_icon(None), "\u{25a0}");
+        let theme = Theme::dark();
+        assert_eq!(playback_icon(None, &theme), theme.glyphs.stopped);
     }
 
     #[test]
     fn build_controls_str_includes_icons() {
-        let controls = build_controls_str(Some(&PlaybackState::Playing));
-        assert!(controls.contains('\u{23ee}')); // ⏮
-        assert!(controls.contains('\u{23ed}')); // ⏭
-        assert!(controls.contains('\u{25b6}')); // ▶
+        let theme = Theme::dark();
+        let controls = build_controls_str(Some(&PlaybackState::Playing), &theme);
+        assert!(controls.contains(theme.glyphs.control_prev));
+        assert!(controls.contains(theme.glyphs.control_next));
+        assert!(controls.contains(theme.glyphs.playing));
     }
 }
