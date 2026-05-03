@@ -39,15 +39,15 @@ pub fn render(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &T
 }
 
 // ---------------------------------------------------------------------------
-// Wide layout (>= 100 cols) — 3 rows, 3 columns
+// Wide layout (>= 100 cols) — 3 rows, 3 columns (Spotify-style)
 // ---------------------------------------------------------------------------
-// Row 0: [art] Title                    controls                  Group Name
-// Row 1: [art] Artist      time ━━━━━━━━━━━━╺──────── time    vol_bar vol%
-// Row 2: [art]
+//            Left               Center                    Right
+// Row 0: [art] Title          controls              Group Name
+// Row 1: [art] Artist    time ━━━━━━━━━━ time     vol_bar vol%
+// Row 2: [art] Album
 // ---------------------------------------------------------------------------
 
 fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &Theme) {
-    // Album art: 5 wide x 3 tall (includes border)
     let art_width: u16 = 6;
     let art_area = Rect::new(area.x, area.y, art_width, 3);
 
@@ -60,92 +60,110 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
         theme.glyphs.music_note,
     );
 
-    let text_x = area.x + art_width + 1;
-    let text_w = area.width.saturating_sub(art_width + 1);
-    if text_w == 0 {
+    let content_x = area.x + art_width + 1;
+    let content_w = area.width.saturating_sub(art_width + 1);
+    if content_w == 0 {
         return;
     }
 
-    // Compute column widths: left (metadata), center (controls+progress), right (group+volume)
-    let vol_width: u16 = 20;
-    let controls_width: u16 = 11; // "  ⏮  ▶  ⏭  "
+    // Three-column split: left (metadata) | center (controls+progress) | right (group+volume)
+    let right_w: u16 = 22.min(content_w / 3);
+    let left_w = (content_w.saturating_sub(right_w)) * 3 / 10;
+    let center_w = content_w.saturating_sub(left_w + right_w);
 
-    // Row 0: Title (left), controls (center), group name (right)
+    let left_x = content_x;
+    let center_x = left_x + left_w;
+    let right_x = center_x + center_w;
+
+    // -- Left column: Title (row 0), Artist (row 1), Album (row 2) --
+
     let title = data.track_title.as_deref().unwrap_or("No track");
-    let group = &data.group_name;
+    let title_display = truncate_str(title, left_w.saturating_sub(1) as usize);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(title_display, theme.header))),
+        Rect::new(left_x, area.y, left_w, 1),
+    );
 
-    let group_width = group.chars().count() as u16;
-    let title_width = text_w.saturating_sub(controls_width + group_width + 4);
+    let artist = data.track_artist.as_deref().unwrap_or("");
+    let artist_display = truncate_str(artist, left_w.saturating_sub(1) as usize);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(artist_display, theme.muted))),
+        Rect::new(left_x, area.y + 1, left_w, 1),
+    );
 
-    let title_display = truncate_str(title, title_width as usize);
+    if area.height >= 3 {
+        let album = data.track_album.as_deref().unwrap_or("");
+        if !album.is_empty() {
+            let album_display = truncate_str(album, left_w.saturating_sub(1) as usize);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(album_display, theme.muted))),
+                Rect::new(left_x, area.y + 2, left_w, 1),
+            );
+        }
+    }
+
+    // -- Center column: Controls (row 0), Progress bar (row 1) --
 
     let controls_str = build_controls_str(data.playback_state.as_ref(), theme);
-
-    // Distribute remaining space: half before controls, half after
-    let title_chars = title_display.chars().count() as u16;
-    let total_used = title_chars + controls_width + group_width;
-    let remaining = text_w.saturating_sub(total_used);
-    let pad1 = (remaining / 2).max(1);
-    let pad2 = remaining.saturating_sub(pad1).max(1);
-
-    let row0 = Line::from(vec![
-        Span::styled(title_display, theme.header),
-        Span::raw(" ".repeat(pad1 as usize)),
-        Span::styled(controls_str, theme.bottom_bar_controls),
-        Span::raw(" ".repeat(pad2 as usize)),
-        Span::styled(group.clone(), theme.track_info),
-    ]);
-    let row0_area = Rect::new(text_x, area.y, text_w, 1);
-    frame.render_widget(Paragraph::new(row0), row0_area);
-
-    // Row 1: Artist, time + progress bar + time, volume bar
-    let artist = data.track_artist.as_deref().unwrap_or("");
+    let controls_width: u16 = 11;
+    let controls_pad = center_w.saturating_sub(controls_width) / 2;
+    let mut controls_spans = vec![Span::raw(" ".repeat(controls_pad as usize))];
+    controls_spans.push(Span::styled(controls_str, theme.bottom_bar_controls));
+    frame.render_widget(
+        Paragraph::new(Line::from(controls_spans)),
+        Rect::new(center_x, area.y, center_w, 1),
+    );
 
     let pos_str = progress_bar::format_time(data.position_ms);
     let dur_str = progress_bar::format_time(data.duration_ms);
-    let time_label_width = (pos_str.chars().count() + dur_str.chars().count() + 2) as u16; // " " on each side
+    let time_label_width = (pos_str.chars().count() + dur_str.chars().count() + 2) as u16;
+    let bar_width = center_w.saturating_sub(time_label_width + 2) as usize;
 
-    let progress_bar_width = text_w.saturating_sub(vol_width + time_label_width + 4) as usize;
-    let artist_max =
-        text_w.saturating_sub(vol_width + time_label_width + progress_bar_width as u16 + 4);
-    let artist_display = truncate_str(artist, artist_max as usize);
-    let artist_chars = artist_display.chars().count() as u16;
-
-    // Build progress spans
     let bar_spans = progress_bar::render_bar_spans(
         data.progress,
-        progress_bar_width.saturating_sub(1),
+        bar_width.saturating_sub(1),
         Some(theme.glyphs.progress_cursor),
         theme.progress_filled,
         theme.progress_cursor,
         theme.progress_empty,
     );
 
-    let bar_section_width = (progress_bar_width + time_label_width as usize + 1) as u16;
-    let pad_after_artist = text_w.saturating_sub(artist_chars + bar_section_width + vol_width + 1);
+    let mut progress_spans = vec![Span::styled(format!("{pos_str} "), theme.progress_time)];
+    progress_spans.extend(bar_spans);
+    progress_spans.push(Span::styled(format!(" {dur_str}"), theme.progress_time));
+    frame.render_widget(
+        Paragraph::new(Line::from(progress_spans)),
+        Rect::new(center_x, area.y + 1, center_w, 1),
+    );
 
-    let mut row1_spans = vec![
-        Span::styled(artist_display, theme.muted),
-        Span::raw(" ".repeat(pad_after_artist as usize)),
-        Span::styled(format!("{pos_str} "), theme.progress_time),
-    ];
-    row1_spans.extend(bar_spans);
-    row1_spans.push(Span::styled(format!(" {dur_str}"), theme.progress_time));
-    row1_spans.push(Span::raw("  "));
+    // -- Right column: Group name (row 0), Volume bar (row 1) --
 
-    // Volume bar
+    let group = &data.group_name;
+    let group_display = truncate_str(group, right_w as usize);
+    let group_chars = group_display.chars().count() as u16;
+    let group_pad = right_w.saturating_sub(group_chars);
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::raw(" ".repeat(group_pad as usize)),
+            Span::styled(group_display, theme.track_info),
+        ])),
+        Rect::new(right_x, area.y, right_w, 1),
+    );
+
+    let vol_width = right_w.min(20);
     let vol_line = volume_bar::render_volume_bar(
         data.volume,
         vol_width,
         theme.volume_filled,
         theme.volume_empty,
     );
-    row1_spans.extend(vol_line.spans);
-
-    let row1_area = Rect::new(text_x, area.y + 1, text_w, 1);
-    frame.render_widget(Paragraph::new(Line::from(row1_spans)), row1_area);
-
-    // Row 2: empty (art occupies this row)
+    let vol_pad = right_w.saturating_sub(vol_width);
+    let mut vol_spans = vec![Span::raw(" ".repeat(vol_pad as usize))];
+    vol_spans.extend(vol_line.spans);
+    frame.render_widget(
+        Paragraph::new(Line::from(vol_spans)),
+        Rect::new(right_x, area.y + 1, right_w, 1),
+    );
 }
 
 // ---------------------------------------------------------------------------

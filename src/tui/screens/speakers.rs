@@ -270,6 +270,7 @@ fn assemble_bottom_bar(
         })
     });
     let track_artist = current_track.as_ref().and_then(|t| t.artist.clone());
+    let track_album = current_track.as_ref().and_then(|t| t.album.clone());
     let album_art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
 
     // Request album art loading if we have a URI and a coordinator IP
@@ -292,6 +293,7 @@ fn assemble_bottom_bar(
         group_name,
         track_title,
         track_artist,
+        track_album,
         album_art_protocol: protocol,
         playback_state,
         progress,

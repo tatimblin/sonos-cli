@@ -113,6 +113,7 @@ pub struct BottomBarData {
     pub group_name: String,
     pub track_title: Option<String>,
     pub track_artist: Option<String>,
+    pub track_album: Option<String>,
     pub album_art_protocol: Option<StatefulProtocol>,
     pub playback_state: Option<PlaybackState>,
     pub progress: f64,

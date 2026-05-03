@@ -71,23 +71,14 @@ pub fn render_album_art(
     placeholder_style: Style,
     music_note: &str,
 ) {
-    if area.width < 3 || area.height < 3 {
+    if area.width == 0 || area.height == 0 {
         return;
     }
 
     match protocol {
         Some(proto) => {
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(border_style);
-            let inner = block.inner(area);
-            frame.render_widget(block, area);
-
-            if inner.width > 0 && inner.height > 0 {
-                let image_widget = StatefulImage::new(None);
-                frame.render_stateful_widget(image_widget, inner, proto);
-            }
+            let image_widget = StatefulImage::new(None);
+            frame.render_stateful_widget(image_widget, area, proto);
         }
         None => {
             render_placeholder(frame, area, border_style, placeholder_style, music_note);

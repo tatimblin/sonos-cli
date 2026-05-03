@@ -108,7 +108,7 @@ impl Glyphs {
 
             separator: '\u{2500}', // ─
 
-            progress_cursor: "\u{257a}", // ╺
+            progress_cursor: "\u{25cf}", // ●
 
             music_note: "\u{266a}", // ♪
         }
