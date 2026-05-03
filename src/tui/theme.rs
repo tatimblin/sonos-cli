@@ -33,14 +33,6 @@ pub struct Glyphs {
     pub divider_fill: &'static str,
     pub divider_right: &'static str,
 
-    // Drop zone borders
-    pub zone_tl: &'static str,
-    pub zone_tr: &'static str,
-    pub zone_bl: &'static str,
-    pub zone_br: &'static str,
-    pub zone_horiz: &'static str,
-    pub zone_vert: &'static str,
-
     // Media controls
     pub control_prev: &'static str,
     pub control_next: &'static str,
@@ -85,13 +77,6 @@ impl Glyphs {
             divider_left: "+",
             divider_fill: "\u{2500}", // ─
             divider_right: "+",
-
-            zone_tl: "\u{256d}",    // ╭
-            zone_tr: "\u{256e}",    // ╮
-            zone_bl: "\u{2570}",    // ╰
-            zone_br: "\u{256f}",    // ╯
-            zone_horiz: "\u{2500}", // ─
-            zone_vert: "\u{2502}",  // │
 
             control_prev: "\u{23ee}", // ⏮
             control_next: "\u{23ed}", // ⏭
@@ -149,6 +134,9 @@ pub struct Theme {
     pub speaker_name: Style,
     pub leader: Style,
 
+    // Pickup mode
+    pub picked_up: Style,
+
     // General
     pub accent: Style,
     pub error: Style,
@@ -195,6 +183,8 @@ impl Theme {
             speaker_name: Style::new().fg(Color::Gray),
             leader: Style::new().fg(Color::DarkGray),
 
+            picked_up: Style::new().bg(Color::DarkGray),
+
             accent: Style::new().fg(Color::Cyan),
             error: Style::new().fg(Color::Red),
 
@@ -230,6 +220,8 @@ impl Theme {
             speaker_cursor: Style::new().fg(Color::Blue),
             speaker_name: Style::new().fg(Color::DarkGray),
             leader: Style::new().fg(Color::Gray),
+
+            picked_up: Style::new().bg(Color::DarkGray),
 
             accent: Style::new().fg(Color::Blue),
             error: Style::new().fg(Color::Red),
@@ -267,6 +259,8 @@ impl Theme {
             speaker_name: Style::new().fg(Color::LightMagenta),
             leader: Style::new().fg(Color::DarkGray),
 
+            picked_up: Style::new().bg(Color::DarkGray),
+
             accent: Style::new().fg(Color::Cyan),
             error: Style::new().fg(Color::LightRed),
 
@@ -303,6 +297,8 @@ impl Theme {
             speaker_cursor: Style::new().fg(orange),
             speaker_name: Style::new().fg(Color::Gray),
             leader: Style::new().fg(Color::DarkGray),
+
+            picked_up: Style::new().bg(Color::DarkGray),
 
             accent: Style::new().fg(orange),
             error: Style::new().fg(Color::Red),
