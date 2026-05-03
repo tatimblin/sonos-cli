@@ -48,7 +48,6 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
         selected_row: state.selected_row,
         dropdown_open: state.dropdown_open,
         dropdown_index: state.dropdown_index,
-        status_message: ctx.app.status_message.clone(),
     };
 
     settings::render(frame, area, &data, &ctx.app.theme);

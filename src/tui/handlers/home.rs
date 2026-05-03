@@ -7,8 +7,6 @@ use crate::tui::handlers::{settings, speaker_list};
 use crate::tui::types::{SettingsAction, SpeakerListAction};
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
-    app.status_message = None;
-
     if app.navigation.tab_focused {
         match key.code {
             KeyCode::Left | KeyCode::Right => {

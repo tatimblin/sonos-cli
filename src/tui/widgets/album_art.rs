@@ -6,16 +6,20 @@
 
 use std::cell::RefCell;
 
+use image::imageops::FilterType;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
+use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
 use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::StatefulImage;
 
 use crate::tui::image_loader::ImageLoader;
+
+const ART_COLS: u16 = 6;
+const ART_ROWS: u16 = 3;
 
 /// Hook-friendly state for album art protocol lifecycle.
 ///
@@ -50,7 +54,11 @@ impl ArtProtocolState {
             if let Some(ref uri) = art_uri {
                 if let Some(img) = image_loader.get(uri) {
                     if let Some(ref mut p) = *picker.borrow_mut() {
-                        self.protocol = Some(p.new_resize_protocol(img.clone()));
+                        let (fw, fh) = p.font_size();
+                        let target_w = (ART_COLS * fw) as u32;
+                        let target_h = (ART_ROWS * fh) as u32;
+                        let resized = img.resize_exact(target_w, target_h, FilterType::Lanczos3);
+                        self.protocol = Some(p.new_resize_protocol(resized));
                     }
                 }
             }
@@ -67,57 +75,32 @@ pub fn render_album_art(
     frame: &mut Frame,
     area: Rect,
     protocol: Option<&mut StatefulProtocol>,
-    border_style: Style,
-    placeholder_style: Style,
+    background_style: Style,
     music_note: &str,
 ) {
-    if area.width < 3 || area.height < 3 {
+    if area.width == 0 || area.height == 0 {
         return;
     }
 
     match protocol {
         Some(proto) => {
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(border_style);
-            let inner = block.inner(area);
-            frame.render_widget(block, area);
-
-            if inner.width > 0 && inner.height > 0 {
-                let image_widget = StatefulImage::new(None);
-                frame.render_stateful_widget(image_widget, inner, proto);
-            }
+            let image_widget = StatefulImage::new(None);
+            frame.render_stateful_widget(image_widget, area, proto);
         }
         None => {
-            render_placeholder(frame, area, border_style, placeholder_style, music_note);
+            render_placeholder(frame, area, background_style, music_note);
         }
     }
 }
 
-/// Render a placeholder box with a centered music note.
-fn render_placeholder(
-    frame: &mut Frame,
-    area: Rect,
-    border_style: Style,
-    text_style: Style,
-    note: &str,
-) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(border_style);
-    let inner = block.inner(area);
+fn render_placeholder(frame: &mut Frame, area: Rect, bg_style: Style, note: &str) {
+    let block = Block::default().style(bg_style);
     frame.render_widget(block, area);
 
-    if inner.height == 0 || inner.width == 0 {
-        return;
-    }
-
-    let center_y = inner.height / 2;
-    let note_area = Rect::new(inner.x, inner.y + center_y, inner.width, 1);
+    let center_y = area.height / 2;
+    let note_area = Rect::new(area.x, area.y + center_y, area.width, 1);
     let paragraph = Paragraph::new(Line::from(note.to_string()))
         .alignment(Alignment::Center)
-        .style(text_style);
+        .style(bg_style);
     frame.render_widget(paragraph, note_area);
 }

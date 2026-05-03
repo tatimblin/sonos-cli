@@ -6,8 +6,8 @@ use ratatui::Frame;
 use crate::tui::helpers;
 use crate::tui::hooks::{ProgressState, RenderContext};
 use crate::tui::types::{
-    build_list_entries, group_for_entry, BottomBarData, DropZone, DropZoneData, DropZoneKind,
-    EntryRenderData, ListEntry, SpeakerListData, SpeakerScreenData,
+    build_list_entries, group_for_entry, BottomBarData, EntryRenderData, ListEntry,
+    SpeakerListData,
 };
 use crate::tui::widgets::album_art::ArtProtocolState;
 use crate::tui::widgets::{bottom_bar, speaker_list};
@@ -23,156 +23,137 @@ pub fn render(
     ctx: &mut RenderContext,
 ) {
     let state = &ctx.app.navigation.speakers_state;
+    let pick_up = state.pick_up.as_ref();
 
-    let data = if let Some(ref pick_up) = state.pick_up {
-        // Build drop zone data from current groups
-        let groups = ctx.app.system.groups();
-        let mut zones: Vec<DropZone> = Vec::new();
+    let entries = build_list_entries(&ctx.app.system, pick_up);
+    let mut entry_data: Vec<EntryRenderData> = Vec::with_capacity(entries.len());
 
-        for group in &groups {
-            let coordinator = group.coordinator();
+    for (i, entry) in entries.iter().enumerate() {
+        match entry {
+            ListEntry::SpeakerRow(speaker_id) => {
+                let speaker = ctx.app.system.speaker_by_id(speaker_id);
+                let vol = speaker
+                    .as_ref()
+                    .and_then(|s| ctx.hooks.use_watch(&s.volume))
+                    .map(|v| v.value() as u16);
+                if let Some(ref s) = speaker {
+                    ctx.hooks.use_watch(&s.group_membership);
+                }
+                let name = speaker
+                    .as_ref()
+                    .map(|s| s.name.clone())
+                    .unwrap_or_else(|| "Unknown".to_string());
+                let model = speaker.as_ref().map(|s| s.model_name.clone());
 
-            // Subscribe to topology changes so the list refreshes after regrouping
-            if let Some(ref coord) = coordinator {
-                ctx.hooks.use_watch(&coord.group_membership);
+                let is_last = !matches!(
+                    entries.get(i + 1),
+                    Some(ListEntry::SpeakerRow(_)) | Some(ListEntry::AddToGroupRow(_))
+                );
+
+                entry_data.push(EntryRenderData {
+                    name,
+                    model_name: model,
+                    speaker_volume: vol,
+                    group_volume: None,
+                    playback_state: None,
+                    track_info: None,
+                    is_last_in_group: is_last,
+                    is_home_group: false,
+                });
             }
+            ListEntry::GroupHeader(group_id) => {
+                let group = ctx.app.system.group_by_id(group_id);
+                let coordinator = group.as_ref().and_then(|g| g.coordinator());
 
-            let members = group.members();
-            let group_name = coordinator
-                .map(|c| c.name.clone())
-                .unwrap_or_else(|| "Unknown Group".to_string());
+                let gvol = group
+                    .as_ref()
+                    .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
+                    .map(|v| v.value());
 
-            // Remaining members: all members except the picked-up speaker
-            let remaining: Vec<String> = members
-                .iter()
-                .filter(|m| m.id != pick_up.speaker_id)
-                .map(|m| m.name.clone())
-                .collect();
+                let pb = coordinator
+                    .as_ref()
+                    .and_then(|c| ctx.hooks.use_watch(&c.playback_state));
 
-            // Inner height = original member count (including picked-up speaker if it was here)
-            let inner_height = members.len().max(1);
+                let current_track = coordinator
+                    .as_ref()
+                    .and_then(|c| ctx.hooks.use_watch(&c.current_track));
+                let track = helpers::track_summary(&current_track);
 
-            zones.push(DropZone {
-                kind: DropZoneKind::ExistingGroup(group.id.clone()),
-                group_name,
-                remaining_members: remaining,
-                inner_height,
-            });
-        }
+                let name = coordinator
+                    .map(|c| c.name.clone())
+                    .unwrap_or_else(|| "Unknown Group".to_string());
 
-        // Always add "Add new group" zone at the bottom
-        zones.push(DropZone {
-            kind: DropZoneKind::NewGroup,
-            group_name: "Add new group".to_string(),
-            remaining_members: Vec::new(),
-            inner_height: 1,
-        });
+                entry_data.push(EntryRenderData {
+                    name,
+                    model_name: None,
+                    speaker_volume: None,
+                    group_volume: gvol,
+                    playback_state: pb,
+                    track_info: track,
+                    is_last_in_group: false,
+                    is_home_group: false,
+                });
+            }
+            ListEntry::AddToGroupRow(group_id) => {
+                let is_home = pick_up
+                    .and_then(|pu| pu.original_group_id.as_ref())
+                    .is_some_and(|og| og == group_id);
 
-        // Clamp active_zone_index
-        let active = pick_up.active_zone_index.min(zones.len().saturating_sub(1));
+                let name = if is_home {
+                    "Already in group".to_string()
+                } else {
+                    "Add to group".to_string()
+                };
 
-        SpeakerScreenData::PickUp(DropZoneData {
-            zones,
-            active_zone_index: active,
-            speaker_name: pick_up.speaker_name.clone(),
-            status_message: ctx.app.status_message.clone(),
-        })
-    } else {
-        // Normal mode: build entry list
-        let entries = build_list_entries(&ctx.app.system);
-        let mut entry_data: Vec<EntryRenderData> = Vec::with_capacity(entries.len());
-
-        for (i, entry) in entries.iter().enumerate() {
-            match entry {
-                ListEntry::SpeakerRow(speaker_id) => {
-                    let speaker = ctx.app.system.speaker_by_id(speaker_id);
-                    let vol = speaker
-                        .as_ref()
-                        .and_then(|s| ctx.hooks.use_watch(&s.volume))
-                        .map(|v| v.value() as u16);
-                    // Subscribe to topology changes so the list refreshes after regrouping
-                    if let Some(ref s) = speaker {
-                        ctx.hooks.use_watch(&s.group_membership);
-                    }
-                    let name = speaker
-                        .as_ref()
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| "Unknown".to_string());
-                    let model = speaker.as_ref().map(|s| s.model_name.clone());
-
-                    // Determine if this is the last speaker in its group
-                    let is_last = !matches!(entries.get(i + 1), Some(ListEntry::SpeakerRow(_)));
-
-                    entry_data.push(EntryRenderData {
-                        name,
-                        model_name: model,
-                        speaker_volume: vol,
-                        group_volume: None,
-                        playback_state: None,
-                        track_info: None,
-                        is_last_in_group: is_last,
-                    });
-                }
-                ListEntry::GroupHeader(group_id) => {
-                    let group = ctx.app.system.group_by_id(group_id);
-                    let coordinator = group.as_ref().and_then(|g| g.coordinator());
-
-                    let gvol = group
-                        .as_ref()
-                        .and_then(|g| ctx.hooks.use_watch_group(&g.volume))
-                        .map(|v| v.value());
-
-                    let pb = coordinator
-                        .as_ref()
-                        .and_then(|c| ctx.hooks.use_watch(&c.playback_state));
-
-                    let current_track = coordinator
-                        .as_ref()
-                        .and_then(|c| ctx.hooks.use_watch(&c.current_track));
-                    let track = helpers::track_summary(&current_track);
-
-                    let name = coordinator
-                        .map(|c| c.name.clone())
-                        .unwrap_or_else(|| "Unknown Group".to_string());
-
-                    entry_data.push(EntryRenderData {
-                        name,
-                        model_name: None,
-                        speaker_volume: None,
-                        group_volume: gvol,
-                        playback_state: pb,
-                        track_info: track,
-                        is_last_in_group: false,
-                    });
-                }
+                entry_data.push(EntryRenderData {
+                    name,
+                    model_name: None,
+                    speaker_volume: None,
+                    group_volume: None,
+                    playback_state: None,
+                    track_info: None,
+                    is_last_in_group: true,
+                    is_home_group: is_home,
+                });
+            }
+            ListEntry::CreateNewGroupRow => {
+                entry_data.push(EntryRenderData {
+                    name: "Create new group".to_string(),
+                    model_name: None,
+                    speaker_volume: None,
+                    group_volume: None,
+                    playback_state: None,
+                    track_info: None,
+                    is_last_in_group: false,
+                    is_home_group: false,
+                });
             }
         }
+    }
 
-        let state = &ctx.app.navigation.speakers_state;
-        // Clamp selected_index after topology changes (entries may have shrunk)
-        let selected_index = state.selected_index.min(entries.len().saturating_sub(1));
-        SpeakerScreenData::Normal(SpeakerListData {
-            entries,
-            entry_data,
-            selected_index,
-            status_message: ctx.app.status_message.clone(),
-        })
+    let state = &ctx.app.navigation.speakers_state;
+    let selected_index = state.selected_index.min(entries.len().saturating_sub(1));
+
+    let data = SpeakerListData {
+        entries,
+        entry_data,
+        selected_index,
+        picked_up_speaker_id: pick_up.map(|pu| pu.speaker_id.clone()),
     };
 
     speaker_list::render(frame, content_area, &data, &ctx.app.theme);
 
-    // Bottom bar: assemble data for the focused group's coordinator (normal mode only)
+    // Bottom bar: assemble data for the focused group's coordinator (hidden during pickup)
     if let Some(bar_rect) = bar_area {
-        if let SpeakerScreenData::Normal(ref list_data) = data {
+        if data.picked_up_speaker_id.is_none() {
             let mut bar_data = assemble_bottom_bar(
-                &list_data.entries,
-                list_data.selected_index,
+                &data.entries,
+                data.selected_index,
                 bar_rect.width >= 100,
                 ctx,
             );
             bottom_bar::render(frame, bar_rect, &mut bar_data, &ctx.app.theme);
 
-            // Put the protocol back into hook state so it persists across frames
             if bar_data.album_art_protocol.is_some() {
                 let art_state = ctx
                     .hooks
@@ -235,7 +216,7 @@ fn assemble_bottom_bar(
     // Group volume
     let volume = group
         .as_ref()
-        .and_then(|g| ctx.hooks.use_watch_group(&g.volume))
+        .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
         .map(|v| v.value())
         .unwrap_or(0);
 
@@ -270,6 +251,7 @@ fn assemble_bottom_bar(
         })
     });
     let track_artist = current_track.as_ref().and_then(|t| t.artist.clone());
+    let track_album = current_track.as_ref().and_then(|t| t.album.clone());
     let album_art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
 
     // Request album art loading if we have a URI and a coordinator IP
@@ -288,10 +270,14 @@ fn assemble_bottom_bar(
     art_state.ensure_protocol(&album_art_uri, &ctx.app.image_loader, &ctx.app.picker);
     let protocol = art_state.protocol.take();
 
+    let group_volume_active = selected_index < entries.len()
+        && matches!(&entries[selected_index], ListEntry::GroupHeader(_));
+
     BottomBarData {
         group_name,
         track_title,
         track_artist,
+        track_album,
         album_art_protocol: protocol,
         playback_state,
         progress,
@@ -299,5 +285,6 @@ fn assemble_bottom_bar(
         duration_ms: dur_ms,
         volume,
         is_wide,
+        group_volume_active,
     }
 }

@@ -42,6 +42,12 @@ fn run_event_loop_inner(
     let mut frame_count: u64 = 0;
 
     loop {
+        // 0. Expire stale toasts
+        if app.toast.as_ref().is_some_and(|t| t.is_expired()) {
+            app.toast = None;
+            app.dirty = true;
+        }
+
         // 1. Render (only when state changed)
         //    Hooks manage watch subscriptions via persistent handles.
         //    Mark-and-sweep evicts state for widgets that stopped rendering.

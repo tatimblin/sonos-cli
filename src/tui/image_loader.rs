@@ -182,12 +182,26 @@ fn fetch_and_decode(agent: &ureq::Agent, url: &str) -> Option<DynamicImage> {
         .read_to_vec()
         .ok()?;
 
-    image::load_from_memory(&body)
+    let img = image::load_from_memory(&body)
         .map_err(|e| {
             tracing::debug!("Album art decode failed for {url}: {e}");
             e
         })
-        .ok()
+        .ok()?;
+
+    Some(crop_to_square(img))
+}
+
+/// Center-crop an image to a square using the shorter dimension.
+fn crop_to_square(img: DynamicImage) -> DynamicImage {
+    let (w, h) = (img.width(), img.height());
+    if w == h {
+        return img;
+    }
+    let side = w.min(h);
+    let x = (w - side) / 2;
+    let y = (h - side) / 2;
+    img.crop_imm(x, y, side, side)
 }
 
 #[cfg(test)]
@@ -215,5 +229,29 @@ mod tests {
         let ip: IpAddr = "192.168.1.100".parse().unwrap();
         let url = "https://example.com/art.jpg";
         assert_eq!(build_url(url, ip), url);
+    }
+
+    #[test]
+    fn crop_to_square_landscape() {
+        let img = DynamicImage::new_rgb8(160, 90);
+        let cropped = crop_to_square(img);
+        assert_eq!(cropped.width(), 90);
+        assert_eq!(cropped.height(), 90);
+    }
+
+    #[test]
+    fn crop_to_square_portrait() {
+        let img = DynamicImage::new_rgb8(90, 160);
+        let cropped = crop_to_square(img);
+        assert_eq!(cropped.width(), 90);
+        assert_eq!(cropped.height(), 90);
+    }
+
+    #[test]
+    fn crop_to_square_already_square() {
+        let img = DynamicImage::new_rgb8(100, 100);
+        let cropped = crop_to_square(img);
+        assert_eq!(cropped.width(), 100);
+        assert_eq!(cropped.height(), 100);
     }
 }

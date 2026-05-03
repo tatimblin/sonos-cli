@@ -780,7 +780,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1205,7 +1205,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -1715,7 +1715,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2359,7 +2359,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2651,8 +2651,6 @@ dependencies = [
 [[package]]
 name = "sonos-api"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b8997da15334a136fed3f29af74cc21f2ff941483d578f9390c3c79284a81f1"
 dependencies = [
  "paste",
  "quick-xml",
@@ -2692,8 +2690,6 @@ dependencies = [
 [[package]]
 name = "sonos-sdk"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce357a4c5be5d022bd8bf43351eb0000b180cdfa5a292bb4f14c90ef53b3ee09"
 dependencies = [
  "dirs",
  "serde",
@@ -2709,8 +2705,6 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-callback-server"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c64dc55258df85825f0fcf96fb3144acdf707072b0c940fa5d5fa56612513eb"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2727,8 +2721,6 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-discovery"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ecba1674315b83810e0888e18cddd048c8799dc590ac53e404640bab73ebdb3"
 dependencies = [
  "quick-xml",
  "reqwest",
@@ -2738,8 +2730,6 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-event-manager"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adf483a79699f00bea7d40e111d9b983345c4d7ac372af7b81f3ca53e0e7e1d4"
 dependencies = [
  "dashmap",
  "parking_lot",
@@ -2754,8 +2744,6 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-soap-client"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27396ff70850263ae6de042a9dd2c89c170ebe4a1192b242e5e21f235dfd1413"
 dependencies = [
  "thiserror 1.0.69",
  "ureq 2.12.1",
@@ -2765,8 +2753,6 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-state"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c0d897dbd3912d1d6a5d36cea145b9f3544e1d71ead00eafae706541fe62b03"
 dependencies = [
  "parking_lot",
  "serde",
@@ -2781,14 +2767,10 @@ dependencies = [
 [[package]]
 name = "sonos-sdk-state-store"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6631a5800cdb8fd29ce15a840095a571d2a7eda38dca0a7a33a5828f1662c835"
 
 [[package]]
 name = "sonos-sdk-stream"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52a901ae123db42e0095db6887eab75ef01e4740356282e689d9d571c6d0ab8b"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2922,7 +2904,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3618,7 +3600,7 @@ version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
 dependencies = [
- "windows-core 0.58.0",
+ "windows-core",
  "windows-targets 0.52.6",
 ]
 
@@ -3628,24 +3610,11 @@ version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
 dependencies = [
- "windows-implement 0.58.0",
- "windows-interface 0.58.0",
- "windows-result 0.2.0",
- "windows-strings 0.1.0",
+ "windows-implement",
+ "windows-interface",
+ "windows-result",
+ "windows-strings",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -3660,32 +3629,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "windows-interface"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3708,31 +3655,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
-dependencies = [
- "windows-link",
-]
-
-[[package]]
 name = "windows-strings"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd9b125c486025df0eabcb585e62173c6c9eddcec5d117d3b6e8c30e2ee4d10"
 dependencies = [
- "windows-result 0.2.0",
+ "windows-result",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-strings"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
-dependencies = [
- "windows-link",
 ]
 
 [[package]]
