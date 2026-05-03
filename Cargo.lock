@@ -780,7 +780,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1715,7 +1715,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2359,7 +2359,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2650,7 +2650,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-api"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ca946ba9339f4bf52c30335aa5576be4f283c2868996944cb1a0ac097ae75cd"
 dependencies = [
  "paste",
  "quick-xml",
@@ -2663,7 +2665,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2689,7 +2691,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e97f4507527f4fb2284acb590d95a65874b543e5ea63886a293e0679a0afedf5"
 dependencies = [
  "dirs",
  "serde",
@@ -2704,7 +2708,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-callback-server"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cf15a4bf4e7ba48140b57964bd0b5eadae915c8c9aafc16d2ec4623df85ccba"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2720,7 +2726,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-discovery"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04f6330ba89d5cc5143122772f23a9fb5d63ded8f2d67bf52fc49564673ffbab"
 dependencies = [
  "quick-xml",
  "reqwest",
@@ -2729,7 +2737,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-event-manager"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "770d2575a41a2321d6d5976d4cc28a2d5786a946828f4cfdd47e070e08b9758e"
 dependencies = [
  "dashmap",
  "parking_lot",
@@ -2743,7 +2753,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-soap-client"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "358d6528adc9abc4bec14c93a3f286437cb13a981e3c7f5def25f5278523192a"
 dependencies = [
  "thiserror 1.0.69",
  "ureq 2.12.1",
@@ -2752,7 +2764,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "973bf45c3d0e74852e12fc88bafd6dda93d003f42272387a020611be988f59f5"
 dependencies = [
  "parking_lot",
  "serde",
@@ -2766,11 +2780,15 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state-store"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ba97eb08a9b1a3086e4328ee7397153c428804de1847b50e0a6a20b14907e16"
 
 [[package]]
 name = "sonos-sdk-stream"
-version = "0.5.0"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b89c0b54584b49b925a77cb8060e338f870b71413db071e6d31d9721932a2c1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2904,7 +2922,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
