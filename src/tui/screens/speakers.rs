@@ -67,7 +67,7 @@ pub fn render(
 
                 let gvol = group
                     .as_ref()
-                    .and_then(|g| ctx.hooks.use_watch_group(&g.volume))
+                    .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
                     .map(|v| v.value());
 
                 let pb = coordinator
@@ -138,8 +138,6 @@ pub fn render(
         entries,
         entry_data,
         selected_index,
-        status_message: ctx.app.status_message.clone(),
-        picked_up_speaker_name: pick_up.map(|pu| pu.speaker_name.clone()),
         picked_up_speaker_id: pick_up.map(|pu| pu.speaker_id.clone()),
     };
 
@@ -218,7 +216,7 @@ fn assemble_bottom_bar(
     // Group volume
     let volume = group
         .as_ref()
-        .and_then(|g| ctx.hooks.use_watch_group(&g.volume))
+        .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
         .map(|v| v.value())
         .unwrap_or(0);
 
@@ -272,6 +270,9 @@ fn assemble_bottom_bar(
     art_state.ensure_protocol(&album_art_uri, &ctx.app.image_loader, &ctx.app.picker);
     let protocol = art_state.protocol.take();
 
+    let group_volume_active = selected_index < entries.len()
+        && matches!(&entries[selected_index], ListEntry::GroupHeader(_));
+
     BottomBarData {
         group_name,
         track_title,
@@ -284,5 +285,6 @@ fn assemble_bottom_bar(
         duration_ms: dur_ms,
         volume,
         is_wide,
+        group_volume_active,
     }
 }

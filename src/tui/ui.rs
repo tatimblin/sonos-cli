@@ -37,6 +37,10 @@ pub fn render(frame: &mut Frame, ctx: &mut RenderContext) {
         return;
     }
 
+    // Drive animation tick while toast is active
+    let toast_active = ctx.app.toast.as_ref().is_some_and(|t| !t.is_expired());
+    ctx.hooks.use_animation("toast", toast_active);
+
     // Horizontal padding (1 char each side)
     let padded_x = area.x + 1;
     let padded_w = area.width.saturating_sub(2);
@@ -142,10 +146,41 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
 
     let logo_width = logo.chars().count();
     let tab_width: usize = tab_spans.iter().map(|s| s.content.chars().count()).sum();
-    let padding = (area.width as usize).saturating_sub(logo_width + tab_width);
+
+    let toast_spans = app
+        .toast
+        .as_ref()
+        .filter(|t| !t.is_expired())
+        .map(|t| {
+            let style = if t.is_error {
+                app.theme.error
+            } else {
+                app.theme.accent
+            };
+            vec![Span::styled(format!("{} {}", app.theme.glyphs.toast_prefix, t.message), style)]
+        });
+
+    let toast_width: usize = toast_spans
+        .as_ref()
+        .map(|spans| spans.iter().map(|s| s.content.chars().count()).sum())
+        .unwrap_or(0);
+
+    let fixed_width = logo_width + toast_width + tab_width;
+    let total = area.width as usize;
 
     let mut spans = vec![Span::styled(logo, app.theme.header)];
-    spans.push(Span::raw(" ".repeat(padding)));
+
+    if let Some(ts) = toast_spans {
+        let left_pad = total.saturating_sub(fixed_width) / 2;
+        let right_pad = total.saturating_sub(fixed_width + left_pad);
+        spans.push(Span::raw(" ".repeat(left_pad)));
+        spans.extend(ts);
+        spans.push(Span::raw(" ".repeat(right_pad)));
+    } else {
+        let padding = total.saturating_sub(logo_width + tab_width);
+        spans.push(Span::raw(" ".repeat(padding)));
+    }
+
     spans.extend(tab_spans);
 
     let paragraph = Paragraph::new(Line::from(spans));

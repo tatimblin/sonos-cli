@@ -23,7 +23,7 @@ use ratatui::Frame;
 use sonos_sdk::PlaybackState;
 
 use crate::tui::theme::Theme;
-use crate::tui::types::{ListEntry, SpeakerListData};
+use crate::tui::types::{group_for_entry, ListEntry, SpeakerListData};
 use crate::tui::widgets::volume_bar;
 
 /// Render the speaker list from pre-computed data.
@@ -55,23 +55,11 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
 
     let cursor_prefix_width = 2;
     let is_pickup = data.picked_up_speaker_id.is_some();
+    let focused_group = group_for_entry(&data.entries, selected_index);
 
     let mut lines: Vec<Line> = Vec::new();
     let mut entry_visual_starts: Vec<usize> = Vec::new();
     let mut entry_visual_heights: Vec<usize> = Vec::new();
-
-    // Status line during pickup mode
-    if let Some(ref speaker_name) = data.picked_up_speaker_name {
-        let left = format!("Picked up: {speaker_name}");
-        let right = "\u{2423} drop  Esc cancel";
-        let pad = total_width.saturating_sub(left.len() + right.len());
-        lines.push(Line::from(vec![
-            Span::styled(left, theme.accent),
-            Span::raw(" ".repeat(pad)),
-            Span::styled(right, theme.muted),
-        ]));
-        lines.push(Line::raw(""));
-    }
 
     for (idx, (entry, entry_data)) in data.entries.iter().zip(data.entry_data.iter()).enumerate() {
         let is_selected = idx == selected_index;
@@ -81,10 +69,14 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
         if idx > 0 && is_group_header {
             lines.push(Line::raw(""));
             let divider_inner_w = total_width.saturating_sub(cursor_prefix_width + 2 + 2);
+            let left_pad = divider_inner_w / 2;
+            let right_pad = divider_inner_w.saturating_sub(left_pad + 1);
             let divider = format!(
-                "{}{}{}",
+                "{}{}{}{}{}",
                 g.divider_left,
-                g.divider_fill.repeat(divider_inner_w),
+                " ".repeat(left_pad),
+                g.divider_fill,
+                " ".repeat(right_pad),
                 g.divider_right,
             );
             lines.push(Line::from(vec![
@@ -97,7 +89,10 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
         let start_line = lines.len();
 
         match entry {
-            ListEntry::GroupHeader(_) => {
+            ListEntry::GroupHeader(group_id) => {
+                let is_focused_group =
+                    focused_group.as_ref().is_some_and(|fg| fg == group_id);
+
                 let (icon, icon_style) = match &entry_data.playback_state {
                     Some(PlaybackState::Playing) => (g.playing, theme.playing_icon),
                     Some(PlaybackState::Paused) => (g.paused, theme.paused_icon),
@@ -108,6 +103,12 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     theme.speaker_cursor
                 } else {
                     theme.group_header
+                };
+
+                let leader_style = if is_focused_group {
+                    theme.accent_secondary
+                } else {
+                    theme.leader
                 };
 
                 let cursor_str = if is_selected { g.cursor } else { " " };
@@ -140,17 +141,17 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
 
                     spans.push(Span::styled(
                         std::iter::repeat_n(g.leader_char, leaders_before).collect::<String>(),
-                        theme.leader,
+                        leader_style,
                     ));
                     spans.push(Span::styled(format!(" {track_text} "), theme.track_info));
                     spans.push(Span::styled(
                         std::iter::repeat_n(g.leader_char, leaders_after).collect::<String>(),
-                        theme.leader,
+                        leader_style,
                     ));
                 } else {
                     spans.push(Span::styled(
                         std::iter::repeat_n(g.leader_char, available).collect::<String>(),
-                        theme.leader,
+                        leader_style,
                     ));
                 }
 
@@ -261,10 +262,14 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                 // Divider before "Create new group"
                 lines.push(Line::raw(""));
                 let divider_inner_w = total_width.saturating_sub(cursor_prefix_width + 2 + 2);
+                let left_pad = divider_inner_w / 2;
+                let right_pad = divider_inner_w.saturating_sub(left_pad + 1);
                 let divider = format!(
-                    "{}{}{}",
+                    "{}{}{}{}{}",
                     g.divider_left,
-                    g.divider_fill.repeat(divider_inner_w),
+                    " ".repeat(left_pad),
+                    g.divider_fill,
+                    " ".repeat(right_pad),
                     g.divider_right,
                 );
                 lines.push(Line::from(vec![
@@ -297,16 +302,6 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                 entry_visual_heights.push(lines.len() - start_line);
             }
         }
-    }
-
-    if let Some(ref msg) = data.status_message {
-        lines.push(Line::raw(""));
-        let style = if msg.starts_with("error:") {
-            theme.error
-        } else {
-            theme.accent
-        };
-        lines.push(Line::from(vec![Span::styled(format!(" {msg}"), style)]));
     }
 
     let scroll_offset = if viewport_height == 0 || entry_visual_starts.is_empty() {
@@ -364,13 +359,13 @@ fn append_volume_spans(
 
     if is_selected {
         // Right-align the volume bar
-        let vol_display_width = bar_width as usize;
+        let vol_line =
+            volume_bar::render_volume_bar(vol, bar_width, theme.volume_filled, theme.volume_empty);
+        let vol_display_width: usize = vol_line.spans.iter().map(|s| s.content.chars().count()).sum();
         let pad = total_width.saturating_sub(content_width + vol_display_width);
         if pad > 0 {
             spans.push(Span::raw(" ".repeat(pad)));
         }
-        let vol_line =
-            volume_bar::render_volume_bar(vol, bar_width, theme.volume_filled, theme.volume_empty);
         spans.extend(vol_line.spans);
     } else {
         // Right-align the volume percentage

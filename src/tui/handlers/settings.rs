@@ -3,7 +3,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::config::AlbumArtMode;
-use crate::tui::app::App;
+use crate::tui::app::{App, Toast};
 use crate::tui::theme::Theme;
 use crate::tui::types::SettingsAction;
 
@@ -167,12 +167,12 @@ fn apply_setting(app: &mut App, row: usize, value: &str) {
                 "off" => AlbumArtMode::Off,
                 _ => AlbumArtMode::Image,
             };
-            app.status_message = Some("Album art change takes effect on restart".to_string());
+            app.toast = Some(Toast::info("Album art change takes effect on restart".to_string()));
         }
         _ => {}
     }
 
     if let Err(e) = app.config.save() {
-        app.status_message = Some(format!("error: failed to save config: {e}"));
+        app.toast = Some(Toast::error(format!("failed to save config: {e}")));
     }
 }

@@ -54,6 +54,9 @@ pub struct Glyphs {
     // Progress bar cursor
     pub progress_cursor: &'static str,
 
+    // Toast notification
+    pub toast_prefix: &'static str,
+
     // Album art placeholder
     pub music_note: &'static str,
 }
@@ -95,6 +98,8 @@ impl Glyphs {
 
             progress_cursor: "\u{25cf}", // ●
 
+            toast_prefix: "\u{25cf}", // ●
+
             music_note: "\u{266a}", // ♪
         }
     }
@@ -110,7 +115,6 @@ pub struct Theme {
 
     // Track info
     pub track_info: Style,
-    pub bottom_bar_border: Style,
     pub bottom_bar_controls: Style,
 
     // Playback state icons
@@ -139,6 +143,7 @@ pub struct Theme {
 
     // General
     pub accent: Style,
+    pub accent_secondary: Style,
     pub error: Style,
 
     // UI characters
@@ -163,7 +168,6 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             track_info: Style::new().fg(Color::Gray),
-            bottom_bar_border: Style::new().fg(Color::DarkGray),
             bottom_bar_controls: Style::new().fg(Color::White),
 
             playing_icon: Style::new().fg(Color::Green),
@@ -186,6 +190,7 @@ impl Theme {
             picked_up: Style::new().bg(Color::DarkGray),
 
             accent: Style::new().fg(Color::Cyan),
+            accent_secondary: Style::new().fg(Color::Blue),
             error: Style::new().fg(Color::Red),
 
             glyphs: Glyphs::default_glyphs(),
@@ -199,7 +204,6 @@ impl Theme {
             muted: Style::new().fg(Color::Gray),
 
             track_info: Style::new().fg(Color::DarkGray),
-            bottom_bar_border: Style::new().fg(Color::Gray),
             bottom_bar_controls: Style::new().fg(Color::Black),
 
             playing_icon: Style::new().fg(Color::Green),
@@ -224,6 +228,7 @@ impl Theme {
             picked_up: Style::new().bg(Color::DarkGray),
 
             accent: Style::new().fg(Color::Blue),
+            accent_secondary: Style::new().fg(Color::DarkGray),
             error: Style::new().fg(Color::Red),
 
             glyphs: Glyphs::default_glyphs(),
@@ -237,7 +242,6 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             track_info: Style::new().fg(Color::LightMagenta),
-            bottom_bar_border: Style::new().fg(Color::DarkGray),
             bottom_bar_controls: Style::new().fg(Color::Cyan),
 
             playing_icon: Style::new().fg(Color::Green),
@@ -262,6 +266,7 @@ impl Theme {
             picked_up: Style::new().bg(Color::DarkGray),
 
             accent: Style::new().fg(Color::Cyan),
+            accent_secondary: Style::new().fg(Color::Blue),
             error: Style::new().fg(Color::LightRed),
 
             glyphs: Glyphs::default_glyphs(),
@@ -276,7 +281,6 @@ impl Theme {
             muted: Style::new().fg(Color::DarkGray),
 
             track_info: Style::new().fg(Color::Gray),
-            bottom_bar_border: Style::new().fg(Color::DarkGray),
             bottom_bar_controls: Style::new().fg(Color::White),
 
             playing_icon: Style::new().fg(orange),
@@ -301,6 +305,7 @@ impl Theme {
             picked_up: Style::new().bg(Color::DarkGray),
 
             accent: Style::new().fg(orange),
+            accent_secondary: Style::new().fg(Color::Yellow),
             error: Style::new().fg(Color::Red),
 
             glyphs: Glyphs::default_glyphs(),

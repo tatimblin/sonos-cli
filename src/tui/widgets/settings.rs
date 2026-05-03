@@ -77,17 +77,6 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SettingsData, theme: &Theme)
         }
     }
 
-    // Status message
-    if let Some(ref msg) = data.status_message {
-        lines.push(Line::raw(""));
-        let style = if msg.starts_with("error:") {
-            theme.error
-        } else {
-            theme.accent
-        };
-        lines.push(Line::from(vec![Span::styled(format!("  {msg}"), style)]));
-    }
-
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, area);
 }

@@ -27,7 +27,7 @@
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 
-use sonos_sdk::property::{GroupPropertyHandle, PropertyHandle};
+use sonos_sdk::property::{GroupFetchable, GroupPropertyHandle, PropertyHandle};
 use sonos_state::property::SonosProperty;
 
 use crate::tui::app::App;
@@ -257,6 +257,7 @@ impl Hooks {
     /// Subscribe to an SDK group property, returning the current value.
     ///
     /// Same as `use_watch` but for group-scoped properties (e.g., group volume).
+    #[allow(dead_code)]
     pub fn use_watch_group<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>
     where
         P: SonosProperty + Clone + 'static,
@@ -273,6 +274,33 @@ impl Hooks {
             Err(e) => {
                 tracing::warn!(
                     "use_watch_group failed for {}: {e}, falling back to get()",
+                    P::KEY
+                );
+                prop.get()
+            }
+        }
+    }
+
+    /// Subscribe to a fetchable group property, fetching on first access if empty.
+    ///
+    /// Like `use_watch_group` but performs a one-time fetch when the cache has
+    /// no value yet, so the UI doesn't show a blank until the first UPnP event.
+    pub fn use_watch_group_or_fetch<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>
+    where
+        P: SonosProperty + GroupFetchable + Clone + 'static,
+    {
+        let key = format!("group:{}:{}", prop.group_id(), P::KEY);
+        self.accessed_watches.insert(key.clone());
+
+        match prop.watch_or_fetch() {
+            Ok(wh) => {
+                let val = wh.value().cloned();
+                self.watches.insert(key, Box::new(wh));
+                val
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "use_watch_group_or_fetch failed for {}: {e}, falling back to get()",
                     P::KEY
                 );
                 prop.get()

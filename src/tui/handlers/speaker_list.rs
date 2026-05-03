@@ -3,7 +3,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::tui::app::App;
+use crate::tui::app::{App, Toast};
 use crate::tui::types::{build_list_entries, group_for_entry, ListEntry, PickUpState, SpeakerListAction};
 
 /// Handle a key event for the speaker list. Returns an action for the caller.
@@ -40,23 +40,10 @@ fn prev_entry(from: usize) -> Option<usize> {
 }
 
 /// Find the next selectable action row (AddToGroupRow where !is_home, or CreateNewGroupRow).
-fn next_action_row(app: &App, entries: &[ListEntry], from: usize) -> Option<usize> {
-    let original_group_id = app
-        .navigation
-        .speakers_state
-        .pick_up
-        .as_ref()
-        .and_then(|pu| pu.original_group_id.as_ref());
-
+fn next_action_row(entries: &[ListEntry], from: usize) -> Option<usize> {
     for i in (from + 1)..entries.len() {
         match &entries[i] {
-            ListEntry::AddToGroupRow(gid) => {
-                let is_home = original_group_id.is_some_and(|og| og == gid);
-                if !is_home {
-                    return Some(i);
-                }
-            }
-            ListEntry::CreateNewGroupRow => return Some(i),
+            ListEntry::AddToGroupRow(_) | ListEntry::CreateNewGroupRow => return Some(i),
             _ => {}
         }
     }
@@ -64,23 +51,10 @@ fn next_action_row(app: &App, entries: &[ListEntry], from: usize) -> Option<usiz
 }
 
 /// Find the previous selectable action row.
-fn prev_action_row(app: &App, entries: &[ListEntry], from: usize) -> Option<usize> {
-    let original_group_id = app
-        .navigation
-        .speakers_state
-        .pick_up
-        .as_ref()
-        .and_then(|pu| pu.original_group_id.as_ref());
-
+fn prev_action_row(entries: &[ListEntry], from: usize) -> Option<usize> {
     for i in (0..from).rev() {
         match &entries[i] {
-            ListEntry::AddToGroupRow(gid) => {
-                let is_home = original_group_id.is_some_and(|og| og == gid);
-                if !is_home {
-                    return Some(i);
-                }
-            }
-            ListEntry::CreateNewGroupRow => return Some(i),
+            ListEntry::AddToGroupRow(_) | ListEntry::CreateNewGroupRow => return Some(i),
             _ => {}
         }
     }
@@ -88,7 +62,7 @@ fn prev_action_row(app: &App, entries: &[ListEntry], from: usize) -> Option<usiz
 }
 
 /// Find the first selectable action row in the list.
-fn first_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
+fn home_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
     let original_group_id = app
         .navigation
         .speakers_state
@@ -97,15 +71,10 @@ fn first_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
         .and_then(|pu| pu.original_group_id.as_ref());
 
     for (i, entry) in entries.iter().enumerate() {
-        match entry {
-            ListEntry::AddToGroupRow(gid) => {
-                let is_home = original_group_id.is_some_and(|og| og == gid);
-                if !is_home {
-                    return Some(i);
-                }
+        if let ListEntry::AddToGroupRow(gid) = entry {
+            if original_group_id.is_some_and(|og| og == gid) {
+                return Some(i);
             }
-            ListEntry::CreateNewGroupRow => return Some(i),
-            _ => {}
         }
     }
     None
@@ -155,16 +124,16 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
                     .map(|s| s.name.clone())
                     .unwrap_or_else(|| "Speaker".to_string());
 
+                app.toast = Some(Toast::info(format!("Picked up: {speaker_name}")));
                 app.navigation.speakers_state.pick_up = Some(PickUpState {
                     speaker_id: speaker_id.clone(),
-                    speaker_name,
                     original_group_id: original_group,
                 });
 
                 // Rebuild entries with pickup active to find the first action row
                 let pickup_entries =
                     build_list_entries(&app.system, app.navigation.speakers_state.pick_up.as_ref());
-                if let Some(first) = first_action_row(app, &pickup_entries) {
+                if let Some(first) = home_action_row(app, &pickup_entries) {
                     app.navigation.speakers_state.selected_index = first;
                 }
             }
@@ -194,14 +163,14 @@ fn handle_volume_adjust(app: &mut App, entries: &[ListEntry], selected: usize, d
         ListEntry::GroupHeader(group_id) => {
             if let Some(group) = app.system.group_by_id(group_id) {
                 if let Err(e) = group.set_relative_volume(delta as i16) {
-                    app.status_message = Some(format!("error: {e}"));
+                    app.toast = Some(Toast::error(format!("{e}")));
                 }
             }
         }
         ListEntry::SpeakerRow(speaker_id) => {
             if let Some(speaker) = app.system.speaker_by_id(speaker_id) {
                 if let Err(e) = speaker.set_relative_volume(delta) {
-                    app.status_message = Some(format!("error: {e}"));
+                    app.toast = Some(Toast::error(format!("{e}")));
                 }
             }
         }
@@ -257,7 +226,7 @@ fn handle_play_pause(app: &mut App, entries: &[ListEntry], selected: usize) {
     };
 
     if let Err(e) = result {
-        app.status_message = Some(format!("error: {e}"));
+        app.toast = Some(Toast::error(format!("{e}")));
     }
 }
 
@@ -277,7 +246,7 @@ fn handle_playback_action(
     };
 
     if let Err(e) = result {
-        app.status_message = Some(format!("error: {e}"));
+        app.toast = Some(Toast::error(format!("{e}")));
     }
 }
 
@@ -303,13 +272,13 @@ fn handle_pick_up_key(
 
     match key.code {
         KeyCode::Up => {
-            if let Some(prev) = prev_action_row(app, entries, selected) {
+            if let Some(prev) = prev_action_row(entries, selected) {
                 app.navigation.speakers_state.selected_index = prev;
             }
             SpeakerListAction::Handled
         }
         KeyCode::Down => {
-            if let Some(next) = next_action_row(app, entries, selected) {
+            if let Some(next) = next_action_row(entries, selected) {
                 app.navigation.speakers_state.selected_index = next;
             }
             SpeakerListAction::Handled
@@ -335,16 +304,16 @@ fn handle_pick_up_key(
                                         .coordinator()
                                         .map(|c| c.name.clone())
                                         .unwrap_or_else(|| "group".to_string());
-                                    app.status_message =
-                                        Some(format!("{} moved to {}", speaker.name, group_name));
+                                    app.toast =
+                                        Some(Toast::info(format!("{} moved to {}", speaker.name, group_name)));
                                 }
                                 Err(e) => {
-                                    app.status_message = Some(format!("error: {e}"));
+                                    app.toast = Some(Toast::error(format!("{e}")));
                                 }
                             }
                         } else {
-                            app.status_message =
-                                Some("error: target group no longer exists".to_string());
+                            app.toast =
+                                Some(Toast::error("target group no longer exists".to_string()));
                         }
                     }
                 }
@@ -352,11 +321,11 @@ fn handle_pick_up_key(
                     if let Some(speaker) = app.system.speaker_by_id(&pick_up.speaker_id) {
                         match speaker.leave_group() {
                             Ok(_) => {
-                                app.status_message =
-                                    Some(format!("{} is now standalone", speaker.name));
+                                app.toast =
+                                    Some(Toast::info(format!("{} is now standalone", speaker.name)));
                             }
                             Err(e) => {
-                                app.status_message = Some(format!("error: {e}"));
+                                app.toast = Some(Toast::error(format!("{e}")));
                             }
                         }
                     }

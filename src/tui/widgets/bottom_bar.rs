@@ -55,8 +55,7 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
         frame,
         art_area,
         data.album_art_protocol.as_mut(),
-        theme.bottom_bar_border,
-        theme.muted,
+        theme.picked_up,
         theme.glyphs.music_note,
     );
 
@@ -151,12 +150,12 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
     );
 
     let vol_width = right_w.min(20);
-    let vol_line = volume_bar::render_volume_bar(
-        data.volume,
-        vol_width,
-        theme.volume_filled,
-        theme.volume_empty,
-    );
+    let vol_filled = if data.group_volume_active {
+        theme.volume_filled
+    } else {
+        theme.muted
+    };
+    let vol_line = volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
     let vol_pad = right_w.saturating_sub(vol_width);
     let mut vol_spans = vec![Span::raw(" ".repeat(vol_pad as usize))];
     vol_spans.extend(vol_line.spans);
@@ -182,8 +181,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
         frame,
         art_area,
         data.album_art_protocol.as_mut(),
-        theme.bottom_bar_border,
-        theme.muted,
+        theme.picked_up,
         theme.glyphs.music_note,
     );
 
@@ -219,12 +217,12 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
     let artist_chars = artist_display.chars().count() as u16;
     let pad = text_w.saturating_sub(artist_chars + vol_width);
 
-    let vol_line = volume_bar::render_volume_bar(
-        data.volume,
-        vol_width,
-        theme.volume_filled,
-        theme.volume_empty,
-    );
+    let vol_filled = if data.group_volume_active {
+        theme.volume_filled
+    } else {
+        theme.muted
+    };
+    let vol_line = volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
 
     let mut row1_spans = vec![
         Span::styled(artist_display, theme.muted),

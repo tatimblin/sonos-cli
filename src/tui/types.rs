@@ -18,7 +18,6 @@ pub enum ListEntry {
 #[derive(Clone, Debug)]
 pub struct PickUpState {
     pub speaker_id: SpeakerId,
-    pub speaker_name: String,
     pub original_group_id: Option<GroupId>,
 }
 
@@ -107,6 +106,9 @@ pub struct BottomBarData {
     pub duration_ms: u64,
     pub volume: u16,
     pub is_wide: bool,
+    /// True when the selected entry is a group header (volume bar shows accent).
+    /// False for speaker rows (volume bar shows dimmed).
+    pub group_volume_active: bool,
 }
 
 /// Pre-computed render data for the speaker list widget.
@@ -114,9 +116,6 @@ pub struct SpeakerListData {
     pub entries: Vec<ListEntry>,
     pub entry_data: Vec<EntryRenderData>,
     pub selected_index: usize,
-    pub status_message: Option<String>,
-    /// Name of the picked-up speaker (enables status line and reverse highlight).
-    pub picked_up_speaker_name: Option<String>,
     /// ID of the picked-up speaker (for reverse-highlight matching).
     pub picked_up_speaker_id: Option<SpeakerId>,
 }
@@ -154,5 +153,4 @@ pub struct SettingsData {
     pub selected_row: usize,
     pub dropdown_open: bool,
     pub dropdown_index: usize,
-    pub status_message: Option<String>,
 }

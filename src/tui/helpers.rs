@@ -3,13 +3,8 @@
 use sonos_state::CurrentTrack;
 
 pub fn uri_source_label(uri: &str) -> &str {
-    if uri.starts_with("x-rincon:") {
-        ""
-    } else if uri.is_empty() {
-        "Unknown"
-    } else {
-        "Playing (no metadata)"
-    }
+    let _ = uri;
+    ""
 }
 
 /// Extract track title and artist as a "title — artist" string.
@@ -18,17 +13,20 @@ pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
     track
         .as_ref()
         .filter(|t| !t.is_empty())
-        .map(|t| match (&t.title, &t.artist) {
-            (Some(title), Some(artist)) => format!("{title} \u{2014} {artist}"),
-            (Some(title), None) => title.clone(),
-            (None, Some(artist)) => artist.clone(),
+        .and_then(|t| {
+            let title = t.title.as_deref().filter(|s| !s.trim().is_empty());
+            let artist = t.artist.as_deref().filter(|s| !s.trim().is_empty());
+            match (title, artist) {
+            (Some(title), Some(artist)) => Some(format!("{title} \u{2014} {artist}")),
+            (Some(title), None) => Some(title.to_string()),
+            (None, Some(artist)) => Some(artist.to_string()),
             (None, None) => t
                 .uri
                 .as_deref()
                 .map(uri_source_label)
                 .filter(|s| !s.is_empty())
-                .unwrap_or("Unknown")
-                .to_string(),
+                .map(String::from),
+            }
         })
 }
 
@@ -43,23 +41,17 @@ mod tests {
 
     #[test]
     fn test_uri_source_label_empty() {
-        assert_eq!(uri_source_label(""), "Unknown");
+        assert_eq!(uri_source_label(""), "");
     }
 
     #[test]
     fn test_uri_source_label_spotify() {
-        assert_eq!(
-            uri_source_label("x-sonos-spotify:spotify:track:abc"),
-            "Playing (no metadata)"
-        );
+        assert_eq!(uri_source_label("x-sonos-spotify:spotify:track:abc"), "");
     }
 
     #[test]
     fn test_uri_source_label_http() {
-        assert_eq!(
-            uri_source_label("http://stream.example.com/radio"),
-            "Playing (no metadata)"
-        );
+        assert_eq!(uri_source_label("http://stream.example.com/radio"), "");
     }
 
     #[test]
@@ -95,11 +87,11 @@ mod tests {
             album_art_uri: None,
             uri: Some("x-sonos-vli:abc".into()),
         });
-        assert_eq!(track_summary(&track), Some("Playing (no metadata)".into()));
+        assert_eq!(track_summary(&track), None);
     }
 
     #[test]
-    fn test_track_summary_rincon_uri_shows_unknown() {
+    fn test_track_summary_rincon_uri_returns_none() {
         let track = Some(CurrentTrack {
             title: None,
             artist: None,
@@ -107,7 +99,7 @@ mod tests {
             album_art_uri: None,
             uri: Some("x-rincon:RINCON_123".into()),
         });
-        assert_eq!(track_summary(&track), Some("Unknown".into()));
+        assert_eq!(track_summary(&track), None);
     }
 
     #[test]

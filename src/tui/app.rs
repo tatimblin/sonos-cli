@@ -1,6 +1,7 @@
 //! TUI application state and navigation types.
 
 use std::cell::RefCell;
+use std::time::{Duration, Instant};
 
 use ratatui_image::picker::Picker;
 
@@ -9,6 +10,37 @@ use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
 use crate::tui::types::PickUpState;
 use sonos_sdk::SonosSystem;
+
+const TOAST_DURATION: Duration = Duration::from_secs(3);
+
+/// A temporary notification that auto-dismisses after `TOAST_DURATION`.
+pub struct Toast {
+    pub message: String,
+    pub is_error: bool,
+    created_at: Instant,
+}
+
+impl Toast {
+    pub fn info(message: String) -> Self {
+        Self {
+            message,
+            is_error: false,
+            created_at: Instant::now(),
+        }
+    }
+
+    pub fn error(message: String) -> Self {
+        Self {
+            message,
+            is_error: true,
+            created_at: Instant::now(),
+        }
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.created_at.elapsed() >= TOAST_DURATION
+    }
+}
 
 /// Top-level TUI state. Owns the SDK handle and all UI state.
 ///
@@ -21,8 +53,8 @@ pub struct App {
     #[allow(dead_code)]
     pub config: Config,
     pub theme: Theme,
-    /// Inline status message (e.g. errors from speaker actions). Cleared on next key press.
-    pub status_message: Option<String>,
+    /// Toast notification shown in the header. Auto-expires after 3 seconds.
+    pub toast: Option<Toast>,
     /// Terminal image protocol picker, detected before entering raw mode.
     /// `None` when album art is disabled or terminal detection failed.
     /// `RefCell` because `new_resize_protocol()` requires `&mut Picker`.
@@ -41,7 +73,7 @@ impl App {
             dirty: true,
             config,
             theme,
-            status_message: None,
+            toast: None,
             picker: RefCell::new(picker),
             image_loader: ImageLoader::new(),
         })
