@@ -2,6 +2,8 @@
 
 Control Sonos speakers from the command line.
 
+<img width="2660" height="1498" alt="sonos-cli" src="https://github.com/user-attachments/assets/9532c52e-604b-4c4d-8032-dbecc069bb51" />
+
 [![CI](https://github.com/tatimblin/sonos-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/tatimblin/sonos-cli/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/sonos-cli.svg)](https://crates.io/crates/sonos-cli)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -106,6 +108,13 @@ Environment variables override the config file:
 |----------|-----------|
 | `SONOS_DEFAULT_GROUP` | `default_group` |
 | `SONOS_CONFIG_DIR` | Config file location (default: `~/.config/sonos/`) |
+
+## Related Projects
+
+This CLI is built on the [sonos-sdk](https://github.com/tatimblin/sonos-sdk) which handles device discovery, event streaming, and the local SOAP API.
+
+It replaces my prior [sonos-local-controller](https://github.com/tatimblin/sonos-local-controller) which was a sonos CLI built in 2024 without event streaming in mind.
+
 
 ## License
 
