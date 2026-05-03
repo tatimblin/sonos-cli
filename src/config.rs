@@ -48,7 +48,7 @@ pub struct Config {
     /// Default group to target when --speaker/--group not specified
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_group: Option<String>,
-    /// TUI color theme: "dark", "light", "neon", or "sonos"
+    /// TUI color theme: "default", "bw", "minimal", or "dance_party"
     pub theme: String,
     /// Album art rendering mode: "image", "halfblock", or "off"
     pub album_art_mode: AlbumArtMode,
@@ -58,7 +58,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             default_group: None,
-            theme: "dark".to_string(),
+            theme: "default".to_string(),
             album_art_mode: AlbumArtMode::default(),
         }
     }

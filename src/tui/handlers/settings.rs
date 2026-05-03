@@ -8,7 +8,7 @@ use crate::tui::theme::Theme;
 use crate::tui::types::SettingsAction;
 
 /// Available theme names.
-pub(crate) const THEME_OPTIONS: &[&str] = &["dark", "light", "neon", "sonos"];
+pub(crate) const THEME_OPTIONS: &[&str] = &["default", "bw", "minimal", "dance_party"];
 
 /// Available album art mode options.
 pub(crate) const ALBUM_ART_OPTIONS: &[&str] = &["image", "halfblock", "off"];

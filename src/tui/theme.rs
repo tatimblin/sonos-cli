@@ -6,6 +6,14 @@
 
 use ratatui::style::{Color, Modifier, Style};
 
+/// Check whether two `Color` values are the same variant and value.
+pub(crate) fn colors_equal(a: Color, b: Color) -> bool {
+    match (a, b) {
+        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => r1 == r2 && g1 == g2 && b1 == b2,
+        _ => std::mem::discriminant(&a) == std::mem::discriminant(&b),
+    }
+}
+
 /// UI characters used by the TUI. Themes declare both styles and glyphs,
 /// so custom themes can swap characters alongside colors.
 #[derive(Clone, Debug)]
@@ -146,22 +154,26 @@ pub struct Theme {
     pub accent_secondary: Style,
     pub error: Style,
 
+    // Progress bar gradient (start == end means no gradient)
+    pub progress_gradient_start: Color,
+    pub progress_gradient_end: Color,
+
     // UI characters
     pub glyphs: Glyphs,
 }
 
 impl Theme {
-    /// Resolve a theme by name from config. Unknown names fall back to dark.
+    /// Resolve a theme by name from config. Unknown names fall back to default.
     pub fn from_name(name: &str) -> Self {
         match name {
-            "light" => Self::light(),
-            "neon" => Self::neon(),
-            "sonos" => Self::sonos(),
-            _ => Self::dark(),
+            "bw" => Self::bw(),
+            "minimal" => Self::minimal(),
+            "dance_party" => Self::dance_party(),
+            _ => Self::default_theme(),
         }
     }
 
-    pub fn dark() -> Self {
+    pub fn default_theme() -> Self {
         Self {
             header: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             legend: Style::new().fg(Color::DarkGray),
@@ -177,7 +189,7 @@ impl Theme {
             volume_filled: Style::new().fg(Color::Cyan),
             volume_empty: Style::new().fg(Color::DarkGray),
 
-            progress_filled: Style::new().fg(Color::White),
+            progress_filled: Style::new().fg(Color::Gray),
             progress_empty: Style::new().fg(Color::DarkGray),
             progress_cursor: Style::new().fg(Color::White),
             progress_time: Style::new().fg(Color::DarkGray),
@@ -193,88 +205,14 @@ impl Theme {
             accent_secondary: Style::new().fg(Color::Blue),
             error: Style::new().fg(Color::Red),
 
-            glyphs: Glyphs::default_glyphs(),
-        }
-    }
-
-    pub fn light() -> Self {
-        Self {
-            header: Style::new().fg(Color::Black).add_modifier(Modifier::BOLD),
-            legend: Style::new().fg(Color::Gray),
-            muted: Style::new().fg(Color::Gray),
-
-            track_info: Style::new().fg(Color::DarkGray),
-            bottom_bar_controls: Style::new().fg(Color::Black),
-
-            playing_icon: Style::new().fg(Color::Green),
-            paused_icon: Style::new().fg(Color::Yellow),
-            stopped_icon: Style::new().fg(Color::Gray),
-
-            volume_filled: Style::new().fg(Color::Blue),
-            volume_empty: Style::new().fg(Color::Gray),
-
-            progress_filled: Style::new().fg(Color::Black),
-            progress_empty: Style::new().fg(Color::Gray),
-            progress_cursor: Style::new().fg(Color::Black),
-            progress_time: Style::new().fg(Color::Gray),
-
-            group_header: Style::new()
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            speaker_cursor: Style::new().fg(Color::Blue),
-            speaker_name: Style::new().fg(Color::DarkGray),
-            leader: Style::new().fg(Color::Gray),
-
-            picked_up: Style::new().bg(Color::DarkGray),
-
-            accent: Style::new().fg(Color::Blue),
-            accent_secondary: Style::new().fg(Color::DarkGray),
-            error: Style::new().fg(Color::Red),
+            progress_gradient_start: Color::Gray,
+            progress_gradient_end: Color::Gray,
 
             glyphs: Glyphs::default_glyphs(),
         }
     }
 
-    pub fn neon() -> Self {
-        Self {
-            header: Style::new().fg(Color::Magenta).add_modifier(Modifier::BOLD),
-            legend: Style::new().fg(Color::DarkGray),
-            muted: Style::new().fg(Color::DarkGray),
-
-            track_info: Style::new().fg(Color::LightMagenta),
-            bottom_bar_controls: Style::new().fg(Color::Cyan),
-
-            playing_icon: Style::new().fg(Color::Green),
-            paused_icon: Style::new().fg(Color::Yellow),
-            stopped_icon: Style::new().fg(Color::DarkGray),
-
-            volume_filled: Style::new().fg(Color::Magenta),
-            volume_empty: Style::new().fg(Color::DarkGray),
-
-            progress_filled: Style::new().fg(Color::Cyan),
-            progress_empty: Style::new().fg(Color::DarkGray),
-            progress_cursor: Style::new().fg(Color::Cyan),
-            progress_time: Style::new().fg(Color::DarkGray),
-
-            group_header: Style::new()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            speaker_cursor: Style::new().fg(Color::Cyan),
-            speaker_name: Style::new().fg(Color::LightMagenta),
-            leader: Style::new().fg(Color::DarkGray),
-
-            picked_up: Style::new().bg(Color::DarkGray),
-
-            accent: Style::new().fg(Color::Cyan),
-            accent_secondary: Style::new().fg(Color::Blue),
-            error: Style::new().fg(Color::LightRed),
-
-            glyphs: Glyphs::default_glyphs(),
-        }
-    }
-
-    pub fn sonos() -> Self {
-        let orange = Color::Rgb(255, 120, 0);
+    pub fn bw() -> Self {
         Self {
             header: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             legend: Style::new().fg(Color::DarkGray),
@@ -283,32 +221,153 @@ impl Theme {
             track_info: Style::new().fg(Color::Gray),
             bottom_bar_controls: Style::new().fg(Color::White),
 
-            playing_icon: Style::new().fg(orange),
-            paused_icon: Style::new().fg(Color::Yellow),
+            playing_icon: Style::new()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+            paused_icon: Style::new().fg(Color::Gray),
             stopped_icon: Style::new().fg(Color::DarkGray),
 
-            volume_filled: Style::new().fg(orange),
+            volume_filled: Style::new().fg(Color::White),
             volume_empty: Style::new().fg(Color::DarkGray),
 
             progress_filled: Style::new().fg(Color::White),
             progress_empty: Style::new().fg(Color::DarkGray),
-            progress_cursor: Style::new().fg(orange),
+            progress_cursor: Style::new()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
             progress_time: Style::new().fg(Color::DarkGray),
 
             group_header: Style::new()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            speaker_cursor: Style::new().fg(orange),
+            speaker_cursor: Style::new()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
             speaker_name: Style::new().fg(Color::Gray),
             leader: Style::new().fg(Color::DarkGray),
 
             picked_up: Style::new().bg(Color::DarkGray),
 
-            accent: Style::new().fg(orange),
-            accent_secondary: Style::new().fg(Color::Yellow),
-            error: Style::new().fg(Color::Red),
+            accent: Style::new().fg(Color::White),
+            accent_secondary: Style::new().fg(Color::Gray),
+            error: Style::new()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+
+            progress_gradient_start: Color::White,
+            progress_gradient_end: Color::White,
 
             glyphs: Glyphs::default_glyphs(),
+        }
+    }
+
+    pub fn minimal() -> Self {
+        Self {
+            header: Style::new().fg(Color::Gray),
+            legend: Style::new().fg(Color::DarkGray),
+            muted: Style::new().fg(Color::DarkGray),
+
+            track_info: Style::new().fg(Color::DarkGray),
+            bottom_bar_controls: Style::new().fg(Color::Gray),
+
+            playing_icon: Style::new().fg(Color::Green),
+            paused_icon: Style::new().fg(Color::Yellow),
+            stopped_icon: Style::new().fg(Color::DarkGray),
+
+            volume_filled: Style::new().fg(Color::Gray),
+            volume_empty: Style::new().fg(Color::DarkGray),
+
+            progress_filled: Style::new().fg(Color::DarkGray),
+            progress_empty: Style::new().fg(Color::DarkGray),
+            progress_cursor: Style::new().fg(Color::Gray),
+            progress_time: Style::new().fg(Color::DarkGray),
+
+            group_header: Style::new()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+            speaker_cursor: Style::new().fg(Color::Gray),
+            speaker_name: Style::new().fg(Color::DarkGray),
+            leader: Style::new().fg(Color::DarkGray),
+
+            picked_up: Style::new().bg(Color::DarkGray),
+
+            accent: Style::new().fg(Color::Gray),
+            accent_secondary: Style::new().fg(Color::DarkGray),
+            error: Style::new().fg(Color::Red),
+
+            progress_gradient_start: Color::DarkGray,
+            progress_gradient_end: Color::DarkGray,
+
+            glyphs: Glyphs {
+                connector_branch: "   ",
+                connector_last: "   ",
+                leader_char: ' ',
+                divider_left: "",
+                divider_fill: " ",
+                divider_right: "",
+                model_separator: "  ",
+                cursor: "\u{203a}",              // ›
+                progress_cursor: "\u{2022}",     // •
+                logo: "sonos",
+                tab_active_left: "",
+                tab_active_right: "",
+                tab_active_indicator: "",
+                ..Glyphs::default_glyphs()
+            },
+        }
+    }
+
+    pub fn dance_party() -> Self {
+        let hot_pink = Color::Rgb(255, 100, 255);
+        Self {
+            header: Style::new().fg(hot_pink).add_modifier(Modifier::BOLD),
+            legend: Style::new().fg(Color::Rgb(100, 100, 180)),
+            muted: Style::new().fg(Color::Rgb(90, 70, 120)),
+
+            track_info: Style::new().fg(Color::Rgb(255, 200, 100)),
+            bottom_bar_controls: Style::new().fg(Color::Rgb(100, 255, 255)),
+
+            playing_icon: Style::new().fg(Color::Rgb(50, 255, 50)),
+            paused_icon: Style::new().fg(Color::Rgb(255, 255, 50)),
+            stopped_icon: Style::new().fg(Color::Rgb(120, 50, 150)),
+
+            volume_filled: Style::new().fg(Color::Rgb(255, 50, 150)),
+            volume_empty: Style::new().fg(Color::Rgb(60, 30, 80)),
+
+            progress_filled: Style::new().fg(Color::Rgb(255, 50, 150)),
+            progress_empty: Style::new().fg(Color::Rgb(40, 20, 60)),
+            progress_cursor: Style::new().fg(Color::Rgb(255, 255, 100)),
+            progress_time: Style::new().fg(Color::Rgb(100, 100, 180)),
+
+            group_header: Style::new()
+                .fg(Color::Rgb(255, 150, 50))
+                .add_modifier(Modifier::BOLD),
+            speaker_cursor: Style::new().fg(hot_pink),
+            speaker_name: Style::new().fg(Color::Rgb(200, 150, 255)),
+            leader: Style::new().fg(Color::Rgb(60, 30, 80)),
+
+            picked_up: Style::new().bg(Color::Rgb(80, 30, 100)),
+
+            accent: Style::new().fg(hot_pink),
+            accent_secondary: Style::new().fg(Color::Rgb(100, 255, 200)),
+            error: Style::new().fg(Color::Rgb(255, 80, 80)),
+
+            progress_gradient_start: Color::Rgb(255, 50, 150),
+            progress_gradient_end: Color::Rgb(50, 200, 255),
+
+            glyphs: Glyphs {
+                playing: "\u{266b}",             // ♫
+                paused: "\u{1f4a4}",             // 💤
+                stopped: "\u{2716}",             // ✖
+                cursor: "\u{2605}",              // ★
+                music_note: "\u{266b}",          // ♫
+                logo: "\u{2605} D A N C E  P A R T Y \u{2605}",
+                progress_cursor: "\u{25c6}",     // ◆
+                toast_prefix: "\u{2605}",        // ★
+                control_prev: "\u{25c4}\u{25c4}", // ◄◄
+                control_next: "\u{25ba}\u{25ba}", // ►►
+                ..Glyphs::default_glyphs()
+            },
         }
     }
 }
@@ -318,32 +377,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn from_name_unknown_falls_back_to_dark() {
+    fn from_name_unknown_falls_back_to_default() {
         let theme = Theme::from_name("nonexistent");
-        let dark = Theme::dark();
-        assert_eq!(theme.header, dark.header);
-        assert_eq!(theme.legend, dark.legend);
-        assert_eq!(theme.muted, dark.muted);
-    }
-
-    #[test]
-    fn from_name_dark_returns_dark() {
-        let theme = Theme::from_name("dark");
-        let dark = Theme::dark();
-        assert_eq!(theme.header, dark.header);
+        let default = Theme::default_theme();
+        assert_eq!(theme.header, default.header);
     }
 
     #[test]
     fn from_name_resolves_all_themes() {
-        let _ = Theme::from_name("light");
-        let _ = Theme::from_name("neon");
-        let _ = Theme::from_name("sonos");
+        let _ = Theme::from_name("default");
+        let _ = Theme::from_name("bw");
+        let _ = Theme::from_name("minimal");
+        let _ = Theme::from_name("dance_party");
     }
 
     #[test]
-    fn glyphs_are_populated() {
-        let theme = Theme::dark();
-        assert_eq!(theme.glyphs.playing, "\u{25b6}");
-        assert_eq!(theme.glyphs.connector_last, "\u{2514}\u{2500} ");
+    fn colors_equal_same_rgb() {
+        assert!(colors_equal(Color::Rgb(1, 2, 3), Color::Rgb(1, 2, 3)));
+    }
+
+    #[test]
+    fn colors_equal_different_rgb() {
+        assert!(!colors_equal(Color::Rgb(1, 2, 3), Color::Rgb(4, 5, 6)));
+    }
+
+    #[test]
+    fn colors_equal_named() {
+        assert!(colors_equal(Color::White, Color::White));
+        assert!(!colors_equal(Color::White, Color::Cyan));
     }
 }

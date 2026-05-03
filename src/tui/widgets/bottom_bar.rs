@@ -125,6 +125,8 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
         theme.progress_filled,
         theme.progress_cursor,
         theme.progress_empty,
+        theme.progress_gradient_start,
+        theme.progress_gradient_end,
     );
 
     let mut progress_spans = vec![Span::styled(format!("{pos_str} "), theme.progress_time)];
@@ -256,6 +258,8 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
             theme.progress_filled,
             theme.progress_cursor,
             theme.progress_empty,
+            theme.progress_gradient_start,
+            theme.progress_gradient_end,
         );
 
         let mut row2_spans = vec![
@@ -359,7 +363,7 @@ mod tests {
 
     #[test]
     fn playback_icon_playing() {
-        let theme = Theme::dark();
+        let theme = Theme::default_theme();
         assert_eq!(
             playback_icon(Some(&PlaybackState::Playing), &theme),
             theme.glyphs.playing
@@ -368,7 +372,7 @@ mod tests {
 
     #[test]
     fn playback_icon_paused() {
-        let theme = Theme::dark();
+        let theme = Theme::default_theme();
         assert_eq!(
             playback_icon(Some(&PlaybackState::Paused), &theme),
             theme.glyphs.paused
@@ -377,13 +381,13 @@ mod tests {
 
     #[test]
     fn playback_icon_none() {
-        let theme = Theme::dark();
+        let theme = Theme::default_theme();
         assert_eq!(playback_icon(None, &theme), theme.glyphs.stopped);
     }
 
     #[test]
     fn build_controls_str_includes_icons() {
-        let theme = Theme::dark();
+        let theme = Theme::default_theme();
         let controls = build_controls_str(Some(&PlaybackState::Playing), &theme);
         assert!(controls.contains(theme.glyphs.control_prev));
         assert!(controls.contains(theme.glyphs.control_next));
