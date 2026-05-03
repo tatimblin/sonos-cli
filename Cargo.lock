@@ -780,7 +780,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1715,7 +1715,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2359,7 +2359,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2650,7 +2650,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-api"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "paste",
  "quick-xml",
@@ -2689,7 +2689,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "dirs",
  "serde",
@@ -2704,7 +2704,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-callback-server"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2720,7 +2720,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-discovery"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "quick-xml",
  "reqwest",
@@ -2729,7 +2729,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-event-manager"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "dashmap",
  "parking_lot",
@@ -2743,7 +2743,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-soap-client"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "thiserror 1.0.69",
  "ureq 2.12.1",
@@ -2752,7 +2752,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "parking_lot",
  "serde",
@@ -2766,11 +2766,11 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state-store"
-version = "0.5.0"
+version = "0.5.1"
 
 [[package]]
 name = "sonos-sdk-stream"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2904,7 +2904,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
