@@ -113,7 +113,7 @@ impl Config {
     /// Otherwise returns `input` unchanged.
     pub fn resolve_alias<'a>(&'a self, input: &'a str) -> &'a str {
         for (name, alias) in &self.aliases {
-            if alias == input {
+            if alias.eq_ignore_ascii_case(input) {
                 return name;
             }
         }
@@ -188,5 +188,14 @@ mod tests {
         let config = Config::default();
         let serialized = toml::to_string_pretty(&config).unwrap();
         assert!(!serialized.contains("[aliases]"));
+    }
+
+    #[test]
+    fn resolve_alias_case_insensitive() {
+        let mut config = Config::default();
+        config.set_alias("Master Bedroom", "bed");
+        assert_eq!(config.resolve_alias("Bed"), "Master Bedroom");
+        assert_eq!(config.resolve_alias("BED"), "Master Bedroom");
+        assert_eq!(config.resolve_alias("bed"), "Master Bedroom");
     }
 }

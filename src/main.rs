@@ -3,7 +3,7 @@
 //! When run without arguments and stdout is a terminal, launches the TUI.
 //! When given a subcommand, executes the command and exits.
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use std::io::IsTerminal;
 use std::process::ExitCode;
 
@@ -92,8 +92,9 @@ fn handle_config_command(
 ) -> ExitCode {
     let result = match action {
         None => {
-            // Bare `sonos config` — show help hint
-            eprintln!("Usage: sonos config <COMMAND>\n\nCommands:\n  alias  Manage speaker/group aliases\n\nFor more information, try 'sonos config --help'");
+            let mut cmd = Cli::command();
+            let config_cmd = cmd.find_subcommand_mut("config").unwrap();
+            config_cmd.print_help().ok();
             return ExitCode::from(2);
         }
         Some(ConfigAction::Alias { name, alias }) => match (name, alias) {
