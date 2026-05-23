@@ -20,6 +20,8 @@ use cli::{run_command, Cli, Commands, ConfigAction};
 use config::Config;
 
 fn main() -> ExitCode {
+    clap_complete::env::CompleteEnv::with_factory(Cli::command).complete();
+
     let cli = Cli::parse();
     let mut config = Config::load();
 
