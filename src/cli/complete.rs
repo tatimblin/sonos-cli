@@ -28,10 +28,8 @@ pub fn group_candidates() -> Vec<CompletionCandidate> {
     }
 
     if let Ok(system) = sonos_sdk::SonosSystem::new() {
-        for grp in system.groups() {
-            if let Some(coord) = grp.coordinator() {
-                candidates.push(CompletionCandidate::new(&coord.name));
-            }
+        for spk in system.speakers() {
+            candidates.push(CompletionCandidate::new(&spk.name));
         }
     }
 
