@@ -23,13 +23,14 @@ pub fn run_command(
         Commands::Speakers => cmd_speakers(system),
         Commands::Groups => cmd_groups(system),
         Commands::Status => cmd_status(system, config, global),
-        Commands::Join => cmd_join(system, global),
-        Commands::Leave => cmd_leave(system, global),
-        Commands::Bass { level } => cmd_bass(system, global, level),
-        Commands::Treble { level } => cmd_treble(system, global, level),
-        Commands::Loudness { state } => cmd_loudness(system, global, state),
+        Commands::Join => cmd_join(system, config, global),
+        Commands::Leave => cmd_leave(system, config, global),
+        Commands::Bass { level } => cmd_bass(system, config, global, level),
+        Commands::Treble { level } => cmd_treble(system, config, global, level),
+        Commands::Loudness { state } => cmd_loudness(system, config, global, state),
         Commands::Sleep { duration } => cmd_sleep(system, config, global, &duration),
         Commands::Queue { action } => cmd_queue(system, config, global, action),
+        Commands::Config { .. } => unreachable!("config commands dispatched before discovery"),
 
         Commands::Play => {
             let s = spk()?;
@@ -269,15 +270,21 @@ fn cmd_status(
     Ok(parts.join("  "))
 }
 
-fn cmd_join(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliError> {
-    let speaker_name = global
+fn cmd_join(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+) -> Result<String, CliError> {
+    let raw_speaker = global
         .speaker
         .as_deref()
         .ok_or_else(|| CliError::Validation("--speaker is required for join".into()))?;
-    let group_name = global
+    let raw_group = global
         .group
         .as_deref()
         .ok_or_else(|| CliError::Validation("--group is required for join".into()))?;
+    let speaker_name = config.resolve_alias(raw_speaker);
+    let group_name = config.resolve_alias(raw_group);
     let spk = system
         .speaker(speaker_name)
         .ok_or_else(|| CliError::SpeakerNotFound(speaker_name.into()))?;
@@ -288,11 +295,16 @@ fn cmd_join(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliErr
     Ok(format!("{speaker_name} joined {group_name}"))
 }
 
-fn cmd_leave(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliError> {
-    let speaker_name = global
+fn cmd_leave(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+) -> Result<String, CliError> {
+    let raw_speaker = global
         .speaker
         .as_deref()
         .ok_or_else(|| CliError::Validation("--speaker is required for leave".into()))?;
+    let speaker_name = config.resolve_alias(raw_speaker);
     let spk = system
         .speaker(speaker_name)
         .ok_or_else(|| CliError::SpeakerNotFound(speaker_name.into()))?;
@@ -304,24 +316,35 @@ fn cmd_leave(system: &SonosSystem, global: &GlobalFlags) -> Result<String, CliEr
     Ok(format!("{speaker_name} left {group_name}"))
 }
 
-fn cmd_bass(system: &SonosSystem, global: &GlobalFlags, level: i8) -> Result<String, CliError> {
-    let spk = require_speaker_only(system, global, "bass")?;
+fn cmd_bass(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    level: i8,
+) -> Result<String, CliError> {
+    let spk = require_speaker_only(system, config, global, "bass")?;
     spk.set_bass(level)?;
     Ok(format!("Bass set to {} ({})", level, spk.name))
 }
 
-fn cmd_treble(system: &SonosSystem, global: &GlobalFlags, level: i8) -> Result<String, CliError> {
-    let spk = require_speaker_only(system, global, "treble")?;
+fn cmd_treble(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    level: i8,
+) -> Result<String, CliError> {
+    let spk = require_speaker_only(system, config, global, "treble")?;
     spk.set_treble(level)?;
     Ok(format!("Treble set to {} ({})", level, spk.name))
 }
 
 fn cmd_loudness(
     system: &SonosSystem,
+    config: &Config,
     global: &GlobalFlags,
     state: OnOff,
 ) -> Result<String, CliError> {
-    let spk = require_speaker_only(system, global, "loudness")?;
+    let spk = require_speaker_only(system, config, global, "loudness")?;
     let enabled = matches!(state, OnOff::On);
     spk.set_loudness(enabled)?;
     if enabled {

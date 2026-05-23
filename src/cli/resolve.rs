@@ -15,18 +15,20 @@ pub fn resolve_speaker(
 ) -> Result<Speaker, CliError> {
     // --group wins over --speaker
     if let Some(group_name) = &global.group {
+        let resolved = config.resolve_alias(group_name);
         let g = system
-            .group(group_name)
-            .ok_or_else(|| CliError::GroupNotFound(group_name.to_string()))?;
+            .group(resolved)
+            .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()))?;
         return g
             .coordinator()
-            .ok_or_else(|| CliError::GroupNotFound(group_name.to_string()));
+            .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()));
     }
 
     if let Some(speaker_name) = &global.speaker {
+        let resolved = config.resolve_alias(speaker_name);
         return system
-            .speaker(speaker_name)
-            .ok_or_else(|| CliError::SpeakerNotFound(speaker_name.to_string()));
+            .speaker(resolved)
+            .ok_or_else(|| CliError::SpeakerNotFound(resolved.to_string()));
     }
 
     // Default: config group → first group coordinator → first speaker
@@ -67,9 +69,10 @@ pub fn resolve_group(
     global: &GlobalFlags,
 ) -> Result<Group, CliError> {
     if let Some(group_name) = &global.group {
+        let resolved = config.resolve_alias(group_name);
         return system
-            .group(group_name)
-            .ok_or_else(|| CliError::GroupNotFound(group_name.to_string()));
+            .group(resolved)
+            .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()));
     }
 
     // Default: config group → first group
@@ -90,6 +93,7 @@ pub fn resolve_group(
 /// Rejects --group with a validation error.
 pub fn require_speaker_only(
     system: &SonosSystem,
+    config: &Config,
     global: &GlobalFlags,
     command_name: &str,
 ) -> Result<Speaker, CliError> {
@@ -102,9 +106,10 @@ pub fn require_speaker_only(
         .speaker
         .as_deref()
         .ok_or_else(|| CliError::Validation(format!("--speaker is required for {command_name}")))?;
+    let resolved = config.resolve_alias(name);
     system
-        .speaker(name)
-        .ok_or_else(|| CliError::SpeakerNotFound(name.to_string()))
+        .speaker(resolved)
+        .ok_or_else(|| CliError::SpeakerNotFound(resolved.to_string()))
 }
 
 #[cfg(all(test, feature = "test-helpers"))]
@@ -199,7 +204,7 @@ mod tests {
             verbose: 0,
             no_input: false,
         };
-        let result = require_speaker_only(&system, &global, "bass");
+        let result = require_speaker_only(&system, &Config::default(), &global, "bass");
         assert!(matches!(result, Err(CliError::Validation(_))));
     }
 
@@ -213,7 +218,7 @@ mod tests {
             verbose: 0,
             no_input: false,
         };
-        let result = require_speaker_only(&system, &global, "bass");
+        let result = require_speaker_only(&system, &Config::default(), &global, "bass");
         assert!(matches!(result, Err(CliError::Validation(_))));
     }
 
@@ -227,7 +232,7 @@ mod tests {
             verbose: 0,
             no_input: false,
         };
-        let spk = require_speaker_only(&system, &global, "bass").unwrap();
+        let spk = require_speaker_only(&system, &Config::default(), &global, "bass").unwrap();
         assert_eq!(spk.name, "Kitchen");
     }
 
@@ -326,5 +331,70 @@ mod tests {
         let grp = resolve_group(&system, &config, &global).unwrap();
         let coord = grp.coordinator().unwrap();
         assert_eq!(coord.name, "Kitchen");
+    }
+
+    #[test]
+    fn resolve_speaker_with_alias() {
+        let system = SonosSystem::with_speakers(&["Master Bedroom"]);
+        let mut config = Config::default();
+        config.set_alias("Master Bedroom", "bed");
+        let global = GlobalFlags {
+            speaker: Some("bed".into()),
+            group: None,
+            quiet: false,
+            verbose: 0,
+            no_input: false,
+        };
+        let spk = resolve_speaker(&system, &config, &global).unwrap();
+        assert_eq!(spk.name, "Master Bedroom");
+    }
+
+    #[test]
+    fn resolve_speaker_alias_not_found_shows_resolved_name() {
+        let system = SonosSystem::with_speakers(&["Kitchen"]);
+        let mut config = Config::default();
+        config.set_alias("Master Bedroom", "bed");
+        let global = GlobalFlags {
+            speaker: Some("bed".into()),
+            group: None,
+            quiet: false,
+            verbose: 0,
+            no_input: false,
+        };
+        let result = resolve_speaker(&system, &config, &global);
+        assert!(matches!(result, Err(CliError::SpeakerNotFound(ref name)) if name == "Master Bedroom"));
+    }
+
+    #[test]
+    fn resolve_group_with_alias() {
+        let system = SonosSystem::with_groups(&["Living Room"]);
+        let mut config = Config::default();
+        config.set_alias("Living Room", "lr");
+        let global = GlobalFlags {
+            speaker: None,
+            group: Some("lr".into()),
+            quiet: false,
+            verbose: 0,
+            no_input: false,
+        };
+        let grp = resolve_group(&system, &config, &global).unwrap();
+        let coord = grp.coordinator().unwrap();
+        assert_eq!(coord.name, "Living Room");
+    }
+
+    #[test]
+    fn require_speaker_only_resolves_alias() {
+        let system = SonosSystem::with_speakers(&["Master Bedroom"]);
+        let mut config = Config::default();
+        config.set_alias("Master Bedroom", "bed");
+        let global = GlobalFlags {
+            speaker: Some("bed".into()),
+            group: None,
+            quiet: false,
+            verbose: 0,
+            no_input: false,
+        };
+        let spk = require_speaker_only(&system, &config, &global, "bass").unwrap();
+        assert_eq!(spk.name, "Master Bedroom");
     }
 }
