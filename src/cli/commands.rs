@@ -70,6 +70,23 @@ pub enum Commands {
         #[command(subcommand)]
         action: Option<QueueAction>,
     },
+    /// Manage configuration
+    Config {
+        #[command(subcommand)]
+        action: Option<ConfigAction>,
+    },
+}
+
+/// Config sub-subcommands.
+#[derive(Debug, Subcommand)]
+pub enum ConfigAction {
+    /// Manage speaker/group aliases
+    Alias {
+        /// Speaker or group name
+        name: Option<String>,
+        /// Short alias to assign
+        alias: Option<String>,
+    },
 }
 
 /// Queue sub-subcommands.

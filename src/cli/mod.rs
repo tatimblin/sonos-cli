@@ -28,10 +28,10 @@ pub struct Cli {
 #[derive(Debug, Args)]
 pub struct GlobalFlags {
     /// Target a specific speaker by friendly name
-    #[arg(long, global = true)]
+    #[arg(long, short = 's', global = true)]
     pub speaker: Option<String>,
     /// Target a group by name
-    #[arg(long, global = true)]
+    #[arg(long, short = 'g', global = true)]
     pub group: Option<String>,
     /// Suppress all non-error stdout output
     #[arg(long, short, global = true)]
