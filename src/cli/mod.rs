@@ -1,6 +1,7 @@
 //! CLI command parsing, helpers, and command execution.
 
 mod commands;
+pub mod complete;
 mod format;
 mod parse;
 mod resolve;
@@ -13,6 +14,7 @@ pub use resolve::*;
 pub use run::run_command;
 
 use clap::{Args, Parser};
+use clap_complete::engine::ArgValueCandidates;
 
 /// Top-level CLI parser.
 #[derive(Debug, Parser)]
@@ -28,10 +30,10 @@ pub struct Cli {
 #[derive(Debug, Args)]
 pub struct GlobalFlags {
     /// Target a specific speaker by friendly name
-    #[arg(long, short = 's', global = true)]
+    #[arg(long, short = 's', global = true, add = ArgValueCandidates::new(complete::speaker_candidates))]
     pub speaker: Option<String>,
     /// Target a group by name
-    #[arg(long, short = 'g', global = true)]
+    #[arg(long, short = 'g', global = true, add = ArgValueCandidates::new(complete::group_candidates))]
     pub group: Option<String>,
     /// Suppress all non-error stdout output
     #[arg(long, short, global = true)]
