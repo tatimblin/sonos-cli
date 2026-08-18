@@ -440,21 +440,87 @@ mod tests {
         assert_eq!(spk.name, "Master Bedroom");
     }
 
-    // NOTE: the largest-group preference in `resolve_speaker` is deliberately NOT
-    // unit-tested here. That is a known gap, not an oversight.
-    //
-    // Asserting it requires a system with one multi-member group alongside a
-    // standalone speaker. `SonosSystem::with_groups` only builds single-member
-    // groups, and topology cannot be built directly from a downstream crate:
-    // `sonos-sdk` does not re-export `GroupInfo`/`Topology`, and the seeding
-    // closure of `from_devices_offline_with_topology` receives a `&SonosSystem`
-    // whose `state_manager` field is crate-private.
-    //
-    // A determinism-only test was written and then discarded because it passed
-    // with the fix reverted: `HashMap` iteration is stable within one process for
-    // a fixed key set, while the bug is about ordering that varies with topology
-    // and process. It proved nothing.
-    //
-    // Filed as an SDK test-support request. Until then the behaviour is verified
-    // manually against hardware via `sonos status`.
+    /// Build a system with one multi-member group beside a standalone speaker.
+    ///
+    /// The standalone group is listed *first* so an implementation that takes
+    /// whatever `groups()` yields first can pick the wrong one.
+    fn system_with_one_big_group() -> SonosSystem {
+        use sonos_sdk::sonos_discovery::Device;
+        use sonos_sdk::{GroupId, SpeakerId};
+
+        let devices: Vec<Device> = ["Bedroom", "Living Room", "Bathroom", "Kitchen"]
+            .iter()
+            .enumerate()
+            .map(|(i, name)| Device {
+                id: format!("RINCON_{i:03}"),
+                name: (*name).to_string(),
+                room_name: (*name).to_string(),
+                ip_address: format!("192.0.2.{}", 10 + i),
+                port: 1400,
+                model_name: "Sonos One".to_string(),
+            })
+            .collect();
+
+        SonosSystem::from_devices_offline_with_groups(
+            devices,
+            vec![
+                // Kitchen, standalone — deliberately first.
+                (
+                    GroupId::new("RINCON_003:1"),
+                    SpeakerId::new("RINCON_003"),
+                    vec![SpeakerId::new("RINCON_003")],
+                ),
+                // Bedroom coordinating a three-speaker group.
+                (
+                    GroupId::new("RINCON_000:1"),
+                    SpeakerId::new("RINCON_000"),
+                    vec![
+                        SpeakerId::new("RINCON_000"),
+                        SpeakerId::new("RINCON_001"),
+                        SpeakerId::new("RINCON_002"),
+                    ],
+                ),
+            ],
+        )
+        .expect("offline construction cannot fail")
+    }
+
+    fn no_flags() -> GlobalFlags {
+        GlobalFlags {
+            speaker: None,
+            group: None,
+            quiet: false,
+            verbose: 0,
+            no_input: false,
+        }
+    }
+
+    /// Bare `sonos status` must report the group the user is listening to.
+    ///
+    /// Hardware regression: with a four-speaker group playing and one idle
+    /// standalone speaker, `sonos status` reported the idle speaker, because the
+    /// old code took `groups().into_iter().next()` and `groups` is a `HashMap`.
+    #[test]
+    fn resolve_speaker_defaults_to_largest_group() {
+        let spk = resolve_speaker(&system_with_one_big_group(), &Config::default(), &no_flags())
+            .expect("a speaker must resolve");
+        assert_eq!(
+            spk.name, "Bedroom",
+            "expected the three-member group's coordinator, got {}",
+            spk.name
+        );
+    }
+
+    /// Same for `resolve_group`, which backs the `volume` and `mute` *writes* —
+    /// so picking arbitrarily here changes the wrong speakers' volume.
+    #[test]
+    fn resolve_group_defaults_to_largest_group() {
+        let grp = resolve_group(&system_with_one_big_group(), &Config::default(), &no_flags())
+            .expect("a group must resolve");
+        assert_eq!(grp.member_ids.len(), 3, "expected the three-member group");
+        assert_eq!(
+            grp.coordinator().map(|c| c.name),
+            Some("Bedroom".to_string())
+        );
+    }
 }

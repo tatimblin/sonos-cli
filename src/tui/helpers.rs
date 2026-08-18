@@ -1,6 +1,6 @@
 //! Shared data helpers for TUI screens — extract common patterns into reusable functions.
 
-use sonos_state::CurrentTrack;
+use sonos_sdk::CurrentTrack;
 
 pub fn uri_source_label(uri: &str) -> &str {
     let _ = uri;

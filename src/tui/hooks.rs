@@ -33,7 +33,7 @@ use std::collections::{HashMap, HashSet};
 
 use sonos_sdk::property::{GroupFetchable, GroupPropertyHandle, PropertyHandle, WatchHandle};
 use sonos_sdk::SdkError;
-use sonos_state::property::SonosProperty;
+use sonos_sdk::SonosProperty;
 
 use crate::tui::app::App;
 
