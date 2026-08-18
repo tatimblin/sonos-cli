@@ -43,13 +43,17 @@ fn prev_entry(from: usize) -> Option<usize> {
 
 /// Find the next selectable action row (AddToGroupRow where !is_home, or CreateNewGroupRow).
 fn next_action_row(entries: &[ListEntry], from: usize) -> Option<usize> {
-    for i in (from + 1)..entries.len() {
-        match &entries[i] {
-            ListEntry::AddToGroupRow(_) | ListEntry::CreateNewGroupRow => return Some(i),
-            _ => {}
-        }
-    }
-    None
+    let start = from + 1;
+    entries
+        .get(start..)?
+        .iter()
+        .position(|entry| {
+            matches!(
+                entry,
+                ListEntry::AddToGroupRow(_) | ListEntry::CreateNewGroupRow
+            )
+        })
+        .map(|offset| start + offset)
 }
 
 /// Find the previous selectable action row.
