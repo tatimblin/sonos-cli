@@ -147,18 +147,17 @@ fn render_header(frame: &mut Frame, area: Rect, app: &App) {
     let logo_width = logo.chars().count();
     let tab_width: usize = tab_spans.iter().map(|s| s.content.chars().count()).sum();
 
-    let toast_spans = app
-        .toast
-        .as_ref()
-        .filter(|t| !t.is_expired())
-        .map(|t| {
-            let style = if t.is_error {
-                app.theme.error
-            } else {
-                app.theme.accent
-            };
-            vec![Span::styled(format!("{} {}", app.theme.glyphs.toast_prefix, t.message), style)]
-        });
+    let toast_spans = app.toast.as_ref().filter(|t| !t.is_expired()).map(|t| {
+        let style = if t.is_error {
+            app.theme.error
+        } else {
+            app.theme.accent
+        };
+        vec![Span::styled(
+            format!("{} {}", app.theme.glyphs.toast_prefix, t.message),
+            style,
+        )]
+    });
 
     let toast_width: usize = toast_spans
         .as_ref()

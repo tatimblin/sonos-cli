@@ -10,13 +10,10 @@ pub fn uri_source_label(uri: &str) -> &str {
 /// Extract track title and artist as a "title — artist" string.
 /// Returns `None` if the track is empty or missing.
 pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
-    track
-        .as_ref()
-        .filter(|t| !t.is_empty())
-        .and_then(|t| {
-            let title = t.title.as_deref().filter(|s| !s.trim().is_empty());
-            let artist = t.artist.as_deref().filter(|s| !s.trim().is_empty());
-            match (title, artist) {
+    track.as_ref().filter(|t| !t.is_empty()).and_then(|t| {
+        let title = t.title.as_deref().filter(|s| !s.trim().is_empty());
+        let artist = t.artist.as_deref().filter(|s| !s.trim().is_empty());
+        match (title, artist) {
             (Some(title), Some(artist)) => Some(format!("{title} \u{2014} {artist}")),
             (Some(title), None) => Some(title.to_string()),
             (None, Some(artist)) => Some(artist.to_string()),
@@ -26,8 +23,8 @@ pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
                 .map(uri_source_label)
                 .filter(|s| !s.is_empty())
                 .map(String::from),
-            }
-        })
+        }
+    })
 }
 
 #[cfg(test)]

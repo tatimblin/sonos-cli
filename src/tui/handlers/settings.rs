@@ -167,7 +167,9 @@ fn apply_setting(app: &mut App, row: usize, value: &str) {
                 "off" => AlbumArtMode::Off,
                 _ => AlbumArtMode::Image,
             };
-            app.toast = Some(Toast::info("Album art change takes effect on restart".to_string()));
+            app.toast = Some(Toast::info(
+                "Album art change takes effect on restart".to_string(),
+            ));
         }
         _ => {}
     }

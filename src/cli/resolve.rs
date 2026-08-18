@@ -404,7 +404,9 @@ mod tests {
             no_input: false,
         };
         let result = resolve_speaker(&system, &config, &global);
-        assert!(matches!(result, Err(CliError::SpeakerNotFound(ref name)) if name == "Master Bedroom"));
+        assert!(
+            matches!(result, Err(CliError::SpeakerNotFound(ref name)) if name == "Master Bedroom")
+        );
     }
 
     #[test]
@@ -502,8 +504,12 @@ mod tests {
     /// old code took `groups().into_iter().next()` and `groups` is a `HashMap`.
     #[test]
     fn resolve_speaker_defaults_to_largest_group() {
-        let spk = resolve_speaker(&system_with_one_big_group(), &Config::default(), &no_flags())
-            .expect("a speaker must resolve");
+        let spk = resolve_speaker(
+            &system_with_one_big_group(),
+            &Config::default(),
+            &no_flags(),
+        )
+        .expect("a speaker must resolve");
         assert_eq!(
             spk.name, "Bedroom",
             "expected the three-member group's coordinator, got {}",
@@ -515,8 +521,12 @@ mod tests {
     /// so picking arbitrarily here changes the wrong speakers' volume.
     #[test]
     fn resolve_group_defaults_to_largest_group() {
-        let grp = resolve_group(&system_with_one_big_group(), &Config::default(), &no_flags())
-            .expect("a group must resolve");
+        let grp = resolve_group(
+            &system_with_one_big_group(),
+            &Config::default(),
+            &no_flags(),
+        )
+        .expect("a group must resolve");
         assert_eq!(grp.member_ids.len(), 3, "expected the three-member group");
         assert_eq!(
             grp.coordinator().map(|c| c.name),

@@ -6,8 +6,7 @@ use ratatui::Frame;
 use crate::tui::helpers;
 use crate::tui::hooks::{ProgressState, RenderContext};
 use crate::tui::types::{
-    build_list_entries, group_for_entry, BottomBarData, EntryRenderData, ListEntry,
-    SpeakerListData,
+    build_list_entries, group_for_entry, BottomBarData, EntryRenderData, ListEntry, SpeakerListData,
 };
 use crate::tui::widgets::album_art::ArtProtocolState;
 use crate::tui::widgets::{bottom_bar, speaker_list};
