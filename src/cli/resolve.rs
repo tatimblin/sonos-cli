@@ -6,8 +6,9 @@ use crate::errors::CliError;
 
 /// Resolve --speaker / --group flags to a Speaker handle.
 ///
-/// Priority: --group wins over --speaker. If neither is given, uses config default
-/// or falls back to the first group's coordinator.
+/// Priority: `--group` wins over `--speaker`. With neither flag, falls back to the
+/// configured default group, then the coordinator of the **largest** group, then any
+/// speaker.
 pub fn resolve_speaker(
     system: &SonosSystem,
     config: &Config,
@@ -41,13 +42,28 @@ pub fn resolve_speaker(
     }
 
     // Prefer a group coordinator so we get track/position data
-    // (non-coordinator speakers return NOT_IMPLEMENTED for these)
-    if let Some(coordinator) = system
-        .groups()
-        .into_iter()
-        .next()
-        .and_then(|g| g.coordinator())
-    {
+    // (non-coordinator speakers return NOT_IMPLEMENTED for these).
+    //
+    // Pick the *largest* group rather than whichever one happens to come first.
+    // `groups()` has no meaningful order, so `.next()` chose arbitrarily: on a
+    // household with a 4-speaker group playing and one idle standalone speaker,
+    // bare `sonos status` reported the idle speaker as often as not.
+    //
+    // Member count is the right tiebreak because it comes from topology and is
+    // free to read. Preferring a *playing* group would be more precise but costs
+    // a SOAP fetch per group — in a fresh process the cache is cold, so it would
+    // turn picking a default into N round-trips. Speakers are grouped in order to
+    // play together, so the biggest group is the one the user means.
+    //
+    // Ties break on group id so repeated invocations agree.
+    let mut groups = system.groups();
+    groups.sort_by(|a, b| {
+        b.member_ids
+            .len()
+            .cmp(&a.member_ids.len())
+            .then_with(|| a.id.as_str().cmp(b.id.as_str()))
+    });
+    if let Some(coordinator) = groups.into_iter().find_map(|g| g.coordinator()) {
         return Ok(coordinator);
     }
 
@@ -173,10 +189,22 @@ mod tests {
             no_input: false,
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
-        // Should pick the first group's coordinator, not an arbitrary speaker
-        let first_group = system.groups().into_iter().next().unwrap();
-        let expected_coordinator = first_group.coordinator().unwrap();
-        assert_eq!(spk.name, expected_coordinator.name);
+
+        // Must be *some* group's coordinator, not an arbitrary member. This
+        // deliberately does not assert which one: the previous version compared
+        // against `groups().into_iter().next()`, which baked the unordered
+        // iteration order into the expectation — the very behaviour that made
+        // bare `sonos status` pick a random speaker on real hardware.
+        let is_a_coordinator = system
+            .groups()
+            .into_iter()
+            .filter_map(|g| g.coordinator())
+            .any(|c| c.name == spk.name);
+        assert!(
+            is_a_coordinator,
+            "{} is not any group's coordinator",
+            spk.name
+        );
     }
 
     #[test]
@@ -397,4 +425,22 @@ mod tests {
         let spk = require_speaker_only(&system, &config, &global, "bass").unwrap();
         assert_eq!(spk.name, "Master Bedroom");
     }
+
+    // NOTE: the largest-group preference in `resolve_speaker` is deliberately NOT
+    // unit-tested here. That is a known gap, not an oversight.
+    //
+    // Asserting it requires a system with one multi-member group alongside a
+    // standalone speaker. `SonosSystem::with_groups` only builds single-member
+    // groups, and topology cannot be built directly from a downstream crate:
+    // `sonos-sdk` does not re-export `GroupInfo`/`Topology`, and the seeding
+    // closure of `from_devices_offline_with_topology` receives a `&SonosSystem`
+    // whose `state_manager` field is crate-private.
+    //
+    // A determinism-only test was written and then discarded because it passed
+    // with the fix reverted: `HashMap` iteration is stable within one process for
+    // a fixed key set, while the bug is about ordering that varies with topology
+    // and process. It proved nothing.
+    //
+    // Filed as an SDK test-support request. Until then the behaviour is verified
+    // manually against hardware via `sonos status`.
 }

@@ -42,15 +42,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
-name = "android_system_properties"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -331,20 +322,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "chrono"
-version = "0.4.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
-dependencies = [
- "iana-time-zone",
- "js-sys",
- "num-traits",
- "serde",
- "wasm-bindgen",
- "windows-link",
-]
-
-[[package]]
 name = "clap"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,28 +469,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1137cd7e7fc0fb5d3c5a8678be38ec56e819125d8d7907411fe24ccb943faca8"
-dependencies = [
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-epoch",
- "crossbeam-queue",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-channel"
-version = "0.5.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82b8f8f868b36967f9606790d1903570de9ceaf870a7bf9fbbd3016d636a2cb2"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
 name = "crossbeam-deque"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -528,15 +483,6 @@ name = "crossbeam-epoch"
 version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-queue"
-version = "0.3.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f58bbc28f91df819d0aa2a2c00cd19754769c2fad90579b3592b1c9ba7a3115"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -638,19 +584,6 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
 ]
 
 [[package]]
@@ -780,7 +713,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1061,12 +994,6 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.14.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
-
-[[package]]
-name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
@@ -1194,30 +1121,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iana-time-zone"
-version = "0.1.65"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e31bc9ad994ba00e440a8aa5c9ef0ec67d5cb5e5cb0cc7f8b744a35b389cc470"
-dependencies = [
- "android_system_properties",
- "core-foundation-sys",
- "iana-time-zone-haiku",
- "js-sys",
- "log",
- "wasm-bindgen",
- "windows-core",
-]
-
-[[package]]
-name = "iana-time-zone-haiku"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "icu_collections"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1335,6 +1238,16 @@ checksum = "3acae9609540aa318d1bc588455225fb2085b9ed0c4f6bd0d9d5bcd86f1a0344"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "if-addrs"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1715,7 +1628,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2359,7 +2272,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2650,14 +2563,13 @@ dependencies = [
 
 [[package]]
 name = "sonos-api"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ca946ba9339f4bf52c30335aa5576be4f283c2868996944cb1a0ac097ae75cd"
+checksum = "d43b5afa956ce915369fb8a3d245f4dedc7c760ab20cbf96942b1efd02d6b156"
 dependencies = [
  "paste",
  "quick-xml",
  "serde",
- "sonos-sdk-discovery",
  "sonos-sdk-soap-client",
  "thiserror 1.0.69",
  "xmltree",
@@ -2691,9 +2603,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e97f4507527f4fb2284acb590d95a65874b543e5ea63886a293e0679a0afedf5"
+checksum = "f59da0494ef5ddc43c726614d0b1e2e9accca191f46770553b8dfd6597ac6b0b"
 dependencies = [
  "dirs",
  "serde",
@@ -2708,12 +2620,13 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-callback-server"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cf15a4bf4e7ba48140b57964bd0b5eadae915c8c9aafc16d2ec4623df85ccba"
+checksum = "d72748cf219d6f0c630f746f9b0fa509b874e7253c5a13057cc815c132beca46"
 dependencies = [
  "async-trait",
  "bytes",
+ "if-addrs",
  "reqwest",
  "thiserror 1.0.69",
  "tokio",
@@ -2726,22 +2639,23 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-discovery"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04f6330ba89d5cc5143122772f23a9fb5d63ded8f2d67bf52fc49564673ffbab"
+checksum = "7368b6feb364a1a378ca2725c239fead028167d9401df45c1612567b8e02f7f6"
 dependencies = [
+ "if-addrs",
  "quick-xml",
  "reqwest",
  "serde",
+ "tracing",
 ]
 
 [[package]]
 name = "sonos-sdk-event-manager"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "770d2575a41a2321d6d5976d4cc28a2d5786a946828f4cfdd47e070e08b9758e"
+checksum = "1ce66487f56310ab94d12fb769b0ba3b1936b99b8b44348e2d99921e10c5d671"
 dependencies = [
- "dashmap",
  "parking_lot",
  "sonos-api",
  "sonos-sdk-discovery",
@@ -2753,9 +2667,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-soap-client"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "358d6528adc9abc4bec14c93a3f286437cb13a981e3c7f5def25f5278523192a"
+checksum = "96dfd25ed4f0f2bb889e1acae29555516248e6132fbaa7293984f8d202dc31da"
 dependencies = [
  "thiserror 1.0.69",
  "ureq 2.12.1",
@@ -2764,9 +2678,9 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "973bf45c3d0e74852e12fc88bafd6dda93d003f42272387a020611be988f59f5"
+checksum = "9a2eb47f7a5cc10df1809599e0c7abec83033d9cce406a582b1eaaae137c653f"
 dependencies = [
  "parking_lot",
  "serde",
@@ -2780,24 +2694,19 @@ dependencies = [
 
 [[package]]
 name = "sonos-sdk-state-store"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ba97eb08a9b1a3086e4328ee7397153c428804de1847b50e0a6a20b14907e16"
+checksum = "c8ba6b206053f5c1fa434a748f091d7ebfcb600b4c209f52d3f318c5c1000c75"
 
 [[package]]
 name = "sonos-sdk-stream"
-version = "0.5.2"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b89c0b54584b49b925a77cb8060e338f870b71413db071e6d31d9721932a2c1"
+checksum = "817586700e4ba1d434f1a25adbccdbb041284e98d1441ff31b0d18a91550e6ce"
 dependencies = [
  "async-trait",
- "bytes",
- "chrono",
- "crossbeam",
- "dashmap",
  "futures",
  "quick-xml",
- "reqwest",
  "serde",
  "serde_json",
  "sonos-api",
@@ -2806,9 +2715,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "url",
- "uuid",
- "warp",
 ]
 
 [[package]]
@@ -2922,7 +2828,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

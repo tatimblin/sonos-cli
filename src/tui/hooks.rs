@@ -7,6 +7,10 @@
 //! - `use_watch(property_handle)` — Subscribe to SDK property, return current value
 //! - `use_animation(key, active)` — Request periodic re-renders when active
 //!
+//! `use_watch` acquires one SDK `WatchHandle` per property on first access and
+//! keeps it across frames. `WatchHandle` is a live view — `value()` re-reads the
+//! state store — so reading through the cached handle is all a later frame needs.
+//!
 //! ## Calling Convention
 //!
 //! `use_state` returns `&mut V` which borrows `&mut self` on `Hooks`.
@@ -27,7 +31,8 @@
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 
-use sonos_sdk::property::{GroupFetchable, GroupPropertyHandle, PropertyHandle};
+use sonos_sdk::property::{GroupFetchable, GroupPropertyHandle, PropertyHandle, WatchHandle};
+use sonos_sdk::SdkError;
 use sonos_state::property::SonosProperty;
 
 use crate::tui::app::App;
@@ -178,6 +183,9 @@ impl Hooks {
     }
 
     /// Evict unaccessed state and drop unaccessed watch handles.
+    ///
+    /// Handles for widgets that rendered this frame are retained, so a
+    /// continuously-visible widget holds one subscription for its whole life.
     pub fn end_frame(&mut self) {
         // Evict unaccessed states
         self.states
@@ -218,43 +226,58 @@ impl Hooks {
     // use_watch
     // -----------------------------------------------------------------------
 
-    /// Subscribe to an SDK speaker property, returning the current value.
+    /// Get-or-create a cached `WatchHandle` and read its current value.
     ///
-    /// Each frame, creates a fresh `WatchHandle` via `prop.watch()` to get
-    /// an up-to-date snapshot. The old handle is replaced (dropped → grace
-    /// period starts → new handle re-acquires → grace period cancelled).
-    /// This is the SDK's intended pattern: "Re-watch each frame to refresh
-    /// the snapshot."
+    /// `WatchHandle` is a live view: `value()` reads the state store on every
+    /// call, so one handle acquired on the first frame reports every subsequent
+    /// change. The handle is therefore created once, parked in `self.watches`,
+    /// and only *read* on later frames — no per-frame `watch()` call, no
+    /// drop/grace-period/re-acquire churn.
     ///
-    /// Falls back to `prop.get()` if `watch()` fails.
+    /// `acquire` is only invoked on a cache miss. `fallback` supplies a value
+    /// when acquisition fails (a plain cache read via `get()`), and is not
+    /// cached, so a transient failure is retried on the next frame.
+    fn use_watch_cached<P>(
+        &mut self,
+        key: String,
+        acquire: impl FnOnce() -> Result<WatchHandle<P>, SdkError>,
+        fallback: impl FnOnce() -> Option<P>,
+    ) -> Option<P>
+    where
+        P: 'static,
+    {
+        self.accessed_watches.insert(key.clone());
+
+        let handle = match self.watches.entry(key) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(e) => match acquire() {
+                Ok(wh) => e.insert(Box::new(wh)),
+                Err(err) => {
+                    tracing::warn!("use_watch: watch() failed ({err}), falling back to get()");
+                    return fallback();
+                }
+            },
+        };
+
+        handle
+            .downcast_ref::<WatchHandle<P>>()
+            .expect("use_watch: same key used with two property types")
+            .value()
+    }
+
+    /// Subscribe to an SDK speaker property, returning its current value.
+    ///
+    /// The subscription is acquired on first access and held until the widget
+    /// stops rendering (mark-and-sweep in [`Self::end_frame`]).
     pub fn use_watch<P>(&mut self, prop: &PropertyHandle<P>) -> Option<P>
     where
         P: SonosProperty + Clone + 'static,
     {
         let key = format!("{}:{}", prop.speaker_id(), P::KEY);
-        self.accessed_watches.insert(key.clone());
-
-        // Create a fresh watch handle each frame to get updated values.
-        // WatchHandle is a snapshot — value is set at creation and never updates.
-        // Replacing the old handle drops it (grace period starts), then the new
-        // handle re-acquires the subscription (grace period cancelled).
-        match prop.watch() {
-            Ok(wh) => {
-                let val = wh.value().cloned();
-                self.watches.insert(key, Box::new(wh));
-                val
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "use_watch failed for {}: {e}, falling back to get()",
-                    P::KEY
-                );
-                prop.get()
-            }
-        }
+        self.use_watch_cached(key, || prop.watch(), || prop.get())
     }
 
-    /// Subscribe to an SDK group property, returning the current value.
+    /// Subscribe to an SDK group property, returning its current value.
     ///
     /// Same as `use_watch` but for group-scoped properties (e.g., group volume).
     #[allow(dead_code)]
@@ -263,49 +286,21 @@ impl Hooks {
         P: SonosProperty + Clone + 'static,
     {
         let key = format!("group:{}:{}", prop.group_id(), P::KEY);
-        self.accessed_watches.insert(key.clone());
-
-        match prop.watch() {
-            Ok(wh) => {
-                let val = wh.value().cloned();
-                self.watches.insert(key, Box::new(wh));
-                val
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "use_watch_group failed for {}: {e}, falling back to get()",
-                    P::KEY
-                );
-                prop.get()
-            }
-        }
+        self.use_watch_cached(key, || prop.watch(), || prop.get())
     }
 
     /// Subscribe to a fetchable group property, fetching on first access if empty.
     ///
     /// Like `use_watch_group` but performs a one-time fetch when the cache has
     /// no value yet, so the UI doesn't show a blank until the first UPnP event.
+    /// The fetch happens only on the frame that acquires the handle, since
+    /// later frames reuse it.
     pub fn use_watch_group_or_fetch<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>
     where
         P: SonosProperty + GroupFetchable + Clone + 'static,
     {
         let key = format!("group:{}:{}", prop.group_id(), P::KEY);
-        self.accessed_watches.insert(key.clone());
-
-        match prop.watch_or_fetch() {
-            Ok(wh) => {
-                let val = wh.value().cloned();
-                self.watches.insert(key, Box::new(wh));
-                val
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "use_watch_group_or_fetch failed for {}: {e}, falling back to get()",
-                    P::KEY
-                );
-                prop.get()
-            }
-        }
+        self.use_watch_cached(key, || prop.watch_or_fetch(), || prop.get())
     }
 
     // -----------------------------------------------------------------------
@@ -343,6 +338,112 @@ impl Hooks {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `use_watch` handle acquired on one frame must report values written
+    /// *after* that frame, without being re-acquired.
+    ///
+    /// This is the property that made the per-frame re-`watch()` pattern
+    /// obsolete (sonos-sdk PR #99). If `WatchHandle` ever reverts to a frozen
+    /// snapshot, `use_watch` would silently pin the first observed value and the
+    /// TUI would stop updating — a failure with no compiler signal at all, which
+    /// is why it is asserted here rather than trusted from the SDK's own suite.
+    #[test]
+    #[cfg(feature = "test-helpers")]
+    fn use_watch_reports_values_written_after_the_handle_was_acquired() {
+        use sonos_sdk::{SonosSystem, Volume};
+
+        let system = SonosSystem::with_speakers(&["Kitchen"]);
+        let speaker = system.speakers().into_iter().next().expect("one speaker");
+        let speaker_id = speaker.id.clone();
+
+        let mut hooks = Hooks::new();
+
+        // Frame 1: acquires the handle. Nothing observed yet.
+        hooks.begin_frame();
+        assert_eq!(hooks.use_watch(&speaker.volume), None);
+        hooks.end_frame();
+
+        system
+            .state_manager()
+            .set_property(&speaker_id, Volume::new(42));
+
+        // Frame 2: same cached handle, new value.
+        hooks.begin_frame();
+        assert_eq!(
+            hooks.use_watch(&speaker.volume).map(|v| v.value()),
+            Some(42),
+            "a handle held across frames must read the store live"
+        );
+        hooks.end_frame();
+
+        system
+            .state_manager()
+            .set_property(&speaker_id, Volume::new(43));
+
+        // Frame 3: keeps tracking, rather than refreshing once.
+        hooks.begin_frame();
+        assert_eq!(
+            hooks.use_watch(&speaker.volume).map(|v| v.value()),
+            Some(43)
+        );
+        hooks.end_frame();
+    }
+
+    /// The handle is acquired once and reused, not rebuilt per frame.
+    ///
+    /// Asserts the churn reduction directly: `watches` must hold exactly one
+    /// entry for the property across many frames, and mark-and-sweep must still
+    /// evict it once the widget stops rendering.
+    #[test]
+    #[cfg(feature = "test-helpers")]
+    fn use_watch_reuses_one_handle_across_frames_then_evicts() {
+        use sonos_sdk::SonosSystem;
+
+        let system = SonosSystem::with_speakers(&["Kitchen"]);
+        let speaker = system.speakers().into_iter().next().expect("one speaker");
+
+        let mut hooks = Hooks::new();
+
+        // Identity of the stored handle, so a re-acquire is detectable — a
+        // count-only assertion passes even if the handle is dropped and rebuilt
+        // every frame, which is exactly the churn this migration removed.
+        let mut first_addr: Option<usize> = None;
+
+        for frame in 0..5 {
+            hooks.begin_frame();
+            let _ = hooks.use_watch(&speaker.volume);
+            hooks.end_frame();
+
+            assert_eq!(
+                hooks.watches.len(),
+                1,
+                "one property watched continuously must hold exactly one handle"
+            );
+
+            let addr = hooks
+                .watches
+                .values()
+                .next()
+                .map(|b| std::ptr::addr_of!(**b) as *const () as usize)
+                .expect("handle present");
+
+            match first_addr {
+                None => first_addr = Some(addr),
+                Some(expected) => assert_eq!(
+                    addr, expected,
+                    "frame {frame} replaced the handle — it must be acquired once and reused"
+                ),
+            }
+        }
+
+        // Widget stops rendering → handle released.
+        hooks.begin_frame();
+        hooks.end_frame();
+        assert!(
+            hooks.watches.is_empty(),
+            "unaccessed handle must be evicted"
+        );
+    }
 
     #[test]
     fn use_state_creates_default_on_first_call() {
