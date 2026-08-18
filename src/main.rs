@@ -155,17 +155,18 @@ fn cmd_config_alias_set(
         }
     }
     config.set_alias(name, alias);
-    config.save().map_err(|e| errors::CliError::Config(e.to_string()))?;
+    config
+        .save()
+        .map_err(|e| errors::CliError::Config(e.to_string()))?;
     Ok(format!("Alias set: {alias} \u{2192} {name}"))
 }
 
-fn cmd_config_alias_clear(
-    config: &mut Config,
-    name: &str,
-) -> Result<String, errors::CliError> {
+fn cmd_config_alias_clear(config: &mut Config, name: &str) -> Result<String, errors::CliError> {
     match config.clear_alias(name) {
         Some(old_alias) => {
-            config.save().map_err(|e| errors::CliError::Config(e.to_string()))?;
+            config
+                .save()
+                .map_err(|e| errors::CliError::Config(e.to_string()))?;
             Ok(format!("Alias cleared: {old_alias} \u{2192} {name}"))
         }
         None => Err(errors::CliError::Validation(format!(

@@ -19,6 +19,12 @@ pub(crate) const PROG_CHAR_BYTES: usize = 3; // ━ U+2501, ─ U+2500
 /// When `gradient_start` and `gradient_end` differ (both must be `Color::Rgb`), each
 /// filled character gets a linearly interpolated color. When they are equal, a single
 /// filled span is emitted (zero overhead).
+// Eight arguments, one over clippy's threshold. They are all irreducible inputs to
+// a single rendering decision — geometry (progress, width), the optional cursor,
+// three styles, and the two gradient endpoints — so grouping them into a struct
+// would move the argument list to the call sites without removing anything. Left
+// flat deliberately rather than restructured.
+#[allow(clippy::too_many_arguments)]
 pub fn render_bar_spans(
     progress: f64,
     width: usize,

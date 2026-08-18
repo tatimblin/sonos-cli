@@ -221,9 +221,7 @@ impl Theme {
             track_info: Style::new().fg(Color::Gray),
             bottom_bar_controls: Style::new().fg(Color::White),
 
-            playing_icon: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            playing_icon: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             paused_icon: Style::new().fg(Color::Gray),
             stopped_icon: Style::new().fg(Color::DarkGray),
 
@@ -232,17 +230,13 @@ impl Theme {
 
             progress_filled: Style::new().fg(Color::White),
             progress_empty: Style::new().fg(Color::DarkGray),
-            progress_cursor: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            progress_cursor: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             progress_time: Style::new().fg(Color::DarkGray),
 
             group_header: Style::new()
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            speaker_cursor: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            speaker_cursor: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             speaker_name: Style::new().fg(Color::Gray),
             leader: Style::new().fg(Color::DarkGray),
 
@@ -282,9 +276,7 @@ impl Theme {
             progress_cursor: Style::new().fg(Color::Gray),
             progress_time: Style::new().fg(Color::DarkGray),
 
-            group_header: Style::new()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
+            group_header: Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
             speaker_cursor: Style::new().fg(Color::Gray),
             speaker_name: Style::new().fg(Color::DarkGray),
             leader: Style::new().fg(Color::DarkGray),
@@ -306,8 +298,8 @@ impl Theme {
                 divider_fill: " ",
                 divider_right: "",
                 model_separator: "  ",
-                cursor: "\u{203a}",              // ›
-                progress_cursor: "\u{2022}",     // •
+                cursor: "\u{203a}",          // ›
+                progress_cursor: "\u{2022}", // •
                 logo: "sonos",
                 tab_active_left: "",
                 tab_active_right: "",
@@ -356,14 +348,14 @@ impl Theme {
             progress_gradient_end: Color::Rgb(50, 200, 255),
 
             glyphs: Glyphs {
-                playing: "\u{266b}",             // ♫
-                paused: "\u{1f4a4}",             // 💤
-                stopped: "\u{2716}",             // ✖
-                cursor: "\u{2605}",              // ★
-                music_note: "\u{266b}",          // ♫
+                playing: "\u{266b}",    // ♫
+                paused: "\u{1f4a4}",    // 💤
+                stopped: "\u{2716}",    // ✖
+                cursor: "\u{2605}",     // ★
+                music_note: "\u{266b}", // ♫
                 logo: "\u{2605} D A N C E  P A R T Y \u{2605}",
-                progress_cursor: "\u{25c6}",     // ◆
-                toast_prefix: "\u{2605}",        // ★
+                progress_cursor: "\u{25c6}",      // ◆
+                toast_prefix: "\u{2605}",         // ★
                 control_prev: "\u{25c4}\u{25c4}", // ◄◄
                 control_next: "\u{25ba}\u{25ba}", // ►►
                 ..Glyphs::default_glyphs()

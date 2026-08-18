@@ -157,7 +157,8 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
     } else {
         theme.muted
     };
-    let vol_line = volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
+    let vol_line =
+        volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
     let vol_pad = right_w.saturating_sub(vol_width);
     let mut vol_spans = vec![Span::raw(" ".repeat(vol_pad as usize))];
     vol_spans.extend(vol_line.spans);
@@ -224,7 +225,8 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
     } else {
         theme.muted
     };
-    let vol_line = volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
+    let vol_line =
+        volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
 
     let mut row1_spans = vec![
         Span::styled(artist_display, theme.muted),

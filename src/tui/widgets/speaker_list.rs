@@ -90,8 +90,7 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
 
         match entry {
             ListEntry::GroupHeader(group_id) => {
-                let is_focused_group =
-                    focused_group.as_ref().is_some_and(|fg| fg == group_id);
+                let is_focused_group = focused_group.as_ref().is_some_and(|fg| fg == group_id);
 
                 let (icon, icon_style) = match &entry_data.playback_state {
                     Some(PlaybackState::Playing) => (g.playing, theme.playing_icon),
@@ -193,10 +192,7 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     spans.push(Span::styled(connector, theme.picked_up));
                     spans.push(Span::styled(entry_data.name.clone(), theme.picked_up));
                     if let Some(ref model) = entry_data.model_name {
-                        spans.push(Span::styled(
-                            g.model_separator.to_string(),
-                            theme.picked_up,
-                        ));
+                        spans.push(Span::styled(g.model_separator.to_string(), theme.picked_up));
                         spans.push(Span::styled(model.clone(), theme.picked_up));
                     }
                     let content_width: usize =
@@ -361,7 +357,11 @@ fn append_volume_spans(
         // Right-align the volume bar
         let vol_line =
             volume_bar::render_volume_bar(vol, bar_width, theme.volume_filled, theme.volume_empty);
-        let vol_display_width: usize = vol_line.spans.iter().map(|s| s.content.chars().count()).sum();
+        let vol_display_width: usize = vol_line
+            .spans
+            .iter()
+            .map(|s| s.content.chars().count())
+            .sum();
         let pad = total_width.saturating_sub(content_width + vol_display_width);
         if pad > 0 {
             spans.push(Span::raw(" ".repeat(pad)));
@@ -382,4 +382,3 @@ fn append_volume_spans(
 // ===========================================================================
 // Tests
 // ===========================================================================
-

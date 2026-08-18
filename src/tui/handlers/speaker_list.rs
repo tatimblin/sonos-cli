@@ -4,7 +4,9 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::app::{App, Toast};
-use crate::tui::types::{build_list_entries, group_for_entry, ListEntry, PickUpState, SpeakerListAction};
+use crate::tui::types::{
+    build_list_entries, group_for_entry, ListEntry, PickUpState, SpeakerListAction,
+};
 
 /// Handle a key event for the speaker list. Returns an action for the caller.
 pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction {
@@ -41,13 +43,17 @@ fn prev_entry(from: usize) -> Option<usize> {
 
 /// Find the next selectable action row (AddToGroupRow where !is_home, or CreateNewGroupRow).
 fn next_action_row(entries: &[ListEntry], from: usize) -> Option<usize> {
-    for i in (from + 1)..entries.len() {
-        match &entries[i] {
-            ListEntry::AddToGroupRow(_) | ListEntry::CreateNewGroupRow => return Some(i),
-            _ => {}
-        }
-    }
-    None
+    let start = from + 1;
+    entries
+        .get(start..)?
+        .iter()
+        .position(|entry| {
+            matches!(
+                entry,
+                ListEntry::AddToGroupRow(_) | ListEntry::CreateNewGroupRow
+            )
+        })
+        .map(|offset| start + offset)
 }
 
 /// Find the previous selectable action row.
@@ -254,11 +260,7 @@ fn handle_playback_action(
 // Pick-up mode handling
 // ---------------------------------------------------------------------------
 
-fn handle_pick_up_key(
-    app: &mut App,
-    key: KeyEvent,
-    entries: &[ListEntry],
-) -> SpeakerListAction {
+fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
     let pick_up = match app.navigation.speakers_state.pick_up.clone() {
         Some(p) => p,
         None => return SpeakerListAction::Handled,
@@ -304,8 +306,10 @@ fn handle_pick_up_key(
                                         .coordinator()
                                         .map(|c| c.name.clone())
                                         .unwrap_or_else(|| "group".to_string());
-                                    app.toast =
-                                        Some(Toast::info(format!("{} moved to {}", speaker.name, group_name)));
+                                    app.toast = Some(Toast::info(format!(
+                                        "{} moved to {}",
+                                        speaker.name, group_name
+                                    )));
                                 }
                                 Err(e) => {
                                     app.toast = Some(Toast::error(format!("{e}")));
@@ -321,8 +325,10 @@ fn handle_pick_up_key(
                     if let Some(speaker) = app.system.speaker_by_id(&pick_up.speaker_id) {
                         match speaker.leave_group() {
                             Ok(_) => {
-                                app.toast =
-                                    Some(Toast::info(format!("{} is now standalone", speaker.name)));
+                                app.toast = Some(Toast::info(format!(
+                                    "{} is now standalone",
+                                    speaker.name
+                                )));
                             }
                             Err(e) => {
                                 app.toast = Some(Toast::error(format!("{e}")));
@@ -340,9 +346,7 @@ fn handle_pick_up_key(
             let new_entries = build_list_entries(&app.system, None);
             let new_index = new_entries
                 .iter()
-                .position(|e| {
-                    matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id)
-                })
+                .position(|e| matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id))
                 .unwrap_or(0);
             app.navigation.speakers_state.selected_index = new_index;
             app.navigation.speakers_state.pick_up = None;
