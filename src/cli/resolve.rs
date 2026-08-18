@@ -56,14 +56,10 @@ pub fn resolve_speaker(
     // play together, so the biggest group is the one the user means.
     //
     // Ties break on group id so repeated invocations agree.
-    let mut groups = system.groups();
-    groups.sort_by(|a, b| {
-        b.member_ids
-            .len()
-            .cmp(&a.member_ids.len())
-            .then_with(|| a.id.as_str().cmp(b.id.as_str()))
-    });
-    if let Some(coordinator) = groups.into_iter().find_map(|g| g.coordinator()) {
+    if let Some(coordinator) = largest_group_first(system)
+        .into_iter()
+        .find_map(|g| g.coordinator())
+    {
         return Ok(coordinator);
     }
 
@@ -77,8 +73,8 @@ pub fn resolve_speaker(
 
 /// Resolve --group / --speaker flags to a Group handle.
 ///
-/// Priority: --group wins. If neither flag is given, uses config default
-/// or falls back to the first available group.
+/// Priority: `--group` wins. With no flag, falls back to the configured default
+/// group, then the **largest** group.
 pub fn resolve_group(
     system: &SonosSystem,
     config: &Config,
@@ -91,18 +87,36 @@ pub fn resolve_group(
             .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()));
     }
 
-    // Default: config group → first group
+    // Default: config group → largest group
     if let Some(default_group) = &config.default_group {
         if let Some(g) = system.group(default_group) {
             return Ok(g);
         }
     }
 
-    system
-        .groups()
+    // Same reasoning as `resolve_speaker`: `groups()` is backed by a HashMap, so
+    // `.next()` picked arbitrarily. This one matters more — `resolve_group` backs
+    // the `volume` and `mute` *write* commands, so a bare `sonos volume 30` could
+    // change the volume of whichever group happened to come out first.
+    largest_group_first(system)
         .into_iter()
         .next()
         .ok_or_else(|| CliError::GroupNotFound("no groups available".to_string()))
+}
+
+/// Groups ordered by member count descending, ties broken on group id.
+///
+/// Shared by `resolve_speaker` and `resolve_group` so a bare command and its
+/// group-scoped equivalent cannot disagree about which group they mean.
+fn largest_group_first(system: &SonosSystem) -> Vec<Group> {
+    let mut groups = system.groups();
+    groups.sort_by(|a, b| {
+        b.member_ids
+            .len()
+            .cmp(&a.member_ids.len())
+            .then_with(|| a.id.as_str().cmp(b.id.as_str()))
+    });
+    groups
 }
 
 /// Resolve --speaker flag for speaker-only commands (bass, treble, loudness).
