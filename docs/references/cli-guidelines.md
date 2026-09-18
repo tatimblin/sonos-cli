@@ -118,8 +118,35 @@ sonos groups
 | `0` | Success |
 | `1` | Runtime error (speaker not found, SDK call failed, network error) |
 | `2` | Usage error (unknown flag, invalid argument value, missing required arg) |
+| `3` | Output printed, but no speaker responded — nothing in it was verified |
 
 clap returns exit code 2 automatically for usage errors. Our error-handling code returns 1 for all runtime failures via `anyhow::Error` propagation from `main`.
+
+### Unverified output (`3`)
+
+Discovery is cached on disk for 24h, so `sonos speakers`, `sonos groups` and
+`sonos status` can print a full, plausible listing without a single packet
+reaching a speaker — every per-field fetch fails, each row quietly collapses to
+the cached name, and the command exits 0. Code `3` exists so that case is not
+indistinguishable from success.
+
+It is a distinct code rather than `1` because the command did run and its stdout
+*is* printed: a script that only tests `-ne 0` now catches it, while one that
+reads the output still gets it. Two global flags move it:
+
+| Flag | Effect when nothing responded |
+|------|-------------------------------|
+| *(none)* | stdout printed, warning banner on stderr, exit `3` |
+| `--offline` | stdout printed, one-line note on stderr, exit `0` |
+| `--require-live` | **stdout suppressed**, warning banner on stderr, exit `1` |
+
+The two flags conflict; passing both is a usage error. A command that reached
+even one speaker is unaffected by either.
+
+stdout itself is never annotated. There is no `--json` mode, so the plain
+format is the de-facto machine contract — a per-row marker would break
+`sonos speakers | awk '{print $1}'` and `sonos speakers | fzf`. The verdict is
+carried by the exit code and stderr only.
 
 ---
 

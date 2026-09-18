@@ -4,5 +4,6 @@ pub mod cli;
 pub mod config;
 pub mod diagnostics;
 pub mod errors;
+pub mod liveness;
 pub mod logging;
 pub mod tui;

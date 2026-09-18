@@ -24,4 +24,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Tests
-        run: cargo test
+        # --features test-helpers is required: the SDK's offline/in-memory
+        # constructors sit behind it, and without it 22 existing tests plus the
+        # whole tests/liveness.rs target compile out and silently never run.
+        run: cargo test --features test-helpers

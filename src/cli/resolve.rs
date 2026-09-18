@@ -153,9 +153,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("Kitchen".into()),
             group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
         assert_eq!(spk.name, "Kitchen");
@@ -168,9 +166,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("Nonexistent".into()),
             group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let result = resolve_speaker(&system, &config, &global);
         assert!(matches!(result, Err(CliError::SpeakerNotFound(_))));
@@ -180,13 +176,7 @@ mod tests {
     fn resolve_speaker_falls_back_to_first() {
         let system = SonosSystem::with_speakers(&["Kitchen"]);
         let config = Config::default();
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let spk = resolve_speaker(&system, &config, &global).unwrap();
         assert_eq!(spk.name, "Kitchen");
     }
@@ -195,13 +185,7 @@ mod tests {
     fn resolve_speaker_prefers_group_coordinator() {
         let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
         let config = Config::default();
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let spk = resolve_speaker(&system, &config, &global).unwrap();
 
         // Must be *some* group's coordinator, not an arbitrary member. This
@@ -225,13 +209,7 @@ mod tests {
     fn resolve_speaker_empty_system_fails() {
         let system = SonosSystem::with_speakers(&[]);
         let config = Config::default();
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let result = resolve_speaker(&system, &config, &global);
         assert!(result.is_err());
     }
@@ -242,9 +220,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: None,
             group: Some("Living Room".into()),
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let result = require_speaker_only(&system, &Config::default(), &global, "bass");
         assert!(matches!(result, Err(CliError::Validation(_))));
@@ -253,13 +229,7 @@ mod tests {
     #[test]
     fn require_speaker_only_requires_speaker_flag() {
         let system = SonosSystem::with_speakers(&["Kitchen"]);
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let result = require_speaker_only(&system, &Config::default(), &global, "bass");
         assert!(matches!(result, Err(CliError::Validation(_))));
     }
@@ -270,9 +240,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("Kitchen".into()),
             group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let spk = require_speaker_only(&system, &Config::default(), &global, "bass").unwrap();
         assert_eq!(spk.name, "Kitchen");
@@ -285,9 +253,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: None,
             group: Some("Kitchen".into()),
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
         let coord = grp.coordinator().unwrap();
@@ -301,9 +267,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: None,
             group: Some("Nonexistent".into()),
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let result = resolve_group(&system, &config, &global);
         assert!(matches!(result, Err(CliError::GroupNotFound(_))));
@@ -313,13 +277,7 @@ mod tests {
     fn resolve_group_falls_back_to_first() {
         let system = SonosSystem::with_groups(&["Kitchen"]);
         let config = Config::default();
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let grp = resolve_group(&system, &config, &global).unwrap();
         let coord = grp.coordinator().unwrap();
         assert_eq!(coord.name, "Kitchen");
@@ -332,13 +290,7 @@ mod tests {
             default_group: Some("Bedroom".into()),
             ..Config::default()
         };
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let grp = resolve_group(&system, &config, &global).unwrap();
         let coord = grp.coordinator().unwrap();
         assert_eq!(coord.name, "Bedroom");
@@ -348,13 +300,7 @@ mod tests {
     fn resolve_group_empty_system_fails() {
         let system = SonosSystem::with_groups(&[]);
         let config = Config::default();
-        let global = GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        };
+        let global = GlobalFlags::default();
         let result = resolve_group(&system, &config, &global);
         assert!(matches!(result, Err(CliError::GroupNotFound(_))));
     }
@@ -366,9 +312,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("Bedroom".into()),
             group: Some("Kitchen".into()),
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
         let coord = grp.coordinator().unwrap();
@@ -383,9 +327,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("bed".into()),
             group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let spk = resolve_speaker(&system, &config, &global).unwrap();
         assert_eq!(spk.name, "Master Bedroom");
@@ -399,9 +341,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("bed".into()),
             group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let result = resolve_speaker(&system, &config, &global);
         assert!(
@@ -417,9 +357,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: None,
             group: Some("lr".into()),
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let grp = resolve_group(&system, &config, &global).unwrap();
         let coord = grp.coordinator().unwrap();
@@ -434,9 +372,7 @@ mod tests {
         let global = GlobalFlags {
             speaker: Some("bed".into()),
             group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
+            ..Default::default()
         };
         let spk = require_speaker_only(&system, &config, &global, "bass").unwrap();
         assert_eq!(spk.name, "Master Bedroom");
@@ -488,13 +424,7 @@ mod tests {
     }
 
     fn no_flags() -> GlobalFlags {
-        GlobalFlags {
-            speaker: None,
-            group: None,
-            quiet: false,
-            verbose: 0,
-            no_input: false,
-        }
+        GlobalFlags::default()
     }
 
     /// Bare `sonos status` must report the group the user is listening to.

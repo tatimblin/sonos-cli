@@ -25,6 +25,41 @@ pub fn discovery_hint() -> &'static str {
     }
 }
 
+/// Framed stderr banner for output that no speaker confirmed.
+///
+/// Printed with `eprintln!` rather than `tracing::warn!` on purpose. A
+/// `tracing` line is suppressed outright by `RUST_LOG=error`, and even when it
+/// survives it renders as one more lowercase log line among many — which is
+/// how the original failure went unnoticed. This is a user-facing verdict on
+/// the command's result, not a log event, so it goes to stderr unconditionally
+/// and is framed so it cannot be mistaken for log noise.
+///
+/// Reuses [`discovery_hint`] for the platform-specific causes rather than
+/// restating them.
+pub fn unvalidated_output_banner() -> String {
+    const RULE: &str = "────────────────────────────────────────────────────────────";
+    format!(
+        "{RULE}\n\
+         WARNING: no speaker responded — this output was not verified.\n\
+         \n\
+         Every request this command made failed. The names and values it\n\
+         printed came from the cached list of speakers on disk, not from any\n\
+         speaker, so they may be stale or simply wrong.\n\
+         \n\
+         {hint}\n\
+         \n\
+         Use --require-live to make this an error instead, or --offline to\n\
+         accept cached data quietly.\n\
+         {RULE}",
+        hint = discovery_hint()
+    )
+}
+
+/// One-line acknowledgement for `--offline`: the user already knows.
+pub fn unvalidated_output_note() -> &'static str {
+    "note: no speaker responded; showing cached data (--offline)"
+}
+
 /// On macOS/Windows, prompts the user to open the relevant settings pane.
 ///
 /// Respects `--no-input` and TTY detection. Does nothing on Linux or when
@@ -117,9 +152,8 @@ mod tests {
         let global = GlobalFlags {
             speaker: None,
             group: None,
-            quiet: false,
-            verbose: 0,
             no_input: true,
+            ..Default::default()
         };
         assert!(!can_prompt(&global));
     }

@@ -10,13 +10,22 @@ use super::{
 use crate::config::Config;
 use crate::diagnostics;
 use crate::errors::CliError;
+use crate::liveness::{CommandOutput, Probes};
 
+/// Run a command and report both what it printed and whether a speaker
+/// actually answered while producing it.
+///
+/// Most arms return [`CommandOutput::live`]: they end in a SOAP call whose
+/// error is propagated with `?`, so reaching `Ok` is itself proof of contact.
+/// The read-only listings (`speakers`, `groups`, `status`) are the exceptions —
+/// they tolerate per-field failure by design, which is exactly how a total
+/// discovery failure used to render as success.
 pub fn run_command(
     cmd: Commands,
     system: &SonosSystem,
     config: &Config,
     global: &GlobalFlags,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = || resolve_speaker(system, config, global);
 
     match cmd {
@@ -35,38 +44,44 @@ pub fn run_command(
         Commands::Play => {
             let s = spk()?;
             s.play()?;
-            Ok(format!("Playing ({})", s.name))
+            Ok(CommandOutput::live(format!("Playing ({})", s.name)))
         }
         Commands::Pause => {
             let s = spk()?;
             s.pause()?;
-            Ok(format!("Paused ({})", s.name))
+            Ok(CommandOutput::live(format!("Paused ({})", s.name)))
         }
         Commands::Stop => {
             let s = spk()?;
             s.stop()?;
-            Ok(format!("Stopped ({})", s.name))
+            Ok(CommandOutput::live(format!("Stopped ({})", s.name)))
         }
         Commands::Next => {
             let s = spk()?;
             s.next()?;
-            Ok(format!("Next track ({})", s.name))
+            Ok(CommandOutput::live(format!("Next track ({})", s.name)))
         }
         Commands::Previous => {
             let s = spk()?;
             s.previous()?;
-            Ok(format!("Previous track ({})", s.name))
+            Ok(CommandOutput::live(format!("Previous track ({})", s.name)))
         }
         Commands::Seek { position } => {
             validate_seek_time(&position)?;
             let s = spk()?;
             s.seek(SeekTarget::Time(position.clone()))?;
-            Ok(format!("Seeked to {} ({})", position, s.name))
+            Ok(CommandOutput::live(format!(
+                "Seeked to {} ({})",
+                position, s.name
+            )))
         }
         Commands::Mode { mode } => {
             let s = spk()?;
             s.set_play_mode(mode.to_sdk())?;
-            Ok(format!("Mode set to {:?} ({})", mode, s.name))
+            Ok(CommandOutput::live(format!(
+                "Mode set to {:?} ({})",
+                mode, s.name
+            )))
         }
         Commands::Volume { level } => cmd_volume(system, config, global, level),
         Commands::Mute => cmd_mute(system, config, global, true),
@@ -76,17 +91,24 @@ pub fn run_command(
 
 // -- Command handlers ---------------------------------------------------------
 
-fn cmd_speakers(system: &SonosSystem) -> Result<String, CliError> {
+fn cmd_speakers(system: &SonosSystem) -> Result<CommandOutput, CliError> {
     let speakers = system.speakers();
     if speakers.is_empty() {
         eprintln!("{}", diagnostics::discovery_hint());
-        return Ok("No speakers found".to_string());
+        // No speaker was claimed, so there is nothing unvalidated to flag; the
+        // hint above already says what went wrong. See `liveness::verdict`.
+        return Ok(CommandOutput::live("No speakers found"));
     }
+    // Two probes per speaker. The visible symptom of a dead network is these
+    // two failing and each row collapsing to a bare cached name — so counting
+    // them is exactly the evidence that the row is unverified.
+    let mut probes = Probes::default();
     let lines: Vec<String> = speakers
         .iter()
         .map(|s| {
-            let state = s.playback_state.fetch().ok();
-            let vol = s.volume.fetch().ok();
+            let state = probes.record(s.playback_state.fetch());
+            let vol = probes.record(s.volume.fetch());
+            // `group()` reads the in-memory topology, not the network — not a probe.
             let group_name = s
                 .group()
                 .and_then(|g| g.coordinator().map(|c| c.name))
@@ -111,15 +133,16 @@ fn cmd_speakers(system: &SonosSystem) -> Result<String, CliError> {
             parts.join("   ")
         })
         .collect();
-    Ok(lines.join("\n"))
+    Ok(CommandOutput::new(lines.join("\n"), probes.verdict()))
 }
 
-fn cmd_groups(system: &SonosSystem) -> Result<String, CliError> {
+fn cmd_groups(system: &SonosSystem) -> Result<CommandOutput, CliError> {
     let groups = system.groups();
     if groups.is_empty() {
         eprintln!("{}", diagnostics::discovery_hint());
-        return Ok("No groups found".to_string());
+        return Ok(CommandOutput::live("No groups found"));
     }
+    let mut probes = Probes::default();
     let lines: Vec<String> = groups
         .iter()
         .map(|g| {
@@ -129,9 +152,15 @@ fn cmd_groups(system: &SonosSystem) -> Result<String, CliError> {
                 .map(|c| c.name.clone())
                 .unwrap_or_else(|| "unknown".to_string());
 
-            let state = coord.as_ref().and_then(|c| c.playback_state.fetch().ok());
-            let track = coord.as_ref().and_then(|c| c.current_track.fetch().ok());
-            let vol = g.volume.fetch().ok();
+            // A group with no coordinator attempts nothing on the speaker, so
+            // it must not be counted as two failures.
+            let state = coord
+                .as_ref()
+                .and_then(|c| probes.record(c.playback_state.fetch()));
+            let track = coord
+                .as_ref()
+                .and_then(|c| probes.record(c.current_track.fetch()));
+            let vol = probes.record(g.volume.fetch());
 
             let state_str = state
                 .as_ref()
@@ -167,7 +196,7 @@ fn cmd_groups(system: &SonosSystem) -> Result<String, CliError> {
             parts.join("   ")
         })
         .collect();
-    Ok(lines.join("\n"))
+    Ok(CommandOutput::new(lines.join("\n"), probes.verdict()))
 }
 
 fn cmd_volume(
@@ -175,12 +204,15 @@ fn cmd_volume(
     config: &Config,
     global: &GlobalFlags,
     level: u8,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     // Explicit --speaker (without --group) → Speaker.set_volume(u8)
     if global.speaker.is_some() && global.group.is_none() {
         let s = resolve_speaker(system, config, global)?;
         s.set_volume(level)?;
-        return Ok(format!("Volume set to {} ({})", level, s.name));
+        return Ok(CommandOutput::live(format!(
+            "Volume set to {} ({})",
+            level, s.name
+        )));
     }
     // Otherwise → Group.set_volume(u16) via GroupRenderingControl
     let g = resolve_group(system, config, global)?;
@@ -189,7 +221,9 @@ fn cmd_volume(
         .map(|c| c.name)
         .unwrap_or_else(|| "unknown".to_string());
     g.set_volume(level as u16)?;
-    Ok(format!("Volume set to {level} ({name})"))
+    Ok(CommandOutput::live(format!(
+        "Volume set to {level} ({name})"
+    )))
 }
 
 fn cmd_mute(
@@ -197,13 +231,13 @@ fn cmd_mute(
     config: &Config,
     global: &GlobalFlags,
     muted: bool,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let label = if muted { "Muted" } else { "Unmuted" };
     // Explicit --speaker (without --group) → Speaker.set_mute(bool)
     if global.speaker.is_some() && global.group.is_none() {
         let s = resolve_speaker(system, config, global)?;
         s.set_mute(muted)?;
-        return Ok(format!("{} ({})", label, s.name));
+        return Ok(CommandOutput::live(format!("{} ({})", label, s.name)));
     }
     // Otherwise → Group.set_mute(bool) via GroupRenderingControl
     let g = resolve_group(system, config, global)?;
@@ -212,19 +246,27 @@ fn cmd_mute(
         .map(|c| c.name)
         .unwrap_or_else(|| "unknown".to_string());
     g.set_mute(muted)?;
-    Ok(format!("{label} ({name})"))
+    Ok(CommandOutput::live(format!("{label} ({name})")))
 }
 
 fn cmd_status(
     system: &SonosSystem,
     config: &Config,
     global: &GlobalFlags,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = resolve_speaker(system, config, global)?;
-    let state = spk.playback_state.fetch().ok();
-    let track = spk.current_track.fetch().ok();
-    let pos = spk.position.fetch().ok();
-    let vol = spk.volume.fetch().ok();
+    // Same bug as `speakers`, one row wide: with every fetch failing this
+    // printed "<name> unknown" and exited 0.
+    //
+    // A non-coordinator speaker answers NOT_IMPLEMENTED for track and
+    // position — a real reply from a real speaker that arrives here as an
+    // `Err`. That is fine: `volume` still succeeds, and one success is enough
+    // for `Live`, so a partially-answering speaker is never reported as dead.
+    let mut probes = Probes::default();
+    let state = probes.record(spk.playback_state.fetch());
+    let track = probes.record(spk.current_track.fetch());
+    let pos = probes.record(spk.position.fetch());
+    let vol = probes.record(spk.volume.fetch());
 
     let state_str = state
         .as_ref()
@@ -267,14 +309,14 @@ fn cmd_status(
     if !vol_str.is_empty() {
         parts.push(vol_str);
     }
-    Ok(parts.join("  "))
+    Ok(CommandOutput::new(parts.join("  "), probes.verdict()))
 }
 
 fn cmd_join(
     system: &SonosSystem,
     config: &Config,
     global: &GlobalFlags,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let raw_speaker = global
         .speaker
         .as_deref()
@@ -292,14 +334,16 @@ fn cmd_join(
         .group(group_name)
         .ok_or_else(|| CliError::GroupNotFound(group_name.into()))?;
     grp.add_speaker(&spk)?;
-    Ok(format!("{speaker_name} joined {group_name}"))
+    Ok(CommandOutput::live(format!(
+        "{speaker_name} joined {group_name}"
+    )))
 }
 
 fn cmd_leave(
     system: &SonosSystem,
     config: &Config,
     global: &GlobalFlags,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let raw_speaker = global
         .speaker
         .as_deref()
@@ -313,7 +357,9 @@ fn cmd_leave(
         .and_then(|g| g.coordinator().map(|c| c.name))
         .unwrap_or_else(|| "its group".into());
     spk.leave_group()?;
-    Ok(format!("{speaker_name} left {group_name}"))
+    Ok(CommandOutput::live(format!(
+        "{speaker_name} left {group_name}"
+    )))
 }
 
 fn cmd_bass(
@@ -321,10 +367,13 @@ fn cmd_bass(
     config: &Config,
     global: &GlobalFlags,
     level: i8,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = require_speaker_only(system, config, global, "bass")?;
     spk.set_bass(level)?;
-    Ok(format!("Bass set to {} ({})", level, spk.name))
+    Ok(CommandOutput::live(format!(
+        "Bass set to {} ({})",
+        level, spk.name
+    )))
 }
 
 fn cmd_treble(
@@ -332,10 +381,13 @@ fn cmd_treble(
     config: &Config,
     global: &GlobalFlags,
     level: i8,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = require_speaker_only(system, config, global, "treble")?;
     spk.set_treble(level)?;
-    Ok(format!("Treble set to {} ({})", level, spk.name))
+    Ok(CommandOutput::live(format!(
+        "Treble set to {} ({})",
+        level, spk.name
+    )))
 }
 
 fn cmd_loudness(
@@ -343,14 +395,20 @@ fn cmd_loudness(
     config: &Config,
     global: &GlobalFlags,
     state: OnOff,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = require_speaker_only(system, config, global, "loudness")?;
     let enabled = matches!(state, OnOff::On);
     spk.set_loudness(enabled)?;
     if enabled {
-        Ok(format!("Loudness enabled ({})", spk.name))
+        Ok(CommandOutput::live(format!(
+            "Loudness enabled ({})",
+            spk.name
+        )))
     } else {
-        Ok(format!("Loudness disabled ({})", spk.name))
+        Ok(CommandOutput::live(format!(
+            "Loudness disabled ({})",
+            spk.name
+        )))
     }
 }
 
@@ -359,16 +417,22 @@ fn cmd_sleep(
     config: &Config,
     global: &GlobalFlags,
     duration: &str,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = resolve_speaker(system, config, global)?;
     if duration == "cancel" {
         spk.cancel_sleep_timer()?;
-        Ok(format!("Sleep timer cancelled ({})", spk.name))
+        Ok(CommandOutput::live(format!(
+            "Sleep timer cancelled ({})",
+            spk.name
+        )))
     } else {
         let hh_mm_ss = parse_duration(duration)?;
         let human = format_duration_human(duration);
         spk.configure_sleep_timer(&hh_mm_ss)?;
-        Ok(format!("Sleep timer set for {} ({})", human, spk.name))
+        Ok(CommandOutput::live(format!(
+            "Sleep timer set for {} ({})",
+            human, spk.name
+        )))
     }
 }
 
@@ -377,19 +441,28 @@ fn cmd_queue(
     config: &Config,
     global: &GlobalFlags,
     action: Option<QueueAction>,
-) -> Result<String, CliError> {
+) -> Result<CommandOutput, CliError> {
     let spk = resolve_speaker(system, config, global)?;
     match action {
         None => {
             let info = spk.get_media_info()?;
             if info.nr_tracks == 0 {
-                return Ok(format!("queue is empty ({})", spk.name));
+                return Ok(CommandOutput::live(format!(
+                    "queue is empty ({})",
+                    spk.name
+                )));
             }
-            Ok(format!("{} — {} tracks", spk.name, info.nr_tracks))
+            Ok(CommandOutput::live(format!(
+                "{} — {} tracks",
+                spk.name, info.nr_tracks
+            )))
         }
         Some(QueueAction::Add { uri }) => {
             spk.add_uri_to_queue(&uri, "", 0, false)?;
-            Ok(format!("Added to queue ({})", spk.name))
+            Ok(CommandOutput::live(format!(
+                "Added to queue ({})",
+                spk.name
+            )))
         }
         Some(QueueAction::Clear) => {
             if std::io::stdin().is_terminal() && !global.no_input {
@@ -399,11 +472,11 @@ fn cmd_queue(
                     .read_line(&mut input)
                     .map_err(|e| CliError::Validation(e.to_string()))?;
                 if !input.trim().eq_ignore_ascii_case("y") {
-                    return Ok("Cancelled".into());
+                    return Ok(CommandOutput::live("Cancelled"));
                 }
             }
             spk.remove_all_tracks_from_queue()?;
-            Ok(format!("Queue cleared ({})", spk.name))
+            Ok(CommandOutput::live(format!("Queue cleared ({})", spk.name)))
         }
     }
 }
