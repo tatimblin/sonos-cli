@@ -13,6 +13,7 @@ mod cli;
 mod config;
 mod diagnostics;
 mod errors;
+mod liveness;
 mod logging;
 mod tui;
 
@@ -66,11 +67,25 @@ fn main() -> ExitCode {
             };
 
             match run_command(cmd, &system, &config, &cli.global) {
-                Ok(msg) => {
-                    if !cli.global.quiet {
-                        println!("{msg}");
+                Ok(out) => {
+                    // A speaker list assembled entirely from the discovery
+                    // cache used to be indistinguishable from a verified one.
+                    // The verdict decides that here, not the handler.
+                    let disposition = liveness::disposition(
+                        out.liveness,
+                        cli.global.offline,
+                        cli.global.require_live,
+                    );
+                    if disposition.prints_stdout() && !cli.global.quiet {
+                        println!("{}", out.stdout);
                     }
-                    ExitCode::SUCCESS
+                    if disposition.prints_banner() {
+                        eprintln!("{}", diagnostics::unvalidated_output_banner());
+                    }
+                    if disposition.prints_note() {
+                        eprintln!("{}", diagnostics::unvalidated_output_note());
+                    }
+                    ExitCode::from(disposition.exit_code())
                 }
                 Err(e) => {
                     tracing::debug!("{e:?}");

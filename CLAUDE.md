@@ -60,7 +60,7 @@ src/
 Follow `docs/references/cli-guidelines.md` for all command design decisions:
 - Flat subcommands: `sonos <verb>`, never `sonos <domain> <verb>`
 - Flags over positional args: `--speaker "Kitchen"` not `sonos play Kitchen`
-- Exit code 0 = success, 1 = runtime error, 2 = usage error
+- Exit code 0 = success, 1 = runtime error, 2 = usage error, 3 = output printed but no speaker responded (see `--offline` / `--require-live`)
 - Error format: `error: <description>\nCheck that your speakers are on the same network, then retry.`
 
 ## Contributing Workflow
