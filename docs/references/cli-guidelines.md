@@ -52,15 +52,15 @@ Living Room  ▶ Playing  Bohemian Rhapsody — Queen  vol:80
 ### Rules
 
 - **Prefer `--flags` over positional arguments.** Flags are self-documenting and order-independent.
-- **Full flag names are required.** Single-letter shortcuts only for the most common flags (`-h` for `--help`, `-v` for `--version`, `-q` for `--quiet`).
+- **Full flag names are required.** Single-letter shortcuts only for the most common flags (`-h` for `--help`, `-V` for `--version`, `-q` for `--quiet`, `-v` for `--verbose`, `-s` / `-g` for `--speaker` / `--group`).
 - **Use standard flag names where they exist.**
 
 | Flag | Meaning |
 |------|---------|
 | `--help` / `-h` | Show help |
-| `--version` / `-v` | Print version |
+| `--version` / `-V` | Print version |
 | `--quiet` / `-q` | Suppress non-error output |
-| `--verbose` | Show debug / raw SDK errors |
+| `--verbose` / `-v` | Raise log verbosity (`-v` info, `-vv` debug, `-vvv` trace) |
 
 - **Validate early.** Reject invalid argument combinations before doing any network work.
 - **Never read secrets via flags.** Flags appear in shell history and `ps` output.
@@ -75,7 +75,7 @@ Living Room  ▶ Playing  Bohemian Rhapsody — Queen  vol:80
 --group NAME      target a group by name
 ```
 
-If both are given, `--group` wins. If neither is given, the default group is used (configured in `~/.config/sonos/config.toml`; falls back to the first discovered group).
+If both are given, `--group` wins. If neither is given, the default group is used (configured in [`config.toml`](#config-file-configtoml); falls back to the coordinator of the largest group, then any speaker).
 
 ```bash
 $ sonos volume 50                        # default group
@@ -83,7 +83,7 @@ $ sonos volume 50 --group "Kitchen"      # specific group
 $ sonos bass 3 --speaker "Kitchen One"   # speaker-level EQ (group flag not applicable)
 ```
 
-**Speaker-only flags** — EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers, not groups. `--group` is not accepted for these.
+**Speaker-only flags** — EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers, not groups. Passing `--group` to them is a usage error (`bass applies to a single speaker; use --speaker instead of --group`, exit 2) rather than being silently ignored.
 
 ---
 
@@ -120,7 +120,7 @@ sonos groups
 | `2` | Usage error (unknown flag, invalid argument value, missing required arg) |
 | `3` | Output printed, but no speaker responded — nothing in it was verified |
 
-clap returns exit code 2 automatically for usage errors. Our error-handling code returns 1 for all runtime failures via `anyhow::Error` propagation from `main`.
+clap returns exit code 2 automatically for usage errors, including out-of-range values (volume, bass, treble ranges are declared on the clap args). Command handlers return `CliError` (a `thiserror` enum in `src/errors.rs`); `main` maps `CliError::Validation` to 2 and every other variant to 1 via `CliError::exit_code()`.
 
 ### Unverified output (`3`)
 
@@ -156,7 +156,7 @@ carried by the exit code and stderr only.
 
 1. **CLI flags** — always win
 2. **Environment variables** — override config file
-3. **Config file** — `~/.config/sonos/config.toml`
+3. **Config file** — `config.toml` (see below)
 4. **Built-in defaults** — fallback values in code
 
 ### Environment Variables
@@ -164,25 +164,46 @@ carried by the exit code and stderr only.
 | Variable | Purpose |
 |----------|---------|
 | `SONOS_DEFAULT_GROUP` | Override default group without editing config |
-| `SONOS_CONFIG_DIR` | Override config directory (default: `~/.config/sonos/`) |
-| `NO_COLOR` | Disable all ANSI color output |
+| `SONOS_CONFIG_DIR` | Override config directory (absolute path only; relative or empty values are ignored) |
+| `SONOS_CACHE_DIR` | Override the SDK's discovery-cache directory (absolute path only) |
+| `RUST_LOG` | Log filter when no `-v` is given (default `warn`) |
 
-### Config File: `~/.config/sonos/config.toml`
+`NO_COLOR` is not implemented yet.
+
+### Config File: `config.toml`
+
+Located at `dirs::config_dir()/sonos/config.toml` unless `SONOS_CONFIG_DIR` is set:
+
+| Platform | Path |
+|----------|------|
+| Linux | `~/.config/sonos/config.toml` (respects `$XDG_CONFIG_HOME`) |
+| macOS | `~/Library/Application Support/sonos/config.toml` |
+| Windows | `%APPDATA%\sonos\config.toml` |
 
 ```toml
 # Default group when --group / --speaker not given
 default_group = "Living Room"
 
-# How long the discovery cache is valid before auto-rediscovery (hours)
-cache_ttl_hours = 24
+# TUI color theme: "default" | "bw" | "minimal" | "dance_party"
+theme = "default"
 
-# TUI color theme: "dark" | "light" | "neon" | "sonos"
-theme = "dark"
+# Album art: "image" | "halfblock" | "off"
+album_art_mode = "image"
+
+# Aliases: full speaker/group name = short alias
+[aliases]
+"Living Room" = "lr"
 ```
 
-### Discovery Cache: `~/.config/sonos/cache.json`
+A missing file means defaults. A file that exists but cannot be read or parsed prints one warning, the run continues with defaults, and every save (`sonos config alias`, the TUI Settings tab) is refused so the user's file is never overwritten.
 
-Separate from the config file. Auto-populated by SSDP discovery and refreshed on TTL expiry. Contains discovered speaker IPs, names, and IDs. Never edit manually.
+### Discovery Cache: `cache.json`
+
+Owned by the SDK, separate from the config file. Stored at `dirs::cache_dir()/sonos/cache.json` — `~/.cache/sonos/` on Linux (respects `$XDG_CACHE_HOME`), `~/Library/Caches/sonos/` on macOS, `%LOCALAPPDATA%\sonos\` on Windows — or under `SONOS_CACHE_DIR`. Auto-populated by SSDP discovery with a 24h TTL. Contains discovered speaker IPs, names, and IDs. Never edit manually.
+
+### Log File: `sonos.log`
+
+Every run (CLI and TUI) appends to `dirs::data_local_dir()/sonos/sonos.log` — `~/.local/share/sonos/` on Linux, `~/Library/Application Support/sonos/` on macOS, `%LOCALAPPDATA%\sonos\` on Windows. At startup a log larger than 1 MiB is moved to `sonos.log.1` (replacing any previous one). The CLI also logs to stderr; the TUI does not.
 
 ---
 
@@ -192,8 +213,7 @@ Separate from the config file. Auto-populated by SSDP discovery and refreshed on
 - **`--no-input` disables all prompts.** Scripts should always pass this flag.
 - **TUI requires a TTY.** If `sonos` is invoked with no args but stdout is not a TTY, print an error and exit 1:
   ```
-  error: TUI mode requires an interactive terminal.
-  Use 'sonos --help' to see available commands.
+  error: no command specified and stdout is not a terminal
   ```
 
 ---
@@ -210,21 +230,25 @@ error: <human-readable description>
 ### Examples
 
 ```
-error: speaker "Office Move" not found.
-Check that your speakers are on the same network, then retry.
+error: speaker "Office Move" not found
+hint: this could mean:
+  - no Sonos speakers are on this network
+  - ...
 
-error: failed to connect to Living Room (192.168.1.42): connection refused
-Check that your Sonos speakers are online.
+error: SDK error: ...
+Check network connectivity and speaker power.
 
-error: volume must be between 0 and 100 (got: 150)
+error: invalid value '150' for '<LEVEL>': 150 is not in 0..=100
 ```
+
+The follow-up line comes from `CliError::recovery_hint()`: not-found and discovery errors print the platform-specific hint from `diagnostics::discovery_hint()`; other SDK errors print a connectivity hint; `Config` and `Validation` errors have none.
 
 ### Rules
 
 - One error per line to stderr.
 - Lowercase, no trailing period on the first line.
 - Always suggest a next action when one exists.
-- Use `--verbose` to expose raw `SdkError` details and stack traces for debugging.
+- The `Debug` form of every error is logged at debug level; run with `-vv` to see it on stderr and in `sonos.log`.
 
 ---
 

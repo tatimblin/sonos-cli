@@ -48,7 +48,7 @@ the first `watch()` call, not at construction time.
 
 Cache-first device discovery:
 
-1. Try loading cached devices from `~/.cache/sonos/cache.json`
+1. Try loading cached devices from `cache.json` in `dirs::cache_dir()/sonos/` (`~/.cache/sonos/` on Linux, `~/Library/Caches/sonos/` on macOS), or `$SONOS_CACHE_DIR` when set to an absolute path
 2. If cache is fresh (< 24 h), use cached devices directly
 3. If cache is stale, run SSDP (3 s timeout); fall back to stale cache if SSDP finds nothing
 4. If no cache exists, run SSDP discovery
@@ -89,7 +89,37 @@ assert_eq!(system.speakers().len(), 2);
 assert!(system.speaker("Kitchen").is_some());
 ```
 
-Construction:
+### `SonosSystem::with_groups(names: &[&str]) -> SonosSystem` (test-support only)
+
+Like `with_speakers`, plus a group topology: each speaker becomes a standalone group
+(coordinator = itself). Speaker IDs are `RINCON_000`, `RINCON_001`, … and group IDs
+`RINCON_000:1`, … so `system.groups()` and `system.group("Kitchen")` work in tests.
+
+### Offline constructors (test-support only)
+
+All three build the system through the normal construction sequence but skip the
+topology SOAP poll and mark the system offline, so a lookup miss never triggers SSDP
+rediscovery. Use them when tests need real `Device` values without network cost.
+
+| Constructor | Topology |
+|---|---|
+| `from_devices_offline(devices: Vec<Device>) -> Result<Self, SdkError>` | None |
+| `from_devices_offline_with_topology(devices, seed: impl FnOnce(&Self))` | Seeded by the closure (crate-internal state, so of limited use downstream) |
+| `from_devices_offline_with_groups(devices, groups: Vec<(GroupId, SpeakerId, Vec<SpeakerId>)>)` | Explicit `(group id, coordinator, members)` list — the way to build multi-member groups from outside the SDK |
+
+```rust
+// Only available with `test-support` feature
+let system = SonosSystem::from_devices_offline_with_groups(
+    devices,
+    vec![(
+        GroupId::new("RINCON_000:1"),
+        SpeakerId::new("RINCON_000"),
+        vec![SpeakerId::new("RINCON_000"), SpeakerId::new("RINCON_001")],
+    )],
+)?;
+```
+
+`SonosSystem::new()` construction:
 
 1. Create a `StateManager` (property cache).
 2. Register all discovered `Device` objects with the state manager.
@@ -106,7 +136,7 @@ Construction:
 |---|---|---|
 | `speakers()` | `&self -> Vec<Speaker>` | All speaker handles |
 | `speaker_names()` | `&self -> Vec<String>` | All friendly names |
-| `speaker(name)` | `(&self, name: &str) -> Option<Speaker>` | By name; auto-rediscovers on miss |
+| `speaker(name)` | `(&self, name: &str) -> Option<Speaker>` | By name (case-insensitive); auto-rediscovers on miss |
 | `speaker_by_id(id)` | `(&self, id: &SpeakerId) -> Option<Speaker>` | By ID; `None` if not found |
 | `state_manager()` | `(&self) -> &Arc<StateManager>` | Low-level state access |
 
@@ -131,7 +161,7 @@ hasn't been loaded yet — no need to watch `group_membership` first.
 | Method | Signature | Returns |
 |---|---|---|
 | `groups()` | `&self -> Vec<Group>` | All current groups |
-| `group(name)` | `(&self, name: &str) -> Option<Group>` | By coordinator speaker name |
+| `group(name)` | `(&self, name: &str) -> Option<Group>` | By coordinator speaker name (case-insensitive) |
 | `group_by_id(id)` | `(&self, id: &GroupId) -> Option<Group>` | By group ID |
 | `group_for_speaker(id)` | `(&self, id: &SpeakerId) -> Option<Group>` | Group the speaker belongs to |
 
@@ -579,7 +609,13 @@ pub fn watch(&self) -> Result<WatchHandle<P>, SdkError>
 
 // Defined on PropertyHandle<P> only when P: Fetchable
 pub fn fetch(&self) -> Result<P, SdkError>
+pub fn watch_or_fetch(&self) -> Result<WatchHandle<P>, SdkError>
 ```
+
+`watch_or_fetch()` subscribes like `watch()` and, if the cache has no value yet, does a
+one-time `fetch()` to seed it (a failed fetch is logged, not returned). Use it when a
+value is needed on the first frame instead of waiting for the first UPnP event.
+`PropertyHandle<GroupMembership>` has its own concrete `fetch()` and no `watch_or_fetch()`.
 
 ### 5.2 `GroupPropertyHandle<P>` (group properties)
 
@@ -594,6 +630,7 @@ pub fn watch(&self) -> Result<WatchHandle<P>, SdkError>
 
 // When P: GroupFetchable
 pub fn fetch(&self) -> Result<P, SdkError>
+pub fn watch_or_fetch(&self) -> Result<WatchHandle<P>, SdkError>  // fetches from the coordinator if empty
 ```
 
 ### 5.3 Method semantics
@@ -622,16 +659,16 @@ pub struct WatchHandle<P> {
 }
 
 impl<P> WatchHandle<P> {
-    pub fn value(&self) -> Option<&P>
-    pub fn has_value(&self) -> bool
+    pub fn value(&self) -> Option<P>        // live read from the store, cloned
+    pub fn has_value(&self) -> bool         // also a live read
     pub fn mode(&self) -> WatchMode
     pub fn has_realtime_events(&self) -> bool
 }
-
-impl<P> Deref for WatchHandle<P> {
-    type Target = Option<P>;
-}
 ```
+
+There is no `Deref` impl. `value()` re-reads the state store on every call (same cost
+as `get()`), so a handle held across many events always returns the current value —
+there is no need to re-`watch()` to refresh it.
 
 `WatchMode` indicates how updates will arrive:
 
@@ -687,12 +724,13 @@ pub type GroupVolumeChangeableHandle = GroupPropertyHandle<GroupVolumeChangeable
 
 ## 6. Discovery API
 
-`sonos_discovery` is an internal crate re-exported through the SDK. You can import it
-directly for finer-grained control.
+`sonos_discovery` is an internal crate re-exported through the SDK as
+`sonos_sdk::sonos_discovery`, so no extra dependency is needed. To depend on it
+directly, note it is published as `sonos-sdk-discovery`:
 
 ```toml
 [dependencies]
-sonos-discovery = "0.1"
+sonos-discovery = { package = "sonos-sdk-discovery", version = "0.9" }
 ```
 
 ### Free functions
@@ -876,7 +914,9 @@ match speaker.set_volume(150) {
 
 ### `ApiError` (from `sonos_api`)
 
-Wraps SOAP-level failures:
+Wraps SOAP-level failures. `sonos-sdk` 0.9 does **not** re-export `ApiError`, so
+downstream crates cannot name its variants; `sonos-cli` matches on the `Display` text
+(`"Network error: ..."`) instead.
 
 ```rust
 pub enum ApiError {

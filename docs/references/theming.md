@@ -11,7 +11,7 @@ How the TUI theme system works and how to add a new theme.
 | **Minimal** | `minimal` | Stripped decorations — no leaders, no connectors, quiet palette |
 | **Dance Party** | `dance_party` | Fun glyphs, vivid RGB colors, gradient progress bar |
 
-Set via `~/.config/sonos/config.toml`:
+Set via `config.toml` in the config directory (`~/.config/sonos/` on Linux, `~/Library/Application Support/sonos/` on macOS, `%APPDATA%\sonos\` on Windows, or `$SONOS_CONFIG_DIR`):
 
 ```toml
 theme = "dance_party"

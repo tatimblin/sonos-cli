@@ -11,10 +11,20 @@ These flags are accepted by every command.
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--help` | `-h` | Show command help and exit (exit 0) |
-| `--version` | `-v` | Print version string and exit (exit 0) |
+| `--version` | `-V` | Print `sonos <version>` and exit (exit 0) |
 | `--quiet` | `-q` | Suppress all non-error stdout output |
-| `--verbose` | — | Show raw SDK errors and debug output on stderr |
+| `--verbose` | `-v` | Raise log verbosity on stderr: `-v` info, `-vv` debug, `-vvv` trace (overrides `RUST_LOG`) |
 | `--no-input` | — | Disable all interactive prompts; required in scripts |
+| `--offline` | — | Accept cached data when no speaker responds (exit 0, no warning banner) |
+| `--require-live` | — | Fail with no stdout (banner on stderr, exit 1) unless a speaker was actually reached |
+| `--speaker NAME` | `-s` | Target a speaker (see [Targeting](#targeting)) |
+| `--group NAME` | `-g` | Target a group (see [Targeting](#targeting)) |
+
+`--offline` and `--require-live` conflict. Without either, a read command (`speakers`, `groups`, `status`) whose every request failed still prints its cached output, adds a warning banner on stderr, and exits 3.
+
+Every run appends a log to `sonos.log` in the platform data directory (`~/.local/share/sonos/` on Linux, `~/Library/Application Support/sonos/` on macOS, `%LOCALAPPDATA%\sonos\` on Windows). At startup a log over 1 MiB is rotated to `sonos.log.1`, replacing the previous one.
+
+Argument values are validated by clap: an out-of-range or unknown value prints clap's message (`error: invalid value '...' for '<ARG>': ...`) and exits 2. Not-found errors are followed by a platform-specific `hint:` block listing likely discovery causes (abbreviated `hint: ...` below).
 
 ---
 
@@ -27,9 +37,15 @@ Most commands operate on a group or speaker. Every command that targets a device
 --group NAME      target a group by name
 ```
 
-If both flags are given, `--group` wins. If neither is given, the default group is used — set via `default_group` in `~/.config/sonos/config.toml` or the `SONOS_DEFAULT_GROUP` environment variable. If no default is configured, the first discovered group is used.
+If both flags are given, `--group` wins. If neither is given, the default group is used — set via `default_group` in the [config file](cli-guidelines.md#config-file-configtoml) or the `SONOS_DEFAULT_GROUP` environment variable. If no default is configured (or it no longer exists), the coordinator of the largest group is used, then any speaker.
 
-EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers only and do not accept `--group`.
+Names given to `--speaker` / `--group` may be aliases (see [config alias](#config-alias)).
+
+EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers only. Passing `--group` to them is a usage error (exit 2):
+
+```
+error: validation error: bass applies to a single speaker; use --speaker instead of --group
+```
 
 ---
 
@@ -56,10 +72,7 @@ Kitchen One       ⏸ Paused    vol:50   (Kitchen)
 
 **Errors:**
 
-```
-error: no speakers in cache
-Check that your speakers are on the same network, then retry.
-```
+With no speakers discovered, the `hint:` block goes to stderr and `No speakers found` to stdout (exit 0). If every speaker request fails, the cached rows still print, followed by the unverified-output banner on stderr (exit 3; see `--offline` / `--require-live`).
 
 ---
 
@@ -83,10 +96,7 @@ Kitchen       ⏸ Paused    Hotel California — Eagles    vol:50
 
 **Errors:**
 
-```
-error: no groups in cache
-Check that your speakers are on the same network, then retry.
-```
+With no groups discovered, the `hint:` block goes to stderr and `No groups found` to stdout (exit 0). As with `speakers`, output that no speaker confirmed gets the unverified-output banner (exit 3).
 
 ---
 
@@ -119,10 +129,7 @@ Kitchen  ⏸ Paused  Hotel California — Eagles  4:12/6:30  vol:50
 
 ```
 error: group "Office" not found
-Check that your speakers are on the same network, then retry.
-
-error: no default group configured
-Set 'default_group' in ~/.config/sonos/config.toml or use --group NAME.
+hint: ...
 ```
 
 ---
@@ -160,7 +167,7 @@ Playing (Kitchen)
 
 ```
 error: group "Kitchen" not found
-Check that your speakers are on the same network, then retry.
+hint: ...
 ```
 
 ---
@@ -308,7 +315,8 @@ Seeked to 0:02:30 (Kitchen)
 **Errors:**
 
 ```
-error: invalid position "5:70" — seconds must be 0–59
+error: validation error: invalid position "0:05:70" — seconds must be 0–59
+[exits 2]
 ```
 
 ---
@@ -351,7 +359,8 @@ Mode set to normal (Kitchen)
 **Errors:**
 
 ```
-error: unknown mode "loop" — valid modes: normal, repeat, repeat-one, shuffle, shuffle-no-repeat
+error: invalid value 'loop' for '<MODE>'
+  [possible values: normal, repeat, repeat-one, shuffle, shuffle-no-repeat]
 [exits 2]
 ```
 
@@ -396,7 +405,7 @@ Volume set to 30 (Bedroom One)
 **Errors:**
 
 ```
-error: volume must be between 0 and 100 (got: 150)
+error: invalid value '150' for '<LEVEL>': 150 is not in 0..=100
 [exits 2]
 ```
 
@@ -483,13 +492,18 @@ $ sonos bass -2 --speaker "Bedroom One"
 Bass set to -2 (Bedroom One)
 ```
 
+Negative levels are parsed as values, not flags, so no `--` separator is needed (same for `treble`).
+
 **Errors:**
 
 ```
-error: bass must be between -10 and 10 (got: 15)
+error: invalid value '15' for '<LEVEL>': 15 is not in -10..=10
 [exits 2]
 
-error: --speaker is required for bass
+error: validation error: --speaker is required for bass
+[exits 2]
+
+error: validation error: bass applies to a single speaker; use --speaker instead of --group
 [exits 2]
 ```
 
@@ -525,10 +539,13 @@ Treble set to 5 (Kitchen One)
 **Errors:**
 
 ```
-error: treble must be between -10 and 10 (got: -15)
+error: invalid value '-15' for '<LEVEL>': -15 is not in -10..=10
 [exits 2]
 
-error: --speaker is required for treble
+error: validation error: --speaker is required for treble
+[exits 2]
+
+error: validation error: treble applies to a single speaker; use --speaker instead of --group
 [exits 2]
 ```
 
@@ -570,10 +587,14 @@ Loudness disabled (Kitchen One)
 **Errors:**
 
 ```
-error: invalid value "yes" — use on or off
+error: invalid value 'yes' for '<STATE>'
+  [possible values: on, off]
 [exits 2]
 
-error: --speaker is required for loudness
+error: validation error: --speaker is required for loudness
+[exits 2]
+
+error: validation error: loudness applies to a single speaker; use --speaker instead of --group
 [exits 2]
 ```
 
@@ -585,7 +606,7 @@ error: --speaker is required for loudness
 
 ### queue
 
-Show the current queue for a group or speaker.
+Show the number of tracks in the current queue for a group or speaker. (Listing individual tracks is not implemented yet.)
 
 ```
 sonos queue [--speaker NAME | --group NAME]
@@ -604,15 +625,8 @@ sonos queue [--speaker NAME | --group NAME]
 $ sonos queue
 Living Room — 3 tracks
 
-  1  ▶ Bohemian Rhapsody — Queen           5:55
-  2    We Will Rock You — Queen             2:01
-  3    Don't Stop Me Now — Queen            3:29
-```
-
-**Errors:**
-
-```
-error: queue is empty (Living Room)
+$ sonos queue --group "Kitchen"
+queue is empty (Kitchen)
 ```
 
 ---
@@ -715,10 +729,10 @@ Bedroom One joined Living Room
 
 ```
 error: speaker "Bedroom One" not found
-Check that your speakers are on the same network, then retry.
+hint: ...
 
 error: group "Living Room" not found
-Check that your speakers are on the same network, then retry.
+hint: ...
 ```
 
 ---
@@ -748,9 +762,9 @@ Bedroom One left Living Room
 
 ```
 error: speaker "Bedroom One" not found
-Check that your speakers are on the same network, then retry.
+hint: ...
 
-error: --speaker is required for leave
+error: validation error: --speaker is required for leave
 [exits 2]
 ```
 
@@ -796,7 +810,7 @@ Sleep timer set for 1 hour (Kitchen)
 **Errors:**
 
 ```
-error: invalid duration "30" — use a unit suffix: 30m or 1h
+error: validation error: invalid duration "30" — use a unit suffix: 30m or 1h
 [exits 2]
 ```
 
@@ -829,3 +843,52 @@ Sleep timer cancelled (Living Room)
 ```
 error: no active sleep timer (Living Room)
 ```
+
+---
+
+## Configuration
+
+`config` commands never contact a speaker, so they run without discovery. With no action, `sonos config` prints its help and exits 2.
+
+### config alias
+
+List, set, or clear short aliases for speaker and group names. Aliases are accepted anywhere `--speaker` / `--group` take a name and match case-insensitively.
+
+```
+sonos config alias                 # list aliases
+sonos config alias <NAME> <ALIAS>  # set (or replace) the alias for NAME
+sonos config alias <NAME>          # clear the alias for NAME
+```
+
+**Example:**
+
+```bash
+$ sonos config alias "Living Room" lr
+Alias set: lr → Living Room
+
+$ sonos config alias
+lr → Living Room
+
+$ sonos config alias "Living Room"
+Alias cleared: lr → Living Room
+```
+
+With no aliases, the list prints `No aliases configured`.
+
+**Errors:**
+
+```
+error: validation error: alias must not contain whitespace
+[exits 2]
+
+error: validation error: alias "lr" is already used by "Living Room"
+[exits 2]
+
+error: validation error: no alias configured for "Kitchen"
+[exits 2]
+
+error: configuration error: refusing to overwrite <path>/config.toml, which could not be loaded; fix or remove it, then retry
+[exits 1]
+```
+
+The last error appears when the config file exists but cannot be read or parsed: every command then warns and runs with default settings, and nothing overwrites the broken file.
