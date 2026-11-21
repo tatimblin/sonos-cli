@@ -1,10 +1,13 @@
 //! Logging setup using `tracing` + `tracing-subscriber`.
 //!
 //! Initializes a global tracing subscriber with two layers:
-//! - **File layer** (always): writes to `~/.local/share/sonos/sonos.log`, truncated per session.
+//! - **File layer** (always): writes to `~/.local/share/sonos/sonos.log`, appended to by
+//!   every run and rotated to `sonos.log.1` once it passes 1 MB.
 //! - **Stderr layer** (CLI only): writes to stderr. Disabled in TUI mode to avoid corrupting the display.
 
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
+use std::io;
+use std::path::Path;
 use std::sync::Mutex;
 
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -51,9 +54,14 @@ fn build_filter(verbosity: u8) -> EnvFilter {
     }
 }
 
-/// Create (or truncate) the log file, ensuring the parent directory exists.
+/// Rotate the log once it grows past this size at startup.
+const MAX_LOG_BYTES: u64 = 1024 * 1024;
+
+/// Open the log file for appending, ensuring the parent directory exists.
 ///
-/// Returns `None` with a warning on stderr if the file cannot be created.
+/// Appends rather than truncates: the TUI and one-off CLI commands share the
+/// file, so truncating on startup would wipe a running TUI session's log.
+/// Returns `None` with a warning on stderr if the file cannot be opened.
 fn create_log_file() -> Option<File> {
     let data_dir = dirs::data_local_dir()?;
     let log_dir = data_dir.join("sonos");
@@ -67,14 +75,103 @@ fn create_log_file() -> Option<File> {
     }
 
     let log_path = log_dir.join("sonos.log");
-    match File::create(&log_path) {
+    match open_log_file(&log_path, MAX_LOG_BYTES) {
         Ok(file) => Some(file),
         Err(e) => {
             eprintln!(
-                "warning: could not create log file {}: {e}",
+                "warning: could not open log file {}: {e}",
                 log_path.display()
             );
             None
         }
+    }
+}
+
+/// Rotate `path` if it exceeds `max_bytes`, then open it for appending.
+///
+/// Rotation is best-effort: a failed rename just keeps appending.
+fn open_log_file(path: &Path, max_bytes: u64) -> io::Result<File> {
+    if let Err(e) = rotate_if_larger_than(path, max_bytes) {
+        eprintln!("warning: could not rotate log file {}: {e}", path.display());
+    }
+    OpenOptions::new().create(true).append(true).open(path)
+}
+
+/// Move `path` to `<path>.1` (replacing any previous one) if it is larger than
+/// `max_bytes`. A missing file is left alone.
+fn rotate_if_larger_than(path: &Path, max_bytes: u64) -> io::Result<()> {
+    match fs::metadata(path) {
+        Ok(meta) if meta.len() > max_bytes => {}
+        Ok(_) => return Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    }
+    let mut rotated = path.as_os_str().to_owned();
+    rotated.push(".1");
+    // `rename` does not replace an existing target on Windows.
+    match fs::remove_file(&rotated) {
+        Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
+        _ => {}
+    }
+    fs::rename(path, rotated)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn rotated(path: &Path) -> std::path::PathBuf {
+        let mut p = path.as_os_str().to_owned();
+        p.push(".1");
+        p.into()
+    }
+
+    #[test]
+    fn appends_instead_of_truncating() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sonos.log");
+        fs::write(&path, "first\n").unwrap();
+        open_log_file(&path, 1024)
+            .unwrap()
+            .write_all(b"second\n")
+            .unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "first\nsecond\n");
+        assert!(!rotated(&path).exists());
+    }
+
+    #[test]
+    fn creates_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sonos.log");
+        open_log_file(&path, 1024).unwrap();
+        assert!(path.exists());
+        assert!(!rotated(&path).exists());
+    }
+
+    #[test]
+    fn rotates_oversized_file_replacing_previous_rotation() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sonos.log");
+        fs::write(rotated(&path), "ancient\n").unwrap();
+        fs::write(&path, "x".repeat(11)).unwrap();
+
+        open_log_file(&path, 10)
+            .unwrap()
+            .write_all(b"fresh\n")
+            .unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "fresh\n");
+        assert_eq!(fs::read_to_string(rotated(&path)).unwrap(), "x".repeat(11));
+    }
+
+    #[test]
+    fn file_at_the_limit_is_not_rotated() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sonos.log");
+        fs::write(&path, "x".repeat(10)).unwrap();
+        rotate_if_larger_than(&path, 10).unwrap();
+        assert!(path.exists());
+        assert!(!rotated(&path).exists());
     }
 }
