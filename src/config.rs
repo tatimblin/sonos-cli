@@ -209,13 +209,23 @@ impl Config {
     }
 
     /// Set or replace an alias for a speaker/group name.
+    ///
+    /// Names match case-insensitively, like speaker lookup, so an existing
+    /// entry for "kitchen" is replaced (and re-keyed) by one for "Kitchen".
     pub fn set_alias(&mut self, name: &str, alias: &str) {
+        self.clear_alias(name);
         self.aliases.insert(name.to_string(), alias.to_string());
     }
 
-    /// Clear the alias for a speaker/group name. Returns the old alias if one existed.
+    /// Clear the alias for a speaker/group name, matched case-insensitively.
+    /// Returns the old alias if one existed.
     pub fn clear_alias(&mut self, name: &str) -> Option<String> {
-        self.aliases.remove(name)
+        let key = self
+            .aliases
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case(name))?
+            .clone();
+        self.aliases.remove(&key)
     }
 }
 
@@ -316,6 +326,26 @@ mod tests {
         let old = config.clear_alias("Master Bedroom");
         assert_eq!(old, Some("bed".to_string()));
         assert_eq!(config.resolve_alias("bed"), "bed");
+    }
+
+    #[test]
+    fn set_alias_replaces_entry_with_differently_cased_name() {
+        let mut config = Config::default();
+        config.set_alias("kitchen", "kit");
+        config.set_alias("Kitchen", "k");
+        assert_eq!(config.aliases.len(), 1);
+        assert_eq!(config.aliases.get("Kitchen"), Some(&"k".to_string()));
+    }
+
+    #[test]
+    fn clear_alias_matches_name_case_insensitively() {
+        let mut config = Config::default();
+        config.set_alias("Master Bedroom", "bed");
+        assert_eq!(
+            config.clear_alias("master bedroom"),
+            Some("bed".to_string())
+        );
+        assert!(config.aliases.is_empty());
     }
 
     #[test]
