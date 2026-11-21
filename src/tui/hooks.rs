@@ -303,22 +303,10 @@ impl Hooks {
         self.use_watch_cached(key, || prop.watch(), || prop.get())
     }
 
-    /// Subscribe to an SDK group property, returning its current value.
-    ///
-    /// Same as `use_watch` but for group-scoped properties (e.g., group volume).
-    #[allow(dead_code)]
-    pub fn use_watch_group<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>
-    where
-        P: SonosProperty + Clone + 'static,
-    {
-        let key = format!("group:{}:{}", prop.group_id(), P::KEY);
-        self.use_watch_cached(key, || prop.watch(), || prop.get())
-    }
-
     /// Subscribe to a fetchable group property, fetching on first access if empty.
     ///
-    /// Like `use_watch_group` but performs a one-time fetch when the cache has
-    /// no value yet, so the UI doesn't show a blank until the first UPnP event.
+    /// Like `use_watch` but for group-scoped properties (e.g., group volume),
+    /// and performs a one-time fetch when the cache has no value yet, so the UI doesn't show a blank until the first UPnP event.
     /// The fetch happens only on the frame that acquires the handle, since
     /// later frames reuse it.
     pub fn use_watch_group_or_fetch<P>(&mut self, prop: &GroupPropertyHandle<P>) -> Option<P>

@@ -50,7 +50,6 @@ pub struct App {
     pub navigation: Navigation,
     pub should_quit: bool,
     pub dirty: bool,
-    #[allow(dead_code)]
     pub config: Config,
     pub theme: Theme,
     /// Toast notification shown in the header. Auto-expires after 3 seconds.
