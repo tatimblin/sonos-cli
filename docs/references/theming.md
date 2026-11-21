@@ -185,10 +185,10 @@ pub fn from_name(name: &str) -> Self {
 
 ### 3. Add it to the settings dropdown
 
-In `src/tui/handlers/settings.rs`, add the name to `THEME_OPTIONS`:
+In `src/tui/types.rs`, add the name to `THEME_OPTIONS`:
 
 ```rust
-pub(crate) const THEME_OPTIONS: &[&str] = &["default", "bw", "minimal", "dance_party", "my_theme"];
+const THEME_OPTIONS: &[&str] = &["default", "bw", "minimal", "dance_party", "my_theme"];
 ```
 
 ### 4. Update the config doc comment

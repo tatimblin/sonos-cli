@@ -6,11 +6,11 @@ use sonos_sdk::{GroupId, SpeakerId};
 
 use crate::tui::helpers;
 use crate::tui::hooks::{ProgressState, RenderContext};
+use crate::tui::image_loader::ArtProtocolState;
 use crate::tui::types::{
-    build_list_entries, group_for_entry, BottomBarData, GroupHeaderData, ListEntry, RowData,
+    build_list_entries, group_for_selection, BottomBarData, GroupHeaderData, ListEntry, RowData,
     SpeakerListData, SpeakerRowData,
 };
-use crate::tui::widgets::album_art::ArtProtocolState;
 use crate::tui::widgets::{bottom_bar, speaker_list};
 
 /// Render the Speakers tab content area and bottom bar.
@@ -153,27 +153,7 @@ fn assemble_bottom_bar(
     is_wide: bool,
     ctx: &mut RenderContext,
 ) -> BottomBarData {
-    // Find the group for the currently focused entry
-    let group_id = group_for_entry(entries, selected_index);
-
-    // For standalone speakers (ungrouped section), resolve via the speaker's own group
-    let resolved_group_id = group_id.or_else(|| {
-        if selected_index < entries.len() {
-            if let ListEntry::SpeakerRow(sid) = &entries[selected_index] {
-                return ctx
-                    .app
-                    .system
-                    .speaker_by_id(sid)
-                    .and_then(|s| s.group())
-                    .map(|g| g.id.clone());
-            }
-        }
-        None
-    });
-
-    let group = resolved_group_id
-        .as_ref()
-        .and_then(|gid| ctx.app.system.group_by_id(gid));
+    let group = group_for_selection(&ctx.app.system, entries, selected_index);
     let coordinator = group.as_ref().and_then(|g| g.coordinator());
 
     // Group name
@@ -223,16 +203,7 @@ fn assemble_bottom_bar(
         0.0
     };
 
-    // Extract track metadata with URI fallback
-    let track_title = current_track.as_ref().and_then(|t| {
-        t.title.clone().or_else(|| {
-            t.uri
-                .as_deref()
-                .map(helpers::uri_source_label)
-                .filter(|s| !s.is_empty())
-                .map(String::from)
-        })
-    });
+    let track_title = current_track.as_ref().and_then(|t| t.title.clone());
     let track_artist = current_track.as_ref().and_then(|t| t.artist.clone());
     let track_album = current_track.as_ref().and_then(|t| t.album.clone());
     let album_art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());

@@ -46,16 +46,16 @@ Key event processing and SDK mutations. Handlers receive `&mut App` and `KeyEven
 **Signature pattern:**
 
 ```rust
-pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction
+pub fn handle_key(app: &mut App, key: KeyEvent) -> KeyOutcome
 ```
 
-**Example:** `speaker_list.rs` handles Up/Down navigation, Left/Right volume adjust, Space for pick-up/drop, and returns `SpeakerListAction` so the caller can respond (e.g., focus tab bar).
+**Example:** `speaker_list.rs` handles Up/Down navigation, Left/Right volume adjust, Space for pick-up/drop, and returns `KeyOutcome` so the caller can respond (e.g., focus tab bar).
 
 ## Shared Modules
 
 ### `tui/types.rs`
 
-Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `SpeakerListAction`, `SpeakerListData`, and `RowData` (per-variant row data: `GroupHeaderData`, `SpeakerRowData`, action rows). Also contains list-building functions (`build_list_entries`, `build_display_order`, `group_for_entry`) used by both handlers and screens.
+Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `KeyOutcome`, `SpeakerListData`, `RowData` (per-variant row data: `GroupHeaderData`, `SpeakerRowData`, action rows), and `SettingsRow` (settings rows with their labels, options and current values). Also contains functions used by both handlers and screens: `build_list_entries`, `group_for_entry`, and `group_for_selection` (the group the bottom bar shows and playback keys control).
 
 ### `tui/keymap.rs`
 

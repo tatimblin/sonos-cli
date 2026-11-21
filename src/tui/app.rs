@@ -104,7 +104,7 @@ pub struct Navigation {
 /// UI state for the Settings screen dropdown form.
 #[derive(Clone, Debug, Default)]
 pub struct SettingsScreenState {
-    /// Which row (0 = theme, 1 = default group, 2 = album art) is selected.
+    /// Index of the selected row in `SettingsRow::ALL`.
     pub selected_row: usize,
     /// Whether the dropdown for the selected row is open.
     pub dropdown_open: bool,
