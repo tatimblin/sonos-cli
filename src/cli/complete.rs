@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::ffi::OsStr;
 
 use clap_complete::engine::CompletionCandidate;
 
 use crate::config::Config;
 
-pub fn speaker_candidates() -> Vec<CompletionCandidate> {
+/// Candidates for `--speaker`, filtered by what has been typed so far.
+pub fn speaker_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
     let mut candidates = Vec::new();
 
     // Quiet: a warning on stderr would garble the shell's completion output.
@@ -19,7 +21,7 @@ pub fn speaker_candidates() -> Vec<CompletionCandidate> {
         }
     }
 
-    candidates
+    matching_prefix(candidates, current)
 }
 
 /// Candidates for `--group`, which resolves an alias and then matches a group
@@ -30,7 +32,7 @@ pub fn speaker_candidates() -> Vec<CompletionCandidate> {
 /// topology request to a speaker. If that fails, falls back to every speaker
 /// name: each standalone speaker coordinates its own group, so this is the
 /// best offline guess.
-pub fn group_candidates() -> Vec<CompletionCandidate> {
+pub fn group_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
     // Quiet: a warning on stderr would garble the shell's completion output.
     let config = Config::try_load().unwrap_or_default();
 
@@ -48,7 +50,32 @@ pub fn group_candidates() -> Vec<CompletionCandidate> {
         }
     });
 
-    group_candidates_from(&config.aliases, coordinators.as_deref())
+    matching_prefix(
+        group_candidates_from(&config.aliases, coordinators.as_deref()),
+        current,
+    )
+}
+
+/// Keep candidates whose value starts with `current`, ignoring case.
+///
+/// Name resolution is case-insensitive (`--group office` finds "Office"), so
+/// completion is too. clap's built-in filter for `ArgValueCandidates` is
+/// case-sensitive, which is why these flags use `ArgValueCompleter` and filter
+/// here instead.
+fn matching_prefix(
+    candidates: Vec<CompletionCandidate>,
+    current: &OsStr,
+) -> Vec<CompletionCandidate> {
+    let current = current.to_string_lossy().to_lowercase();
+    candidates
+        .into_iter()
+        .filter(|c| {
+            c.get_value()
+                .to_string_lossy()
+                .to_lowercase()
+                .starts_with(&current)
+        })
+        .collect()
 }
 
 /// Build `--group` candidates from coordinator names and the configured
@@ -120,6 +147,20 @@ mod tests {
             kit.get_help().map(|h| h.to_string()).as_deref(),
             Some("Kitchen")
         );
+    }
+
+    #[test]
+    fn prefix_match_ignores_case() {
+        let filtered = |current: &str| {
+            let candidates = ["Office / Roam", "roam", "Kitchen"]
+                .into_iter()
+                .map(CompletionCandidate::new)
+                .collect();
+            values(&matching_prefix(candidates, OsStr::new(current)))
+        };
+        assert_eq!(filtered("o"), ["Office / Roam"]);
+        assert_eq!(filtered("ROA"), ["roam"]);
+        assert_eq!(filtered("").len(), 3);
     }
 
     #[test]
