@@ -2,6 +2,7 @@ use std::io::IsTerminal;
 
 use sonos_sdk::{SeekTarget, SonosSystem};
 
+use super::config_cmd::run_config_action;
 use super::{
     format_duration_human, format_time_ms, parse_duration, playback_icon, playback_label,
     require_speaker_only, resolve_group, resolve_speaker, validate_seek_time, Commands,
@@ -39,7 +40,15 @@ pub fn run_command(
         Commands::Loudness { state } => cmd_loudness(system, config, global, state),
         Commands::Sleep { duration } => cmd_sleep(system, config, global, &duration),
         Commands::Queue { action } => cmd_queue(system, config, global, action),
-        Commands::Config { .. } => unreachable!("config commands dispatched before discovery"),
+        // `main` runs these before discovery via `run_config_command`; this arm
+        // keeps `run_command` total for library callers. No speaker is probed,
+        // so there is nothing unvalidated to flag.
+        Commands::Config {
+            action: Some(action),
+        } => run_config_action(&action, &mut config.clone()).map(CommandOutput::live),
+        Commands::Config { action: None } => Err(CliError::Validation(
+            "missing config action (see `sonos config --help`)".to_string(),
+        )),
 
         Commands::Play => {
             let s = spk()?;

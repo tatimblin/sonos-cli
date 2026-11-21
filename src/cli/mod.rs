@@ -2,12 +2,14 @@
 
 mod commands;
 pub mod complete;
+mod config_cmd;
 mod format;
 mod parse;
 mod resolve;
 mod run;
 
 pub use commands::*;
+pub use config_cmd::{run_config_action, run_config_command};
 pub use format::*;
 pub use parse::*;
 pub use resolve::*;
