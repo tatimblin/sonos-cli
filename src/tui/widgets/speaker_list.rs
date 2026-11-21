@@ -11,6 +11,9 @@
 //!   `├─ Bathroom • Sonos Connect:AMP                  46%`
 //!   `└─ Bedroom • Sonos Amp                           28%`
 //!
+//! Muted speakers and groups show the mute glyph before the volume:
+//!   `├─ Bathroom • Sonos Connect:AMP                × 46%`
+//!
 //! During pickup mode, inline action rows appear:
 //!   `└─ Add to group`       (selectable drop target)
 //!   `└─ Already in group`   (dimmed, home group)
@@ -113,7 +116,12 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                 let cursor_str = if is_selected { g.cursor } else { " " };
 
                 let vol_text = format_volume(entry_data.group_volume);
-                let vol_chars = vol_text.chars().count();
+                let mute_text = if entry_data.is_muted {
+                    format!(" {}", g.muted)
+                } else {
+                    String::new()
+                };
+                let vol_chars = vol_text.chars().count() + mute_text.chars().count();
 
                 let name_chars = entry_data.name.chars().count();
                 let icon_chars = icon.chars().count();
@@ -154,6 +162,9 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                     ));
                 }
 
+                if !mute_text.is_empty() {
+                    spans.push(Span::styled(mute_text, theme.error));
+                }
                 spans.push(Span::styled(format!(" {vol_text}"), theme.muted));
 
                 lines.push(Line::from(spans));
@@ -214,6 +225,7 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
                         append_volume_spans(
                             &mut spans,
                             vol,
+                            entry_data.is_muted,
                             is_selected && !is_pickup,
                             vol_width,
                             total_width,
@@ -342,9 +354,12 @@ fn format_volume(vol: Option<u16>) -> String {
 }
 
 /// Append right-aligned volume bar (when selected) or percentage text to a span list.
+///
+/// When `is_muted`, the mute glyph precedes the volume and the bar renders dimmed.
 fn append_volume_spans(
     spans: &mut Vec<Span>,
     vol: u16,
+    is_muted: bool,
     is_selected: bool,
     bar_width: u16,
     total_width: usize,
@@ -353,30 +368,35 @@ fn append_volume_spans(
     // Calculate current content width
     let content_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
 
-    if is_selected {
+    let mute_text = if is_muted {
+        format!("{} ", theme.glyphs.muted)
+    } else {
+        String::new()
+    };
+    let mute_chars = mute_text.chars().count();
+
+    let vol_spans = if is_selected {
         // Right-align the volume bar
-        let vol_line =
-            volume_bar::render_volume_bar(vol, bar_width, theme.volume_filled, theme.volume_empty);
-        let vol_display_width: usize = vol_line
-            .spans
-            .iter()
-            .map(|s| s.content.chars().count())
-            .sum();
-        let pad = total_width.saturating_sub(content_width + vol_display_width);
-        if pad > 0 {
-            spans.push(Span::raw(" ".repeat(pad)));
-        }
-        spans.extend(vol_line.spans);
+        let filled = if is_muted {
+            theme.volume_empty
+        } else {
+            theme.volume_filled
+        };
+        volume_bar::render_volume_bar(vol, bar_width, filled, theme.volume_empty).spans
     } else {
         // Right-align the volume percentage
-        let vol_text = format!("{vol:>3}%");
-        let vol_chars = vol_text.chars().count();
-        let pad = total_width.saturating_sub(content_width + vol_chars);
-        if pad > 0 {
-            spans.push(Span::raw(" ".repeat(pad)));
-        }
-        spans.push(Span::styled(vol_text, theme.muted));
+        vec![Span::styled(format!("{vol:>3}%"), theme.muted)]
+    };
+    let vol_display_width: usize = vol_spans.iter().map(|s| s.content.chars().count()).sum();
+
+    let pad = total_width.saturating_sub(content_width + mute_chars + vol_display_width);
+    if pad > 0 {
+        spans.push(Span::raw(" ".repeat(pad)));
     }
+    if is_muted {
+        spans.push(Span::styled(mute_text, theme.error));
+    }
+    spans.extend(vol_spans);
 }
 
 // ===========================================================================

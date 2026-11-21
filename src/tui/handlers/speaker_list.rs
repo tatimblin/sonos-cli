@@ -145,6 +145,10 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
             }
             SpeakerListAction::Handled
         }
+        KeyCode::Char('m') => {
+            handle_mute_toggle(app, entries, selected);
+            SpeakerListAction::Handled
+        }
         KeyCode::Char('p') => {
             handle_play_pause(app, entries, selected);
             SpeakerListAction::Handled
@@ -181,6 +185,27 @@ fn handle_volume_adjust(app: &mut App, entries: &[ListEntry], selected: usize, d
             }
         }
         _ => {}
+    }
+}
+
+/// Toggle mute on the selected group header (group mute) or speaker row.
+fn handle_mute_toggle(app: &mut App, entries: &[ListEntry], selected: usize) {
+    if selected >= entries.len() {
+        return;
+    }
+    let result = match &entries[selected] {
+        ListEntry::GroupHeader(group_id) => app.system.group_by_id(group_id).map(|group| {
+            let muted = group.mute.get().is_some_and(|m| m.is_muted());
+            group.set_mute(!muted)
+        }),
+        ListEntry::SpeakerRow(speaker_id) => app.system.speaker_by_id(speaker_id).map(|speaker| {
+            let muted = speaker.mute.get().is_some_and(|m| m.is_muted());
+            speaker.set_mute(!muted)
+        }),
+        _ => None,
+    };
+    if let Some(Err(e)) = result {
+        app.toast = Some(Toast::error(format!("{e}")));
     }
 }
 

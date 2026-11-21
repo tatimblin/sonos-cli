@@ -228,7 +228,7 @@ fn render_tab_labels(
 
 fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
     let text = match app.navigation.tab {
-        Tab::Speakers => "\u{2191}\u{2193} Navigate   \u{2190}\u{2192} Volume   \u{2423} Pick up/Drop   p Play/Pause  n Next  b Prev   \u{238b} Quit",
+        Tab::Speakers => "\u{2191}\u{2193} Navigate   \u{2190}\u{2192} Volume  m Mute   \u{2423} Pick up/Drop   p Play/Pause  n Next  b Prev   \u{238b} Quit",
         Tab::Settings => {
             if app.navigation.settings_state.dropdown_open {
                 "\u{2191}\u{2193} Select  Enter Confirm  \u{238b} Cancel"

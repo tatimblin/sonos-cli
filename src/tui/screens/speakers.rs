@@ -35,6 +35,10 @@ pub fn render(
                     .as_ref()
                     .and_then(|s| ctx.hooks.use_watch(&s.volume))
                     .map(|v| v.value() as u16);
+                let muted = speaker
+                    .as_ref()
+                    .and_then(|s| ctx.hooks.use_watch(&s.mute))
+                    .is_some_and(|m| m.is_muted());
                 if let Some(ref s) = speaker {
                     ctx.hooks.use_watch(&s.group_membership);
                 }
@@ -54,6 +58,7 @@ pub fn render(
                     model_name: model,
                     speaker_volume: vol,
                     group_volume: None,
+                    is_muted: muted,
                     playback_state: None,
                     track_info: None,
                     is_last_in_group: is_last,
@@ -68,6 +73,10 @@ pub fn render(
                     .as_ref()
                     .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
                     .map(|v| v.value());
+                let gmuted = group
+                    .as_ref()
+                    .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.mute))
+                    .is_some_and(|m| m.is_muted());
 
                 let pb = coordinator
                     .as_ref()
@@ -87,6 +96,7 @@ pub fn render(
                     model_name: None,
                     speaker_volume: None,
                     group_volume: gvol,
+                    is_muted: gmuted,
                     playback_state: pb,
                     track_info: track,
                     is_last_in_group: false,
@@ -109,6 +119,7 @@ pub fn render(
                     model_name: None,
                     speaker_volume: None,
                     group_volume: None,
+                    is_muted: false,
                     playback_state: None,
                     track_info: None,
                     is_last_in_group: true,
@@ -121,6 +132,7 @@ pub fn render(
                     model_name: None,
                     speaker_volume: None,
                     group_volume: None,
+                    is_muted: false,
                     playback_state: None,
                     track_info: None,
                     is_last_in_group: false,

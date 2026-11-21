@@ -126,6 +126,8 @@ pub struct EntryRenderData {
     pub model_name: Option<String>,
     pub speaker_volume: Option<u16>,
     pub group_volume: Option<u16>,
+    /// True when the speaker (speaker rows) or group (group headers) is muted.
+    pub is_muted: bool,
     pub playback_state: Option<PlaybackState>,
     pub track_info: Option<String>,
     /// True when this entry is the last member of its group block (renders `└` connector).
