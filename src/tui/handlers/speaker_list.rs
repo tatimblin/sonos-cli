@@ -1,9 +1,10 @@
 //! Speaker list key handling — navigation, volume adjustment, pick-up/drop regrouping,
 //! and playback controls (play/pause, next, previous).
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 
 use crate::tui::app::{App, Toast};
+use crate::tui::keymap::{lookup, PickUpCommand, SpeakerCommand, PICK_UP_KEYS, SPEAKER_KEYS};
 use crate::tui::types::{
     build_list_entries, group_for_entry, ListEntry, PickUpState, SpeakerListAction,
 };
@@ -87,10 +88,13 @@ fn home_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
 }
 
 fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
+    let Some(command) = lookup(SPEAKER_KEYS, key.code) else {
+        return SpeakerListAction::Handled;
+    };
     let selected = app.navigation.speakers_state.selection.index_in(entries);
 
-    match key.code {
-        KeyCode::Up => {
+    match command {
+        SpeakerCommand::Up => {
             if let Some(prev) = prev_entry(selected) {
                 app.navigation
                     .speakers_state
@@ -101,7 +105,7 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
             }
             SpeakerListAction::Handled
         }
-        KeyCode::Down => {
+        SpeakerCommand::Down => {
             if let Some(next) = next_entry(entries, selected) {
                 app.navigation
                     .speakers_state
@@ -110,15 +114,15 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
             }
             SpeakerListAction::Handled
         }
-        KeyCode::Left => {
+        SpeakerCommand::VolumeDown => {
             handle_volume_adjust(app, entries, selected, -2);
             SpeakerListAction::Handled
         }
-        KeyCode::Right => {
+        SpeakerCommand::VolumeUp => {
             handle_volume_adjust(app, entries, selected, 2);
             SpeakerListAction::Handled
         }
-        KeyCode::Char(' ') => {
+        SpeakerCommand::PickUp => {
             if selected >= entries.len() {
                 return SpeakerListAction::Handled;
             }
@@ -150,23 +154,22 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
             }
             SpeakerListAction::Handled
         }
-        KeyCode::Char('m') => {
+        SpeakerCommand::ToggleMute => {
             handle_mute_toggle(app, entries, selected);
             SpeakerListAction::Handled
         }
-        KeyCode::Char('p') => {
+        SpeakerCommand::PlayPause => {
             handle_play_pause(app, entries, selected);
             SpeakerListAction::Handled
         }
-        KeyCode::Char('n') => {
+        SpeakerCommand::Next => {
             handle_playback_action(app, entries, selected, PlaybackAction::Next);
             SpeakerListAction::Handled
         }
-        KeyCode::Char('b') => {
+        SpeakerCommand::Previous => {
             handle_playback_action(app, entries, selected, PlaybackAction::Previous);
             SpeakerListAction::Handled
         }
-        _ => SpeakerListAction::Handled,
     }
 }
 
@@ -296,10 +299,13 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
         None => return SpeakerListAction::Handled,
     };
 
+    let Some(command) = lookup(PICK_UP_KEYS, key.code) else {
+        return SpeakerListAction::Handled;
+    };
     let selected = app.navigation.speakers_state.selection.index_in(entries);
 
-    match key.code {
-        KeyCode::Up => {
+    match command {
+        PickUpCommand::Up => {
             if let Some(prev) = prev_action_row(entries, selected) {
                 app.navigation
                     .speakers_state
@@ -308,7 +314,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
             }
             SpeakerListAction::Handled
         }
-        KeyCode::Down => {
+        PickUpCommand::Down => {
             if let Some(next) = next_action_row(entries, selected) {
                 app.navigation
                     .speakers_state
@@ -317,7 +323,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
             }
             SpeakerListAction::Handled
         }
-        KeyCode::Char(' ') => {
+        PickUpCommand::Drop => {
             match &entries[selected] {
                 ListEntry::AddToGroupRow(target_gid) => {
                     let same_group = pick_up
@@ -380,11 +386,10 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
 
             SpeakerListAction::Handled
         }
-        KeyCode::Esc => {
+        PickUpCommand::Cancel => {
             app.navigation.speakers_state.cancel_pick_up();
             SpeakerListAction::Handled
         }
-        _ => SpeakerListAction::Handled,
     }
 }
 
@@ -397,6 +402,7 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::tui::theme::Theme;
+    use crossterm::event::KeyCode;
     use sonos_sdk::SonosSystem;
 
     /// Two standalone groups. `groups()` order is not guaranteed, so tests
