@@ -41,6 +41,9 @@ pub struct Glyphs {
     pub divider_fill: &'static str,
     pub divider_right: &'static str,
 
+    // Mute indicator (prefixes the volume on muted rows)
+    pub muted: &'static str,
+
     // Media controls
     pub control_prev: &'static str,
     pub control_next: &'static str,
@@ -88,6 +91,8 @@ impl Glyphs {
             divider_left: "+",
             divider_fill: "\u{2500}", // ─
             divider_right: "+",
+
+            muted: "\u{00d7}", // ×
 
             control_prev: "\u{23ee}", // ⏮
             control_next: "\u{23ed}", // ⏭
