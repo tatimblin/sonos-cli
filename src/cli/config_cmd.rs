@@ -111,6 +111,7 @@ fn alias_clear(config: &mut Config, name: &str) -> Result<String, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ConfigError;
 
     #[test]
     fn alias_list_empty() {
@@ -181,6 +182,25 @@ mod tests {
         let mut config = Config::default();
         let err = alias_clear(&mut config, "Kitchen").unwrap_err();
         assert!(matches!(err, CliError::Validation(_)));
+    }
+
+    /// A config standing in for an unparseable file must make alias writes
+    /// fail (exit 1) rather than overwrite it. `save()` refuses before it
+    /// touches the filesystem, so this never reaches the real config file.
+    #[test]
+    fn run_config_action_refuses_to_save_over_broken_config() {
+        let mut config = Config::fallback(ConfigError::Parse {
+            path: "/nonexistent/sonos/config.toml".into(),
+            message: "expected `=`".to_string(),
+        });
+        let action = ConfigAction::Alias {
+            name: Some("Kitchen".to_string()),
+            alias: Some("kit".to_string()),
+        };
+        let err = run_config_action(&action, &mut config).unwrap_err();
+        assert!(matches!(err, CliError::Config(_)));
+        assert!(err.to_string().contains("refusing to overwrite"));
+        assert_eq!(err.exit_code(), std::process::ExitCode::from(1));
     }
 
     /// Listing reads only, so it is safe to drive through the dispatcher —
