@@ -385,3 +385,130 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
         _ => SpeakerListAction::Handled,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Only keys that resolve without a SOAP call are covered here: the
+    //! in-memory system's speakers sit at unroutable IPs, so volume, mute and
+    //! playback keys (and regrouping) would hit the network.
+
+    use super::*;
+    use crate::config::Config;
+    use crate::tui::theme::Theme;
+    use sonos_sdk::SonosSystem;
+
+    /// Two standalone groups. `groups()` order is not guaranteed, so tests
+    /// locate entries by kind rather than by name.
+    fn app() -> App {
+        let system = SonosSystem::with_groups(&["Kitchen", "Office"]);
+        App::with_system(system, Config::default(), Theme::default_theme(), None)
+    }
+
+    fn press(app: &mut App, code: KeyCode) -> SpeakerListAction {
+        handle_key(app, KeyEvent::from(code))
+    }
+
+    fn entries(app: &App) -> Vec<ListEntry> {
+        build_list_entries(&app.system, app.navigation.speakers_state.pick_up.as_ref())
+    }
+
+    fn selected(app: &App) -> usize {
+        app.navigation.speakers_state.selected_index
+    }
+
+    #[test]
+    fn down_moves_selection_and_stops_at_the_end() {
+        let mut app = app();
+        let len = entries(&app).len();
+        assert_eq!(len, 4, "header + row per group");
+
+        press(&mut app, KeyCode::Down);
+        assert_eq!(selected(&app), 1);
+        for _ in 0..len {
+            press(&mut app, KeyCode::Down);
+        }
+        assert_eq!(selected(&app), len - 1);
+    }
+
+    #[test]
+    fn up_from_the_top_focuses_the_tab_bar() {
+        let mut app = app();
+        assert!(matches!(
+            press(&mut app, KeyCode::Up),
+            SpeakerListAction::FocusTabBar
+        ));
+        press(&mut app, KeyCode::Down);
+        assert!(matches!(
+            press(&mut app, KeyCode::Up),
+            SpeakerListAction::Handled
+        ));
+        assert_eq!(selected(&app), 0);
+    }
+
+    #[test]
+    fn space_on_group_header_does_not_pick_up() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char(' '));
+        assert!(app.navigation.speakers_state.pick_up.is_none());
+        assert!(app.toast.is_none());
+    }
+
+    #[test]
+    fn space_on_speaker_row_picks_up_and_selects_home_row() {
+        let mut app = app();
+        press(&mut app, KeyCode::Down);
+        let ListEntry::SpeakerRow(speaker_id) = entries(&app)[1].clone() else {
+            panic!("entry 1 should be a speaker row");
+        };
+        let name = app.system.speaker_by_id(&speaker_id).unwrap().name.clone();
+
+        press(&mut app, KeyCode::Char(' '));
+
+        let pick_up = app.navigation.speakers_state.pick_up.clone().unwrap();
+        assert_eq!(pick_up.speaker_id, speaker_id);
+        let home = pick_up.original_group_id.expect("speaker has a group");
+        assert_eq!(
+            entries(&app)[selected(&app)],
+            ListEntry::AddToGroupRow(home),
+            "cursor lands on the speaker's own group"
+        );
+        assert_eq!(
+            app.toast.as_ref().map(|t| t.message.as_str()),
+            Some(format!("Picked up: {name}").as_str())
+        );
+    }
+
+    #[test]
+    fn pickup_down_jumps_between_action_rows_and_esc_cancels() {
+        let mut app = app();
+        press(&mut app, KeyCode::Down);
+        press(&mut app, KeyCode::Char(' '));
+        assert_eq!(selected(&app), 2, "first group's AddToGroupRow");
+
+        press(&mut app, KeyCode::Down);
+        assert!(matches!(
+            entries(&app)[selected(&app)],
+            ListEntry::AddToGroupRow(_)
+        ));
+        assert_eq!(selected(&app), 5, "skips the second group's header and row");
+
+        press(&mut app, KeyCode::Down);
+        assert_eq!(entries(&app)[selected(&app)], ListEntry::CreateNewGroupRow);
+
+        press(&mut app, KeyCode::Esc);
+        assert!(app.navigation.speakers_state.pick_up.is_none());
+    }
+
+    #[test]
+    fn dropping_on_home_group_ends_pickup_without_regrouping() {
+        let mut app = app();
+        press(&mut app, KeyCode::Down);
+        press(&mut app, KeyCode::Char(' '));
+        let before = app.system.groups().len();
+
+        press(&mut app, KeyCode::Char(' '));
+
+        assert!(app.navigation.speakers_state.pick_up.is_none());
+        assert_eq!(app.system.groups().len(), before);
+    }
+}

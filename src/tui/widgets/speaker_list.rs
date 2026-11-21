@@ -402,3 +402,289 @@ fn append_volume_spans(
 // ===========================================================================
 // Tests
 // ===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tui::types::EntryRenderData;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use sonos_sdk::{GroupId, SpeakerId};
+
+    const WIDTH: u16 = 80;
+
+    fn gid(n: u8) -> GroupId {
+        GroupId::new(format!("RINCON_{n:03}:1"))
+    }
+
+    fn sid(n: u8) -> SpeakerId {
+        SpeakerId::new(format!("RINCON_{n:03}"))
+    }
+
+    fn header(name: &str, volume: u16) -> EntryRenderData {
+        EntryRenderData {
+            name: name.to_string(),
+            model_name: None,
+            speaker_volume: None,
+            group_volume: Some(volume),
+            is_muted: false,
+            playback_state: Some(PlaybackState::Stopped),
+            track_info: None,
+            is_last_in_group: false,
+            is_home_group: false,
+        }
+    }
+
+    fn row(name: &str, model: &str, volume: u16, is_last: bool) -> EntryRenderData {
+        EntryRenderData {
+            name: name.to_string(),
+            model_name: Some(model.to_string()),
+            speaker_volume: Some(volume),
+            group_volume: None,
+            is_muted: false,
+            playback_state: None,
+            track_info: None,
+            is_last_in_group: is_last,
+            is_home_group: false,
+        }
+    }
+
+    fn action(name: &str, is_home: bool) -> EntryRenderData {
+        EntryRenderData {
+            name: name.to_string(),
+            model_name: None,
+            speaker_volume: None,
+            group_volume: None,
+            is_muted: false,
+            playback_state: None,
+            track_info: None,
+            is_last_in_group: true,
+            is_home_group: is_home,
+        }
+    }
+
+    /// One group "Kitchen" (playing, 30%) with members Kitchen (46%) and
+    /// Bathroom (28%). The header is selected unless a test changes it.
+    fn kitchen_group() -> SpeakerListData {
+        let mut kitchen = header("Kitchen", 30);
+        kitchen.playback_state = Some(PlaybackState::Playing);
+        kitchen.track_info = Some("Boy In Red \u{2014} Artist".to_string());
+        SpeakerListData {
+            entries: vec![
+                ListEntry::GroupHeader(gid(0)),
+                ListEntry::SpeakerRow(sid(0)),
+                ListEntry::SpeakerRow(sid(1)),
+            ],
+            entry_data: vec![
+                kitchen,
+                row("Kitchen", "Sonos One", 46, false),
+                row("Bathroom", "Sonos Amp", 28, true),
+            ],
+            selected_index: 0,
+            picked_up_speaker_id: None,
+        }
+    }
+
+    /// Render into a `WIDTH`-column test terminal and return each row as text
+    /// with trailing blanks trimmed.
+    fn render_lines(data: &SpeakerListData) -> Vec<String> {
+        let height = 20;
+        let mut terminal = Terminal::new(TestBackend::new(WIDTH, height)).unwrap();
+        let theme = Theme::default_theme();
+        terminal
+            .draw(|frame| render(frame, frame.area(), data, &theme))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        (0..height)
+            .map(|y| {
+                (0..WIDTH)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    .trim_end()
+                    .to_string()
+            })
+            .collect()
+    }
+
+    /// Right-aligned content ends exactly at the last column.
+    fn assert_flush_right(line: &str) {
+        assert_eq!(
+            line.chars().count(),
+            WIDTH as usize,
+            "expected right-aligned content in {line:?}"
+        );
+    }
+
+    #[test]
+    fn empty_list_says_no_speakers() {
+        let data = SpeakerListData {
+            entries: vec![],
+            entry_data: vec![],
+            selected_index: 0,
+            picked_up_speaker_id: None,
+        };
+        assert!(render_lines(&data)
+            .iter()
+            .any(|l| l.contains("No speakers found")));
+    }
+
+    #[test]
+    fn group_header_shows_icon_name_track_and_volume() {
+        let lines = render_lines(&kitchen_group());
+        let header = &lines[0];
+        assert!(
+            header.starts_with("\u{276f} \u{25b6} Kitchen :"),
+            "{header:?}"
+        );
+        assert!(
+            header.contains(": Boy In Red \u{2014} Artist :"),
+            "{header:?}"
+        );
+        assert!(header.ends_with(":  30%"), "{header:?}");
+        assert_flush_right(header);
+    }
+
+    #[test]
+    fn stopped_group_header_fills_with_leaders() {
+        let mut data = kitchen_group();
+        data.entry_data[0] = header("Kitchen", 5);
+        let header = &render_lines(&data)[0];
+        assert!(
+            header.starts_with("\u{276f} \u{25a0} Kitchen :"),
+            "{header:?}"
+        );
+        assert!(header.ends_with("::::   5%"), "{header:?}");
+        assert_flush_right(header);
+    }
+
+    #[test]
+    fn speaker_rows_use_tree_connectors_and_right_aligned_volume() {
+        let lines = render_lines(&kitchen_group());
+        assert!(
+            lines[1].starts_with("    \u{251c}\u{2500} Kitchen \u{2022} Sonos One "),
+            "{:?}",
+            lines[1]
+        );
+        assert!(lines[1].ends_with(" 46%"), "{:?}", lines[1]);
+        assert_flush_right(&lines[1]);
+        assert!(
+            lines[2].starts_with("    \u{2514}\u{2500} Bathroom \u{2022} Sonos Amp "),
+            "{:?}",
+            lines[2]
+        );
+        assert!(lines[2].ends_with(" 28%"), "{:?}", lines[2]);
+        assert_flush_right(&lines[2]);
+    }
+
+    #[test]
+    fn selected_speaker_row_shows_volume_bar() {
+        let mut data = kitchen_group();
+        data.selected_index = 1;
+        let lines = render_lines(&data);
+        assert!(lines[1].starts_with('\u{276f}'), "{:?}", lines[1]);
+        // 16-column bar: 11 cells (46% → 5 filled) then the label.
+        let bar = format!("{}{} 46%", "\u{25a0}".repeat(5), "\u{b7}".repeat(6));
+        assert!(lines[1].ends_with(&format!(" {bar}")), "{:?}", lines[1]);
+        assert_flush_right(&lines[1]);
+        // The header loses the cursor; unselected rows keep plain text.
+        assert!(lines[0].starts_with("  \u{25b6} Kitchen"), "{:?}", lines[0]);
+        assert!(!lines[2].contains('\u{25a0}'), "{:?}", lines[2]);
+    }
+
+    #[test]
+    fn muted_header_and_rows_show_mute_glyph_before_volume() {
+        let mut data = kitchen_group();
+        data.entry_data[0].is_muted = true;
+        data.entry_data[2].is_muted = true;
+        let lines = render_lines(&data);
+        assert!(lines[0].ends_with(": \u{d7}  30%"), "{:?}", lines[0]);
+        assert_flush_right(&lines[0]);
+        assert!(!lines[1].contains('\u{d7}'), "{:?}", lines[1]);
+        assert!(lines[2].ends_with(" \u{d7}  28%"), "{:?}", lines[2]);
+        assert_flush_right(&lines[2]);
+    }
+
+    #[test]
+    fn muted_selected_row_shows_mute_glyph_before_bar() {
+        let mut data = kitchen_group();
+        data.entry_data[1].is_muted = true;
+        data.selected_index = 1;
+        let line = &render_lines(&data)[1];
+        assert!(line.contains(" \u{d7} \u{25a0}"), "{line:?}");
+        assert!(line.ends_with(" 46%"), "{line:?}");
+        assert_flush_right(line);
+    }
+
+    #[test]
+    fn groups_are_separated_by_a_divider() {
+        let mut data = kitchen_group();
+        data.entries.push(ListEntry::GroupHeader(gid(2)));
+        data.entries.push(ListEntry::SpeakerRow(sid(2)));
+        data.entry_data.push(header("Office", 10));
+        data.entry_data
+            .push(row("Office", "Sonos Era 100", 10, true));
+        let lines = render_lines(&data);
+        assert_eq!(lines[3], "");
+        assert!(!lines[4].is_empty(), "divider expected");
+        assert_eq!(lines[5], "");
+        assert!(
+            lines[6].starts_with("  \u{25a0} Office :"),
+            "{:?}",
+            lines[6]
+        );
+        assert!(
+            lines[7].contains("\u{2514}\u{2500} Office"),
+            "{:?}",
+            lines[7]
+        );
+    }
+
+    #[test]
+    fn pickup_mode_shows_action_rows() {
+        // Bathroom picked up from Kitchen; Office is a second group.
+        let data = SpeakerListData {
+            entries: vec![
+                ListEntry::GroupHeader(gid(0)),
+                ListEntry::SpeakerRow(sid(0)),
+                ListEntry::SpeakerRow(sid(1)),
+                ListEntry::AddToGroupRow(gid(0)),
+                ListEntry::GroupHeader(gid(2)),
+                ListEntry::SpeakerRow(sid(2)),
+                ListEntry::AddToGroupRow(gid(2)),
+                ListEntry::CreateNewGroupRow,
+            ],
+            entry_data: vec![
+                header("Kitchen", 30),
+                row("Kitchen", "Sonos One", 46, false),
+                row("Bathroom", "Sonos Amp", 28, false),
+                action("Already in group", true),
+                header("Office", 10),
+                row("Office", "Sonos Era 100", 10, false),
+                action("Add to group", false),
+                action("Create new group", false),
+            ],
+            selected_index: 6,
+            picked_up_speaker_id: Some(sid(1)),
+        };
+        let lines = render_lines(&data);
+
+        // The picked-up speaker drops its volume (it is padded to full width
+        // for the reverse highlight instead).
+        assert!(
+            lines[2].contains("\u{251c}\u{2500} Bathroom \u{2022} Sonos Amp"),
+            "{:?}",
+            lines[2]
+        );
+        assert!(!lines[2].contains('%'), "{:?}", lines[2]);
+        assert!(lines[1].ends_with(" 46%"), "{:?}", lines[1]);
+
+        assert_eq!(lines[3], "    \u{2514}\u{2500} Already in group");
+        assert!(lines[7].contains("Office"), "{:?}", lines[7]);
+        assert_eq!(lines[9], "\u{276f}   \u{2514}\u{2500} Add to group");
+        // "Create new group" sits below its own divider.
+        assert_eq!(lines[10], "");
+        assert!(!lines[11].is_empty(), "divider expected");
+        assert_eq!(lines[12], "");
+        assert_eq!(lines[13], "    \u{25b8} Create new group");
+    }
+}

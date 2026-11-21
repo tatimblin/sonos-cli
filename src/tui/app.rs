@@ -64,9 +64,21 @@ pub struct App {
 }
 
 impl App {
+    /// Discover speakers (network, or the SDK's disk cache) and build the app.
     pub fn new(config: Config, theme: Theme, picker: Option<Picker>) -> anyhow::Result<Self> {
         let system = SonosSystem::new()?;
-        Ok(Self {
+        Ok(Self::with_system(system, config, theme, picker))
+    }
+
+    /// Build the app around an existing system. Does no discovery, so tests
+    /// can pass the SDK's in-memory `SonosSystem::with_groups` and friends.
+    pub fn with_system(
+        system: SonosSystem,
+        config: Config,
+        theme: Theme,
+        picker: Option<Picker>,
+    ) -> Self {
+        Self {
             system,
             navigation: Navigation::new(),
             should_quit: false,
@@ -76,7 +88,7 @@ impl App {
             toast: None,
             picker: RefCell::new(picker),
             image_loader: ImageLoader::new(),
-        })
+        }
     }
 }
 
