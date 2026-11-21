@@ -102,7 +102,7 @@ Top-level render dispatch: header, separator, screen call, separator, footer. No
 - **Rendering in handlers** — breaks separation. Handlers mutate state; the next render cycle picks it up.
 - **SDK mutations in screens** — belongs in handlers. Screens are read-only data assembly.
 - **Intermediate Action/executor dispatch** — SDK is the shared layer. Call SDK methods directly from handlers.
-- **Widget state in App** — use hooks to co-locate state with the screen that needs it (exception: navigation state like `selected_index` which handlers need).
+- **Widget state in App** — use hooks to co-locate state with the screen that needs it (exception: navigation state like the speaker list `selection` which handlers need).
 
 ## References
 

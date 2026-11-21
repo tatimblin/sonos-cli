@@ -143,7 +143,7 @@ pub fn render(
     }
 
     let state = &ctx.app.navigation.speakers_state;
-    let selected_index = state.selected_index.min(entries.len().saturating_sub(1));
+    let selected_index = state.selection.index_in(&entries);
 
     let data = SpeakerListData {
         entries,
