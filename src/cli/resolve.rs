@@ -4,6 +4,67 @@ use crate::cli::GlobalFlags;
 use crate::config::Config;
 use crate::errors::CliError;
 
+/// What a speaker-or-group command (`volume`, `mute`) acts on.
+pub enum Target {
+    Speaker(Speaker),
+    Group(Group),
+}
+
+impl Target {
+    /// The name shown in command output: the speaker, or the group's coordinator.
+    pub fn display_name(&self) -> String {
+        match self {
+            Self::Speaker(s) => s.name.clone(),
+            Self::Group(g) => coordinator_name(g).unwrap_or_else(|| "unknown".to_string()),
+        }
+    }
+}
+
+/// Resolve --speaker / --group flags for commands that can act on either.
+///
+/// `--group` wins over `--speaker`: only an explicit `--speaker` on its own
+/// targets a single speaker. Everything else — `--group`, both flags, or
+/// neither — targets a group, falling back as `resolve_group` does.
+pub fn resolve_target(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+) -> Result<Target, CliError> {
+    if global.speaker.is_some() && global.group.is_none() {
+        resolve_speaker(system, config, global).map(Target::Speaker)
+    } else {
+        resolve_group(system, config, global).map(Target::Group)
+    }
+}
+
+/// The friendly name of a group's coordinator, if it has one.
+pub fn coordinator_name(group: &Group) -> Option<String> {
+    group.coordinator().map(|c| c.name)
+}
+
+/// Look up a speaker by its (already alias-resolved) name.
+pub fn find_speaker(system: &SonosSystem, name: &str) -> Result<Speaker, CliError> {
+    system
+        .speaker(name)
+        .ok_or_else(|| CliError::SpeakerNotFound(name.to_string()))
+}
+
+/// Look up a group by its (already alias-resolved) coordinator name.
+pub fn find_group(system: &SonosSystem, name: &str) -> Result<Group, CliError> {
+    system
+        .group(name)
+        .ok_or_else(|| CliError::GroupNotFound(name.to_string()))
+}
+
+/// The value of a flag a command cannot run without, e.g. `--speaker` for `join`.
+pub fn required_flag<'a>(
+    value: Option<&'a str>,
+    flag: &str,
+    command_name: &str,
+) -> Result<&'a str, CliError> {
+    value.ok_or_else(|| CliError::Validation(format!("{flag} is required for {command_name}")))
+}
+
 /// Resolve --speaker / --group flags to a Speaker handle.
 ///
 /// Priority: `--group` wins over `--speaker`. With neither flag, falls back to the
@@ -17,19 +78,13 @@ pub fn resolve_speaker(
     // --group wins over --speaker
     if let Some(group_name) = &global.group {
         let resolved = config.resolve_alias(group_name);
-        let g = system
-            .group(resolved)
-            .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()))?;
-        return g
+        return find_group(system, resolved)?
             .coordinator()
             .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()));
     }
 
     if let Some(speaker_name) = &global.speaker {
-        let resolved = config.resolve_alias(speaker_name);
-        return system
-            .speaker(resolved)
-            .ok_or_else(|| CliError::SpeakerNotFound(resolved.to_string()));
+        return find_speaker(system, config.resolve_alias(speaker_name));
     }
 
     // Default: config group → first group coordinator → first speaker
@@ -81,10 +136,7 @@ pub fn resolve_group(
     global: &GlobalFlags,
 ) -> Result<Group, CliError> {
     if let Some(group_name) = &global.group {
-        let resolved = config.resolve_alias(group_name);
-        return system
-            .group(resolved)
-            .ok_or_else(|| CliError::GroupNotFound(resolved.to_string()));
+        return find_group(system, config.resolve_alias(group_name));
     }
 
     // Default: config group → largest group
@@ -129,17 +181,11 @@ pub fn require_speaker_only(
 ) -> Result<Speaker, CliError> {
     if global.group.is_some() {
         return Err(CliError::Validation(format!(
-            "--speaker is required for {command_name}"
+            "{command_name} applies to a single speaker; use --speaker instead of --group"
         )));
     }
-    let name = global
-        .speaker
-        .as_deref()
-        .ok_or_else(|| CliError::Validation(format!("--speaker is required for {command_name}")))?;
-    let resolved = config.resolve_alias(name);
-    system
-        .speaker(resolved)
-        .ok_or_else(|| CliError::SpeakerNotFound(resolved.to_string()))
+    let name = required_flag(global.speaker.as_deref(), "--speaker", command_name)?;
+    find_speaker(system, config.resolve_alias(name))
 }
 
 #[cfg(test)]
@@ -223,7 +269,12 @@ mod tests {
             ..Default::default()
         };
         let result = require_speaker_only(&system, &Config::default(), &global, "bass");
-        assert!(matches!(result, Err(CliError::Validation(_))));
+        // The message must name --group: telling the user "--speaker is
+        // required" when they passed --group reads as if their flag was lost.
+        assert!(
+            matches!(result, Err(CliError::Validation(ref msg)) if msg.contains("--group")),
+            "expected a validation error naming --group"
+        );
     }
 
     #[test]
@@ -425,6 +476,90 @@ mod tests {
 
     fn no_flags() -> GlobalFlags {
         GlobalFlags::default()
+    }
+
+    fn flags(speaker: Option<&str>, group: Option<&str>) -> GlobalFlags {
+        GlobalFlags {
+            speaker: speaker.map(Into::into),
+            group: group.map(Into::into),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn resolve_target_speaker_alone_targets_speaker() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let target =
+            resolve_target(&system, &Config::default(), &flags(Some("Bedroom"), None)).unwrap();
+        assert!(matches!(target, Target::Speaker(ref s) if s.name == "Bedroom"));
+        assert_eq!(target.display_name(), "Bedroom");
+    }
+
+    #[test]
+    fn resolve_target_group_alone_targets_group() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let target =
+            resolve_target(&system, &Config::default(), &flags(None, Some("Kitchen"))).unwrap();
+        assert!(matches!(target, Target::Group(_)));
+        assert_eq!(target.display_name(), "Kitchen");
+    }
+
+    /// CLAUDE.md: "--group wins over --speaker".
+    #[test]
+    fn resolve_target_group_wins_over_speaker() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Bedroom"]);
+        let target = resolve_target(
+            &system,
+            &Config::default(),
+            &flags(Some("Bedroom"), Some("Kitchen")),
+        )
+        .unwrap();
+        assert!(matches!(target, Target::Group(_)));
+        assert_eq!(target.display_name(), "Kitchen");
+    }
+
+    #[test]
+    fn resolve_target_no_flags_targets_largest_group() {
+        let target = resolve_target(
+            &system_with_one_big_group(),
+            &Config::default(),
+            &no_flags(),
+        )
+        .unwrap();
+        assert!(matches!(target, Target::Group(ref g) if g.member_ids.len() == 3));
+        assert_eq!(target.display_name(), "Bedroom");
+    }
+
+    #[test]
+    fn resolve_target_resolves_aliases() {
+        let system = SonosSystem::with_speakers(&["Master Bedroom"]);
+        let mut config = Config::default();
+        config.set_alias("Master Bedroom", "bed");
+        let target = resolve_target(&system, &config, &flags(Some("bed"), None)).unwrap();
+        assert_eq!(target.display_name(), "Master Bedroom");
+    }
+
+    #[test]
+    fn resolve_target_reports_missing_names() {
+        let system = SonosSystem::with_groups(&["Kitchen"]);
+        let config = Config::default();
+        assert!(matches!(
+            resolve_target(&system, &config, &flags(Some("Nope"), None)),
+            Err(CliError::SpeakerNotFound(ref n)) if n == "Nope"
+        ));
+        assert!(matches!(
+            resolve_target(&system, &config, &flags(None, Some("Nope"))),
+            Err(CliError::GroupNotFound(ref n)) if n == "Nope"
+        ));
+    }
+
+    #[test]
+    fn required_flag_names_flag_and_command() {
+        assert_eq!(required_flag(Some("x"), "--speaker", "join").unwrap(), "x");
+        assert!(matches!(
+            required_flag(None, "--group", "join"),
+            Err(CliError::Validation(ref m)) if m == "--group is required for join"
+        ));
     }
 
     /// Bare `sonos status` must report the group the user is listening to.
