@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2](https://github.com/tatimblin/sonos-cli/compare/v0.7.1...v0.7.2) - 2026-11-21
+
+### Added
+
+- add dynamic shell completions for speakers, groups, and aliases ([#91](https://github.com/tatimblin/sonos-cli/pull/91))
+
+### Fixed
+
+- *(deps)* bump sonos-sdk to 0.9.0 ([#92](https://github.com/tatimblin/sonos-cli/pull/92))
+
 ## [0.7.0](https://github.com/tatimblin/sonos-cli/compare/v0.6.0...v0.7.0) - 2026-09-18
 
 ### Fixed
