@@ -203,26 +203,42 @@ pub struct BottomBarData {
 /// Pre-computed render data for the speaker list widget.
 pub struct SpeakerListData {
     pub entries: Vec<ListEntry>,
-    pub entry_data: Vec<EntryRenderData>,
+    /// Display data for each entry, index-aligned with `entries`.
+    pub rows: Vec<RowData>,
     pub selected_index: usize,
     /// ID of the picked-up speaker (for reverse-highlight matching).
     pub picked_up_speaker_id: Option<SpeakerId>,
 }
 
-/// Per-entry display data, pre-resolved by the screen layer.
-pub struct EntryRenderData {
+/// Per-entry display data, pre-resolved by the screen layer. One variant per
+/// [`ListEntry`] variant.
+pub enum RowData {
+    GroupHeader(GroupHeaderData),
+    Speaker(SpeakerRowData),
+    /// Drop target during pick-up. `is_home` marks the picked-up speaker's own
+    /// group, shown dimmed as "Already in group".
+    AddToGroup {
+        is_home: bool,
+    },
+    CreateNewGroup,
+}
+
+pub struct GroupHeaderData {
+    /// The coordinator's name.
     pub name: String,
-    pub model_name: Option<String>,
-    pub speaker_volume: Option<u16>,
-    pub group_volume: Option<u16>,
-    /// True when the speaker (speaker rows) or group (group headers) is muted.
+    pub volume: Option<u16>,
     pub is_muted: bool,
     pub playback_state: Option<PlaybackState>,
     pub track_info: Option<String>,
-    /// True when this entry is the last member of its group block (renders `└` connector).
+}
+
+pub struct SpeakerRowData {
+    pub name: String,
+    pub model_name: Option<String>,
+    pub volume: Option<u16>,
+    pub is_muted: bool,
+    /// True when this is the last member of its group block (renders `└` connector).
     pub is_last_in_group: bool,
-    /// True for `AddToGroupRow` where the speaker already belongs (dimmed, not selectable).
-    pub is_home_group: bool,
 }
 
 /// Action returned from settings key handling so callers can respond.

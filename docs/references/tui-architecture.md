@@ -55,7 +55,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction
 
 ### `tui/types.rs`
 
-Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `SpeakerListAction`, `SpeakerListData`, `EntryRenderData`. Also contains list-building functions (`build_list_entries`, `build_display_order`, `group_for_entry`) used by both handlers and screens.
+Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `SpeakerListAction`, `SpeakerListData`, and `RowData` (per-variant row data: `GroupHeaderData`, `SpeakerRowData`, action rows). Also contains list-building functions (`build_list_entries`, `build_display_order`, `group_for_entry`) used by both handlers and screens.
 
 ### `tui/keymap.rs`
 
