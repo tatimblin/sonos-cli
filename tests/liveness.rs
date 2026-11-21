@@ -13,7 +13,6 @@
 //! minus the wait. Using the SDK's `with_speakers` helper instead would
 //! hardcode `192.168.1.100+`, which may be routable on the developer's LAN and
 //! would hang.
-#![cfg(feature = "test-helpers")]
 
 use std::net::TcpListener;
 

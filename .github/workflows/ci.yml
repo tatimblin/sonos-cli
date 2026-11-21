@@ -24,7 +24,6 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Tests
-        # --features test-helpers is required: the SDK's offline/in-memory
-        # constructors sit behind it, and without it 22 existing tests plus the
-        # whole tests/liveness.rs target compile out and silently never run.
-        run: cargo test --features test-helpers
+        # No feature flags needed: the dev-dependency on sonos-sdk enables its
+        # `test-support` feature, so plain `cargo test` runs every test.
+        run: cargo test

@@ -26,7 +26,6 @@ required-features = ["generate"]
 
 [features]
 generate = ["dep:clap_mangen"]
-test-helpers = ["sonos-sdk/test-support"]
 
 [dependencies]
 # Sonos SDK
