@@ -2300,7 +2300,7 @@ dependencies = [
 
 [[package]]
 name = "sonos-cli"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -3530,11 +3530,3 @@ checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
 dependencies = [
  "zune-core",
 ]
-
-[[patch.unused]]
-name = "sonos-sdk"
-version = "0.9.0"
-
-[[patch.unused]]
-name = "sonos-sdk-state"
-version = "0.9.0"
