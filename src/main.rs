@@ -11,6 +11,7 @@ use sonos_sdk::{SdkError, SonosSystem};
 
 use sonos_cli::cli::{run_command, run_config_command, Cli, Commands};
 use sonos_cli::config::Config;
+use sonos_cli::errors::is_discovery_failure;
 use sonos_cli::{diagnostics, liveness, logging, tui};
 
 fn main() -> ExitCode {
@@ -29,7 +30,7 @@ fn main() -> ExitCode {
                     Ok(()) => ExitCode::SUCCESS,
                     Err(e) => {
                         eprintln!("error: {e}");
-                        if format!("{e:?}").contains("DiscoveryFailed") {
+                        if is_discovery_failure(&e) {
                             eprintln!("{}", diagnostics::discovery_hint());
                         }
                         ExitCode::from(1)
