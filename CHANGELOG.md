@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/tatimblin/sonos-cli/compare/v0.8.0...v0.9.0) - 2026-11-22
+
+### Added
+
+- adopt sonos-sdk 0.10 ([#117](https://github.com/tatimblin/sonos-cli/pull/117))
+
+### Changed
+
+- share selection resolvers between screens and handlers ([#111](https://github.com/tatimblin/sonos-cli/pull/111))
+- split speaker list rows into per-variant data and renderers ([#110](https://github.com/tatimblin/sonos-cli/pull/110))
+- drive TUI key handling and legend from one binding table ([#109](https://github.com/tatimblin/sonos-cli/pull/109))
+- move read-command formatting into format.rs ([#107](https://github.com/tatimblin/sonos-cli/pull/107))
+- resolve speaker-or-group targets in one place ([#106](https://github.com/tatimblin/sonos-cli/pull/106))
+- use the library crate from the binary and move config commands into cli ([#97](https://github.com/tatimblin/sonos-cli/pull/97))
+
+### Fixed
+
+- fetch playback position so the progress bar moves ([#115](https://github.com/tatimblin/sonos-cli/pull/115))
+- match speaker and group completions case-insensitively ([#114](https://github.com/tatimblin/sonos-cli/pull/114))
+- detect discovery failures by error variant instead of message text ([#108](https://github.com/tatimblin/sonos-cli/pull/108))
+- reject out-of-range volume, bass and treble as usage errors ([#105](https://github.com/tatimblin/sonos-cli/pull/105))
+- keep the cursor on the same speaker when topology changes ([#104](https://github.com/tatimblin/sonos-cli/pull/104))
+- interpolate progress between position updates ([#103](https://github.com/tatimblin/sonos-cli/pull/103))
+- complete group names for --group ([#102](https://github.com/tatimblin/sonos-cli/pull/102))
+- append to the log file instead of truncating it ([#101](https://github.com/tatimblin/sonos-cli/pull/101))
+- make alias names case-insensitive when setting ([#100](https://github.com/tatimblin/sonos-cli/pull/100))
+- refuse to overwrite a config file that fails to parse ([#99](https://github.com/tatimblin/sonos-cli/pull/99))
+
 ## [0.8.0](https://github.com/tatimblin/sonos-cli/compare/v0.7.2...v0.8.0) - 2026-11-21
 
 ### Added
