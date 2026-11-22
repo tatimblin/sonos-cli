@@ -87,9 +87,11 @@ fn alias_set(config: &mut Config, name: &str, alias: &str) -> Result<String, Cli
             "alias must not contain whitespace".to_string(),
         ));
     }
-    // Check uniqueness: alias string must not already be used by another name
+    // Check uniqueness: alias string must not already be used by another name.
+    // Case-insensitive on both sides, matching `resolve_alias` — otherwise
+    // "kit" and "Kit" could coexist and resolution would depend on HashMap order.
     for (existing_name, existing_alias) in &config.aliases {
-        if existing_alias == alias && existing_name != name {
+        if existing_alias.eq_ignore_ascii_case(alias) && !existing_name.eq_ignore_ascii_case(name) {
             return Err(CliError::Validation(format!(
                 "alias \"{alias}\" is already used by \"{existing_name}\""
             )));
@@ -159,6 +161,33 @@ mod tests {
         let err = alias_set(&mut config, "Bedroom", "kit").unwrap_err();
         assert!(err.to_string().contains("already used by \"Kitchen\""));
         assert_eq!(config.resolve_alias("kit"), "Kitchen");
+    }
+
+    #[test]
+    fn alias_set_rejects_alias_differing_only_in_case() {
+        let mut config = Config::default();
+        config.set_alias("Kitchen", "kit");
+        let err = alias_set(&mut config, "Bedroom", "KIT").unwrap_err();
+        assert!(err.to_string().contains("already used by \"Kitchen\""));
+        assert_eq!(config.aliases.len(), 1);
+    }
+
+    #[test]
+    fn alias_set_recases_alias_for_same_name_in_any_case() {
+        let mut config = Config::default();
+        config.set_alias("Kitchen", "kit");
+        alias_set(&mut config, "kitchen", "Kit").unwrap();
+        assert_eq!(config.aliases.len(), 1);
+        assert_eq!(config.resolve_alias("kit"), "kitchen");
+    }
+
+    #[test]
+    fn alias_clear_matches_name_case_insensitively() {
+        let mut config = Config::default();
+        config.set_alias("Kitchen", "kit");
+        let msg = alias_clear(&mut config, "KITCHEN").unwrap();
+        assert_eq!(msg, "Alias cleared: kit \u{2192} KITCHEN");
+        assert!(config.aliases.is_empty());
     }
 
     #[test]
