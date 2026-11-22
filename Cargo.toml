@@ -5,7 +5,6 @@ edition = "2021"
 description = "CLI and TUI for controlling Sonos speakers"
 license = "MIT"
 repository = "https://github.com/tatimblin/sonos-cli"
-homepage = "https://github.com/tatimblin/sonos-cli"
 readme = "README.md"
 keywords = ["sonos", "cli", "tui", "audio", "speakers"]
 categories = ["command-line-utilities", "multimedia::audio"]
@@ -45,7 +44,6 @@ ureq = "3"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 toml = "0.8"
 
 # Config directory
