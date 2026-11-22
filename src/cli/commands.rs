@@ -23,6 +23,10 @@ pub enum Commands {
     /// Set volume level (0-100)
     Volume {
         /// Volume level (0-100)
+        // Ranges here mirror sonos-api's own validation, so an out-of-range
+        // value is a clap usage error (exit 2) rather than an SDK error that
+        // exits 1 with a network hint.
+        #[arg(value_parser = clap::value_parser!(u8).range(0..=100))]
         level: u8,
     },
     /// Mute playback
@@ -43,11 +47,13 @@ pub enum Commands {
     /// Set bass level (-10 to 10), speaker-only
     Bass {
         /// Bass level (-10 to 10)
+        #[arg(value_parser = clap::value_parser!(i8).range(-10..=10), allow_negative_numbers = true)]
         level: i8,
     },
     /// Set treble level (-10 to 10), speaker-only
     Treble {
         /// Treble level (-10 to 10)
+        #[arg(value_parser = clap::value_parser!(i8).range(-10..=10), allow_negative_numbers = true)]
         level: i8,
     },
     /// Set loudness compensation (on/off), speaker-only
@@ -126,6 +132,71 @@ impl PlayModeArg {
             Self::RepeatOne => sonos_sdk::PlayMode::RepeatOne,
             Self::Shuffle => sonos_sdk::PlayMode::Shuffle,
             Self::ShuffleNoRepeat => sonos_sdk::PlayMode::ShuffleNoRepeat,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Commands;
+    use crate::cli::Cli;
+    use clap::error::ErrorKind;
+    use clap::Parser;
+
+    fn command(args: &[&str]) -> Commands {
+        Cli::try_parse_from(args)
+            .expect("should parse")
+            .command
+            .expect("a subcommand")
+    }
+
+    fn parse_err(args: &[&str]) -> clap::Error {
+        Cli::try_parse_from(args).expect_err("should be rejected")
+    }
+
+    #[test]
+    fn volume_accepts_bounds() {
+        assert!(matches!(
+            command(&["sonos", "volume", "0"]),
+            Commands::Volume { level: 0 }
+        ));
+        assert!(matches!(
+            command(&["sonos", "volume", "100"]),
+            Commands::Volume { level: 100 }
+        ));
+    }
+
+    #[test]
+    fn volume_out_of_range_is_usage_error() {
+        for level in ["101", "150"] {
+            let err = parse_err(&["sonos", "volume", level]);
+            assert_eq!(err.kind(), ErrorKind::ValueValidation);
+            // clap usage errors exit 2, the same as `CliError::Validation`.
+            assert_eq!(err.exit_code(), 2);
+        }
+    }
+
+    #[test]
+    fn bass_and_treble_accept_bounds() {
+        // Negative levels must parse as values, not as unknown short flags.
+        assert!(matches!(
+            command(&["sonos", "bass", "-10", "--speaker", "Kitchen"]),
+            Commands::Bass { level: -10 }
+        ));
+        assert!(matches!(
+            command(&["sonos", "treble", "10"]),
+            Commands::Treble { level: 10 }
+        ));
+    }
+
+    #[test]
+    fn bass_and_treble_out_of_range_are_usage_errors() {
+        for cmd in ["bass", "treble"] {
+            for level in ["11", "-11"] {
+                let err = parse_err(&["sonos", cmd, level]);
+                assert_eq!(err.kind(), ErrorKind::ValueValidation, "{cmd} {level}");
+                assert_eq!(err.exit_code(), 2);
+            }
         }
     }
 }
