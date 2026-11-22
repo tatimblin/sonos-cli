@@ -231,13 +231,13 @@ fn assemble_bottom_bar(
     let track_title = current_track.as_ref().and_then(|t| t.title.clone());
     let track_artist = current_track.as_ref().and_then(|t| t.artist.clone());
     let track_album = current_track.as_ref().and_then(|t| t.album.clone());
-    let album_art_uri = current_track.as_ref().and_then(|t| t.album_art_uri.clone());
+    let album_art_url = current_track
+        .as_ref()
+        .zip(coordinator.as_ref())
+        .and_then(|(t, coord)| t.album_art_url(coord.ip));
 
-    // Request album art loading if we have a URI and a coordinator IP
-    if let Some(ref uri) = album_art_uri {
-        if let Some(ref coord) = coordinator {
-            ctx.app.image_loader.request(uri, coord.ip);
-        }
+    if let Some(ref url) = album_art_url {
+        ctx.app.image_loader.request(url);
     }
 
     // Manage art protocol state via use_state — must be called after use_watch/use_animation.
@@ -246,7 +246,7 @@ fn assemble_bottom_bar(
     let art_state = ctx
         .hooks
         .use_state::<ArtProtocolState>("bottom_bar_art", ArtProtocolState::default);
-    art_state.ensure_protocol(&album_art_uri, &ctx.app.image_loader, &ctx.app.picker);
+    art_state.ensure_protocol(&album_art_url, &ctx.app.image_loader, &ctx.app.picker);
     let protocol = art_state.protocol.take();
 
     let group_volume_active = selected_index < entries.len()

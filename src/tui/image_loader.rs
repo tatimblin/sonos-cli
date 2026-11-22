@@ -2,7 +2,7 @@
 //!
 //! Fetches album art from Sonos speakers over HTTP in a background thread,
 //! decodes images via the `image` crate, and caches decoded `DynamicImage`s
-//! by URI. The main thread polls for completed loads each event loop tick.
+//! by URL. The main thread polls for completed loads each event loop tick.
 //!
 //! Design: single-threaded access from the TUI event loop. `request()` uses
 //! `RefCell` for the pending set so it can be called from render functions
@@ -10,7 +10,6 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::net::IpAddr;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -26,12 +25,11 @@ const MAX_CACHE_SIZE: usize = 20;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(3);
 
 struct LoadRequest {
-    uri: String,
-    full_url: String,
+    url: String,
 }
 
 struct LoadResult {
-    uri: String,
+    url: String,
     image: Option<DynamicImage>,
 }
 
@@ -82,24 +80,22 @@ impl ImageLoader {
     ///
     /// Callable from render functions with `&self`. The fetch happens in a
     /// background thread; call `poll()` from the event loop to collect results.
-    pub fn request(&self, uri: &str, speaker_ip: IpAddr) {
-        if self.cache.contains_key(uri) {
+    pub fn request(&self, url: &str) {
+        if self.cache.contains_key(url) {
             return;
         }
 
         let mut pending = self.pending.borrow_mut();
-        if pending.contains(uri) {
+        if pending.contains(url) {
             return;
         }
 
-        let full_url = build_url(uri, speaker_ip);
         let req = LoadRequest {
-            uri: uri.to_string(),
-            full_url,
+            url: url.to_string(),
         };
 
         if self.request_tx.send(req).is_ok() {
-            pending.insert(uri.to_string());
+            pending.insert(url.to_string());
         }
     }
 
@@ -109,19 +105,19 @@ impl ImageLoader {
     pub fn poll(&mut self) -> bool {
         let mut loaded = false;
         while let Ok(result) = self.result_rx.try_recv() {
-            self.pending.borrow_mut().remove(&result.uri);
+            self.pending.borrow_mut().remove(&result.url);
             if let Some(img) = result.image {
                 self.evict_if_full();
-                self.insertion_order.push_back(result.uri.clone());
-                self.cache.insert(result.uri, img);
+                self.insertion_order.push_back(result.url.clone());
+                self.cache.insert(result.url, img);
                 loaded = true;
             }
         }
         loaded
     }
 
-    pub fn get(&self, uri: &str) -> Option<&DynamicImage> {
-        self.cache.get(uri)
+    pub fn get(&self, url: &str) -> Option<&DynamicImage> {
+        self.cache.get(url)
     }
 
     fn evict_if_full(&mut self) {
@@ -135,19 +131,6 @@ impl ImageLoader {
     }
 }
 
-/// Build a full URL from an album art URI and speaker IP.
-///
-/// Sonos speakers return `album_art_uri` as either:
-/// - A relative path: `/getaa?s=1&u=...` → prepend `http://{ip}:1400`
-/// - An absolute URL: `http://...` → use as-is
-fn build_url(uri: &str, speaker_ip: IpAddr) -> String {
-    if uri.starts_with("http://") || uri.starts_with("https://") {
-        uri.to_string()
-    } else {
-        format!("http://{speaker_ip}:1400{uri}")
-    }
-}
-
 /// Worker thread: receives fetch requests, downloads + decodes images, sends results back.
 fn worker_loop(rx: mpsc::Receiver<LoadRequest>, tx: mpsc::Sender<LoadResult>) {
     let agent = ureq::Agent::config_builder()
@@ -156,9 +139,9 @@ fn worker_loop(rx: mpsc::Receiver<LoadRequest>, tx: mpsc::Sender<LoadResult>) {
         .new_agent();
 
     for req in rx {
-        let image = fetch_and_decode(&agent, &req.full_url);
+        let image = fetch_and_decode(&agent, &req.url);
         let result = LoadResult {
-            uri: req.uri,
+            url: req.url,
             image,
         };
         if tx.send(result).is_err() {
@@ -222,31 +205,31 @@ const ART_ROWS: u16 = 3;
 /// creates new ones from the image cache.
 #[derive(Default)]
 pub struct ArtProtocolState {
-    uri: Option<String>,
+    url: Option<String>,
     pub protocol: Option<StatefulProtocol>,
 }
 
 impl ArtProtocolState {
     /// Update protocol when URI changes. Creates protocol from cached image.
     ///
-    /// Call this each render frame with the current `art_uri`. Handles:
+    /// Call this each render frame with the current `art_url`. Handles:
     /// - URI change detection (invalidates old protocol)
     /// - Lazy protocol creation from `ImageLoader` cache + `Picker`
     pub fn ensure_protocol(
         &mut self,
-        art_uri: &Option<String>,
+        art_url: &Option<String>,
         image_loader: &ImageLoader,
         picker: &RefCell<Option<Picker>>,
     ) {
-        let uri_changed = self.uri.as_deref() != art_uri.as_deref();
-        if uri_changed {
-            self.uri = art_uri.clone();
+        let url_changed = self.url.as_deref() != art_url.as_deref();
+        if url_changed {
+            self.url = art_url.clone();
             self.protocol = None;
         }
 
         if self.protocol.is_none() {
-            if let Some(ref uri) = art_uri {
-                if let Some(img) = image_loader.get(uri) {
+            if let Some(ref url) = art_url {
+                if let Some(img) = image_loader.get(url) {
                     if let Some(ref mut p) = *picker.borrow_mut() {
                         let (fw, fh) = p.font_size();
                         let target_w = (ART_COLS * fw) as u32;
@@ -263,29 +246,6 @@ impl ArtProtocolState {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn build_url_relative_path() {
-        let ip: IpAddr = "192.168.1.100".parse().unwrap();
-        assert_eq!(
-            build_url("/getaa?s=1&u=test", ip),
-            "http://192.168.1.100:1400/getaa?s=1&u=test"
-        );
-    }
-
-    #[test]
-    fn build_url_absolute_http() {
-        let ip: IpAddr = "192.168.1.100".parse().unwrap();
-        let url = "http://example.com/art.jpg";
-        assert_eq!(build_url(url, ip), url);
-    }
-
-    #[test]
-    fn build_url_absolute_https() {
-        let ip: IpAddr = "192.168.1.100".parse().unwrap();
-        let url = "https://example.com/art.jpg";
-        assert_eq!(build_url(url, ip), url);
-    }
 
     #[test]
     fn crop_to_square_landscape() {
