@@ -8,7 +8,7 @@ use ratatui_image::picker::Picker;
 use crate::config::Config;
 use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
-use crate::tui::types::PickUpState;
+use crate::tui::types::{ListEntry, ListSelection, PickUpState};
 use sonos_sdk::SonosSystem;
 
 const TOAST_DURATION: Duration = Duration::from_secs(3);
@@ -121,8 +121,19 @@ impl Navigation {
 /// Shared UI state for the speaker list.
 #[derive(Clone, Debug, Default)]
 pub struct SpeakerListScreenState {
-    pub selected_index: usize,
+    pub selection: ListSelection,
     pub pick_up: Option<PickUpState>,
+}
+
+impl SpeakerListScreenState {
+    /// End pick-up mode without regrouping, returning the cursor to the
+    /// picked-up speaker.
+    pub fn cancel_pick_up(&mut self) {
+        if let Some(pick_up) = self.pick_up.take() {
+            self.selection
+                .select_entry(ListEntry::SpeakerRow(pick_up.speaker_id));
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

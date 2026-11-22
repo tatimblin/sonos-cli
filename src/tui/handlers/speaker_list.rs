@@ -87,16 +87,15 @@ fn home_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
 }
 
 fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
-    let selected = app
-        .navigation
-        .speakers_state
-        .selected_index
-        .min(entries.len().saturating_sub(1));
+    let selected = app.navigation.speakers_state.selection.index_in(entries);
 
     match key.code {
         KeyCode::Up => {
             if let Some(prev) = prev_entry(selected) {
-                app.navigation.speakers_state.selected_index = prev;
+                app.navigation
+                    .speakers_state
+                    .selection
+                    .select(entries, prev);
             } else {
                 return SpeakerListAction::FocusTabBar;
             }
@@ -104,7 +103,10 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
         }
         KeyCode::Down => {
             if let Some(next) = next_entry(entries, selected) {
-                app.navigation.speakers_state.selected_index = next;
+                app.navigation
+                    .speakers_state
+                    .selection
+                    .select(entries, next);
             }
             SpeakerListAction::Handled
         }
@@ -140,7 +142,10 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
                 let pickup_entries =
                     build_list_entries(&app.system, app.navigation.speakers_state.pick_up.as_ref());
                 if let Some(first) = home_action_row(app, &pickup_entries) {
-                    app.navigation.speakers_state.selected_index = first;
+                    app.navigation
+                        .speakers_state
+                        .selection
+                        .select(&pickup_entries, first);
                 }
             }
             SpeakerListAction::Handled
@@ -291,22 +296,24 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
         None => return SpeakerListAction::Handled,
     };
 
-    let selected = app
-        .navigation
-        .speakers_state
-        .selected_index
-        .min(entries.len().saturating_sub(1));
+    let selected = app.navigation.speakers_state.selection.index_in(entries);
 
     match key.code {
         KeyCode::Up => {
             if let Some(prev) = prev_action_row(entries, selected) {
-                app.navigation.speakers_state.selected_index = prev;
+                app.navigation
+                    .speakers_state
+                    .selection
+                    .select(entries, prev);
             }
             SpeakerListAction::Handled
         }
         KeyCode::Down => {
             if let Some(next) = next_action_row(entries, selected) {
-                app.navigation.speakers_state.selected_index = next;
+                app.navigation
+                    .speakers_state
+                    .selection
+                    .select(entries, next);
             }
             SpeakerListAction::Handled
         }
@@ -319,7 +326,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                         .is_some_and(|og| og == target_gid);
 
                     if same_group {
-                        app.navigation.speakers_state.pick_up = None;
+                        app.navigation.speakers_state.cancel_pick_up();
                         return SpeakerListAction::Handled;
                     }
 
@@ -367,19 +374,14 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                 }
             }
 
-            // Find the speaker in the rebuilt list and set cursor there
-            let new_entries = build_list_entries(&app.system, None);
-            let new_index = new_entries
-                .iter()
-                .position(|e| matches!(e, ListEntry::SpeakerRow(sid) if *sid == pick_up.speaker_id))
-                .unwrap_or(0);
-            app.navigation.speakers_state.selected_index = new_index;
-            app.navigation.speakers_state.pick_up = None;
+            // Follow the moved speaker — the selection resolves its new row
+            // once the topology change lands.
+            app.navigation.speakers_state.cancel_pick_up();
 
             SpeakerListAction::Handled
         }
         KeyCode::Esc => {
-            app.navigation.speakers_state.pick_up = None;
+            app.navigation.speakers_state.cancel_pick_up();
             SpeakerListAction::Handled
         }
         _ => SpeakerListAction::Handled,
@@ -413,7 +415,10 @@ mod tests {
     }
 
     fn selected(app: &App) -> usize {
-        app.navigation.speakers_state.selected_index
+        app.navigation
+            .speakers_state
+            .selection
+            .index_in(&entries(app))
     }
 
     #[test]
@@ -497,6 +502,22 @@ mod tests {
 
         press(&mut app, KeyCode::Esc);
         assert!(app.navigation.speakers_state.pick_up.is_none());
+    }
+
+    #[test]
+    fn cancelling_pickup_returns_the_cursor_to_the_picked_up_speaker() {
+        let mut app = app();
+        for _ in 0..3 {
+            press(&mut app, KeyCode::Down);
+        }
+        let picked = entries(&app)[3].clone();
+        assert!(matches!(picked, ListEntry::SpeakerRow(_)));
+
+        press(&mut app, KeyCode::Char(' '));
+        press(&mut app, KeyCode::Up);
+        press(&mut app, KeyCode::Esc);
+
+        assert_eq!(entries(&app)[selected(&app)], picked);
     }
 
     #[test]

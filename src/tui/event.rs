@@ -130,7 +130,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
                 return;
             }
             KeyCode::Esc => {
-                app.navigation.speakers_state.pick_up = None;
+                app.navigation.speakers_state.cancel_pick_up();
                 return;
             }
             // Forward Up/Down/Space to the handler; swallow everything else
