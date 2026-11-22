@@ -70,7 +70,7 @@ One-off commands executed and exited. Designed for scripts, keyboard shortcuts, 
 
 **Targeting:** Every command accepts `--speaker NAME` and/or `--group NAME`. Default target is the configured default group (falls back to first discovered group).
 
-**Discovery cache:** Results cached to `~/.config/sonos/cache.json` with 24h TTL. Auto-rediscovers on cache miss or TTL expiry.
+**Discovery cache:** Results cached by the SDK to `cache.json` in the platform cache directory (`~/.cache/sonos/` on Linux, `~/Library/Caches/sonos/` on macOS) with 24h TTL. Auto-rediscovers on cache miss or TTL expiry.
 
 ---
 
@@ -145,7 +145,7 @@ Launch → Startup / Discovery screen
 
 ### Configuration
 
-File: `~/.config/sonos/config.toml`
+File: `config.toml` in the platform config directory (`~/.config/sonos/` on Linux, `~/Library/Application Support/sonos/` on macOS, `%APPDATA%\sonos\` on Windows)
 
 ```toml
 default_group = "Living Room"   # default target when no --group / --speaker given

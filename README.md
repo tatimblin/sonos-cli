@@ -68,6 +68,9 @@ sonos next
 | `queue` | Show the playback queue |
 | `queue add <uri>` | Add a URI to the queue |
 | `queue clear` | Clear the queue |
+| `config alias [name] [alias]` | List, set, or clear speaker/group aliases |
+
+Run `sonos` with no arguments in a terminal to open the interactive TUI.
 
 ### Targeting
 
@@ -85,29 +88,52 @@ If both are given, `--group` wins. If neither is given, the default group is use
 | Flag | Description |
 |------|-------------|
 | `--help`, `-h` | Show help |
-| `--version` | Print version |
+| `--version`, `-V` | Print version |
 | `--quiet`, `-q` | Suppress non-error output |
-| `--verbose` | Show debug output |
+| `--verbose`, `-v` | More log output on stderr (`-vv` debug, `-vvv` trace) |
 | `--no-input` | Disable interactive prompts |
+| `--offline` | Accept cached data when no speaker responds |
+| `--require-live` | Fail unless a speaker actually responded |
+
+Exit codes: `0` success, `1` runtime error, `2` usage error, `3` output printed but no speaker responded.
 
 ## Configuration
 
-Create `~/.config/sonos/config.toml`:
+Settings live in `config.toml` in the platform config directory:
+
+| Platform | Path |
+|----------|------|
+| Linux | `~/.config/sonos/config.toml` (or `$XDG_CONFIG_HOME/sonos/`) |
+| macOS | `~/Library/Application Support/sonos/config.toml` |
+| Windows | `%APPDATA%\sonos\config.toml` |
+
+The TUI Settings tab and `sonos config alias` write this file for you. To edit it by hand:
 
 ```toml
 # Default group when --speaker/--group is not specified
 default_group = "Living Room"
 
-# TUI color theme: "dark" or "light"
-theme = "dark"
+# TUI color theme: "default", "bw", "minimal", or "dance_party"
+theme = "default"
+
+# Album art: "image", "halfblock", or "off"
+album_art_mode = "image"
+
+# Short names usable with --speaker/--group (full name = alias)
+[aliases]
+"Living Room" = "lr"
 ```
+
+If the file cannot be parsed, sonos warns, runs with defaults, and refuses to overwrite it until it is fixed.
 
 Environment variables override the config file:
 
 | Variable | Overrides |
 |----------|-----------|
 | `SONOS_DEFAULT_GROUP` | `default_group` |
-| `SONOS_CONFIG_DIR` | Config file location (default: `~/.config/sonos/`) |
+| `SONOS_CONFIG_DIR` | Config directory (absolute path; replaces the platform default above) |
+
+The SDK caches discovered speakers in `cache.json` under the platform cache directory (`~/.cache/sonos/` on Linux, `~/Library/Caches/sonos/` on macOS, `%LOCALAPPDATA%\sonos\` on Windows; override with `SONOS_CACHE_DIR`) for 24 hours. Logs are appended to `sonos.log` under the platform data directory (`~/.local/share/sonos/` on Linux, `~/Library/Application Support/sonos/` on macOS) and rotated to `sonos.log.1` past 1 MiB.
 
 ## Related Projects
 

@@ -44,15 +44,15 @@ The scaffolding that everything else builds on. No user-visible features yet, bu
 ### Cargo.toml & Dependencies
 
 - [x] `Cargo.toml` with all dependencies:
-  - `sonos-sdk` (path = `"../sonos-sdk/sonos-sdk"`)
-  - `clap` v4 with `derive` feature
+  - `sonos-sdk` from crates.io (`"0.9.0"`); local development overrides it with a gitignored `.cargo/config.toml` `[patch.crates-io]` pointing at `../sonos-sdk`
+  - `clap` v4 with `derive` feature (+ `clap_complete` for dynamic completions)
   - `ratatui` + `crossterm`
-  - `serde` + `serde_json` + `toml` (for config)
-  - `dirs` (for `~/.config/sonos/`)
+  - `serde` + `toml` (for config)
+  - `dirs` (platform config / data directories)
   - `anyhow` (error propagation)
   - `thiserror` (domain error types)
-  - `ratatui-image` (album art rendering) *(not yet added)*
-  - `image` (image decoding for album art) *(not yet added)*
+  - `ratatui-image` (album art rendering)
+  - `image` (image decoding for album art)
 
 ### Entry Point — `src/main.rs`
 
@@ -146,7 +146,7 @@ pub struct Config {
     pub theme: String,  // default: "dark"
 }
 ```
-- [x] `Config::load() -> Config` — reads `~/.config/sonos/config.toml`, falls back to defaults on any error
+- [x] `Config::load() -> Config` — reads `config.toml` from `dirs::config_dir()/sonos/` (`~/.config/sonos/` on Linux, `~/Library/Application Support/sonos/` on macOS) or `$SONOS_CONFIG_DIR`; falls back to defaults with a warning if the file is unreadable, and then refuses to save over it
 - [x] Environment variable overrides: `SONOS_DEFAULT_GROUP`, `SONOS_CONFIG_DIR`
 
 **Exit criteria:** `cargo build` succeeds. `Commands::run()` calls SDK directly — no Action enum or executor. Config loads defaults when no file exists.
@@ -237,7 +237,7 @@ pub struct GlobalFlags {
 
 ### Auto-Rediscovery & Error Handling
 
-- [x] Auto-rediscovery on cache miss: SDK `get_speaker_by_name()` triggers one-shot SSDP rediscovery per session
+- [x] Auto-rediscovery on cache miss: SDK `system.speaker(name)` triggers SSDP rediscovery on a miss (rate-limited to once per 30 s)
 - [x] Error format: `error: speaker "X" not found.\nCheck that your speakers are on the same network, then retry.`
 - [x] Exit code 1 for runtime errors (speaker not found, network failure)
 
@@ -495,8 +495,10 @@ The landing experience. Must feel live and scannable.
 
 ### Groups Tab (default)
 
-- [x] Responsive group card grid: 2 columns on terminals ≥ 100 chars wide, 1 column on narrow
-- [x] Each group card widget rendering:
+> **Not built as specified.** There is no Groups tab: `Tab` is `Speakers` + `Settings`, and the Speakers tab lists each group as a header row with its members beneath. The card-grid items are unchecked; the mini-player (`widgets/bottom_bar.rs`), group property watching (via the `use_watch*` hooks), and progress interpolation are implemented on the Speakers tab.
+
+- [ ] Responsive group card grid: 2 columns on terminals ≥ 100 chars wide, 1 column on narrow
+- [ ] Each group card widget rendering:
   - Group name (bold)
   - Playback state icon: `▶` Playing, `⏸` Paused, `■` Stopped
   - Current track + artist (marquee scroll if truncated)
@@ -504,8 +506,8 @@ The landing experience. Must feel live and scannable.
   - Animated progress bar: `━━━━━━━╺──── 2:31/5:55` with elapsed/total
   - Speaker count: `Beam + 2 surrounds`
 
-- [x] Selected card: double border (`BorderType::Double`) + bold + `●` indicator
-- [x] Arrow key navigation between cards (`↑↓←→`)
+- [ ] Selected card: double border (`BorderType::Double`) + bold + `●` indicator
+- [ ] Arrow key navigation between cards (`↑↓←→`)
 
 - [x] Mini-player at bottom: tracks focused card
   - Group name + current track + progress + volume
@@ -536,10 +538,11 @@ The landing experience. Must feel live and scannable.
 - [x] Speakers organized by group with group name headers
 - [x] `"NOT IN A GROUP"` section for ungrouped speakers (standalone groups with `group.is_standalone()`)
 - [x] `▸` cursor with `↑↓` navigation
-- [x] `n` — create new group: pick a coordinator, calls `system.create_group(&coordinator, &[])`
+- [ ] `n` — create new group: pick a coordinator, calls `system.create_group(&coordinator, &[])` *(no such key; `n` is next track. Dropping a picked-up speaker on the "create group" row makes it standalone via `speaker.leave_group()`)*
 - [x] `Enter` — move selected speaker into a group (picker modal listing available groups)
   - SDK: `group.add_speaker(&speaker)`
-- [x] `d` — ungroup selected speaker
+  - *Implemented as pick-up/drop: `Space` picks up the speaker, `↑↓` chooses a group, `Space` drops it (`Esc` cancels).*
+- [ ] `d` — ungroup selected speaker *(no `d` key; see the "create group" drop target above)*
   - SDK: `speaker.leave_group()`
 
 **Exit criteria:** Home screen renders live data. Progress bars animate. State changes from the Sonos app (volume, track change, play/pause) appear on screen within 1 second.
@@ -671,21 +674,25 @@ Everything needed to hand this to someone who has never heard of it.
   - Command reference table (from `docs/goals.md`)
   - Config file documentation with all keys and defaults
   - Terminal compatibility notes
+  - *Everything except terminal compatibility notes is in the README.*
 
 ### CLI Flags & Output
 
-- [ ] `--verbose` flag: exposes raw `SdkError` debug output and backtrace
+- [x] `--verbose` flag: exposes raw `SdkError` debug output and backtrace
   - When `global.verbose`: print `{:?}` of error before the formatted message
-- [ ] `--quiet` / `-q` flag: suppresses non-error output
+  - *Implemented as a count flag (`-v` info, `-vv` debug, `-vvv` trace) driving the `tracing` filter; `main` logs each error's `{:?}` at debug level, so `-vv` shows it. No backtrace.*
+- [x] `--quiet` / `-q` flag: suppresses non-error output
   - Success messages silenced; only stderr errors shown
-- [ ] `--no-input` flag: disables confirmation prompts (for scripts)
-- [ ] `--version` / `-v` flag: prints `sonos {version}` from `Cargo.toml`
-  - clap: `#[command(version)]` on `Cli` struct
+- [x] `--no-input` flag: disables confirmation prompts (for scripts)
+  - *Gates the `queue clear` confirmation and the open-settings prompt after a discovery failure.*
+- [x] `--version` / `-V` flag: prints `sonos {version}` from `Cargo.toml`
+  - clap: `#[command(version)]` on `Cli` struct (clap's short is `-V`; `-v` is `--verbose`)
 
 ### Error Handling Polish
 
 - [ ] All error messages follow format: `error: <description>\n<recovery action>`
-- [ ] `CliError::recovery_hint()` implemented for every variant
+- [x] `CliError::recovery_hint()` implemented for every variant
+  - *Exhaustive match: not-found and discovery errors get the platform discovery hint, other SDK errors a connectivity hint, `Config` / `Validation` return `None`.*
 - [ ] Graceful handling of speakers going offline mid-session:
   - SDK returns `SdkError::ApiError(ApiError::NetworkError(...))` — catch and suggest rediscovery
   - TUI: mark offline speakers with `✗` indicator, continue operating on remaining speakers
@@ -701,8 +708,10 @@ Everything needed to hand this to someone who has never heard of it.
 
 ### Robustness
 
-- [ ] TUI panic hook restores terminal (from Milestone 6)
-- [ ] `Ctrl-C` exits cleanly (crossterm handles SIGINT in raw mode)
+- [x] TUI panic hook restores terminal (from Milestone 6)
+  - *`ratatui::init()` in `tui/event.rs` installs a panic hook that restores the terminal.*
+- [x] `Ctrl-C` exits cleanly (crossterm handles SIGINT in raw mode)
+  - *Raw mode delivers Ctrl-C as a key event; `tui/event.rs` treats it as quit in every mode, then `ratatui::restore()` runs.*
 - [ ] No panics in normal operation — all `.unwrap()` calls reviewed and replaced with proper error handling
 
 **Exit criteria:** A non-developer Sonos user can install, run, and use sonos-cli without help. The TUI is stable across all target terminals. No panics in normal operation.
