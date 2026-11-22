@@ -4,67 +4,13 @@
 //! provides a `StatefulProtocol` (from `ratatui-image`) for image rendering,
 //! or `None` for a placeholder.
 
-use std::cell::RefCell;
-
-use image::imageops::FilterType;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 use ratatui::Frame;
-use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::StatefulImage;
-
-use crate::tui::image_loader::ImageLoader;
-
-const ART_COLS: u16 = 6;
-const ART_ROWS: u16 = 3;
-
-/// Hook-friendly state for album art protocol lifecycle.
-///
-/// Tracks the current album art URI and holds the `StatefulProtocol` used for
-/// rendering. Detects URI changes, invalidates stale protocols, and lazily
-/// creates new ones from the image cache.
-#[derive(Default)]
-pub struct ArtProtocolState {
-    uri: Option<String>,
-    pub protocol: Option<StatefulProtocol>,
-}
-
-impl ArtProtocolState {
-    /// Update protocol when URI changes. Creates protocol from cached image.
-    ///
-    /// Call this each render frame with the current `art_uri`. Handles:
-    /// - URI change detection (invalidates old protocol)
-    /// - Lazy protocol creation from `ImageLoader` cache + `Picker`
-    pub fn ensure_protocol(
-        &mut self,
-        art_uri: &Option<String>,
-        image_loader: &ImageLoader,
-        picker: &RefCell<Option<Picker>>,
-    ) {
-        let uri_changed = self.uri.as_deref() != art_uri.as_deref();
-        if uri_changed {
-            self.uri = art_uri.clone();
-            self.protocol = None;
-        }
-
-        if self.protocol.is_none() {
-            if let Some(ref uri) = art_uri {
-                if let Some(img) = image_loader.get(uri) {
-                    if let Some(ref mut p) = *picker.borrow_mut() {
-                        let (fw, fh) = p.font_size();
-                        let target_w = (ART_COLS * fw) as u32;
-                        let target_h = (ART_ROWS * fh) as u32;
-                        let resized = img.resize_exact(target_w, target_h, FilterType::Lanczos3);
-                        self.protocol = Some(p.new_resize_protocol(resized));
-                    }
-                }
-            }
-        }
-    }
-}
 
 /// Render album art or a placeholder within the given area.
 ///

@@ -1,7 +1,9 @@
 //! Shared types used across TUI layers (widgets, screens, handlers).
 
 use ratatui_image::protocol::StatefulProtocol;
-use sonos_sdk::{GroupId, PlaybackState, SonosSystem, SpeakerId};
+use sonos_sdk::{Group, GroupId, PlaybackState, SonosSystem, SpeakerId};
+
+use crate::config::Config;
 
 /// A single row in the flat speaker list. Navigation and rendering dispatch on this.
 #[derive(Clone, Debug, PartialEq)]
@@ -21,9 +23,10 @@ pub struct PickUpState {
     pub original_group_id: Option<GroupId>,
 }
 
-/// Action returned from speaker list key handling so callers can respond.
-pub enum SpeakerListAction {
+/// Returned from screen key handlers so the caller can respond.
+pub enum KeyOutcome {
     Handled,
+    /// Up from the first row: move focus to the tab bar.
     FocusTabBar,
 }
 
@@ -91,6 +94,22 @@ pub fn group_for_entry(entries: &[ListEntry], index: usize) -> Option<GroupId> {
         }
     }
     None
+}
+
+/// The group targeted by the entry at `index` — what the bottom bar shows and
+/// playback keys control. Falls back to a speaker row's own group when no
+/// header resolves.
+pub fn group_for_selection(
+    system: &SonosSystem,
+    entries: &[ListEntry],
+    index: usize,
+) -> Option<Group> {
+    group_for_entry(entries, index)
+        .and_then(|gid| system.group_by_id(&gid))
+        .or_else(|| match entries.get(index) {
+            Some(ListEntry::SpeakerRow(sid)) => system.speaker_by_id(sid).and_then(|s| s.group()),
+            _ => None,
+        })
 }
 
 /// The speaker list cursor, tracked by entry identity rather than position.
@@ -241,10 +260,67 @@ pub struct SpeakerRowData {
     pub is_last_in_group: bool,
 }
 
-/// Action returned from settings key handling so callers can respond.
-pub enum SettingsAction {
-    Handled,
-    FocusTabBar,
+/// Available theme names.
+const THEME_OPTIONS: &[&str] = &["default", "bw", "minimal", "dance_party"];
+
+/// Available album art mode options.
+const ALBUM_ART_OPTIONS: &[&str] = &["image", "halfblock", "off"];
+
+/// Display label for "no default group" (auto-detect).
+pub const AUTO_GROUP_LABEL: &str = "(auto)";
+
+/// A row in the settings form, in display order. `SettingsScreenState::selected_row`
+/// indexes [`SettingsRow::ALL`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SettingsRow {
+    Theme,
+    DefaultGroup,
+    AlbumArt,
+}
+
+impl SettingsRow {
+    pub const ALL: [SettingsRow; 3] = [Self::Theme, Self::DefaultGroup, Self::AlbumArt];
+
+    pub fn at(index: usize) -> Option<Self> {
+        Self::ALL.get(index).copied()
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Theme => "Theme",
+            Self::DefaultGroup => "Default group",
+            Self::AlbumArt => "Album art",
+        }
+    }
+
+    /// Dropdown options. Default group lists live coordinators after "(auto)".
+    pub fn options(self, system: &SonosSystem) -> Vec<String> {
+        match self {
+            Self::Theme => THEME_OPTIONS.iter().map(|s| s.to_string()).collect(),
+            Self::DefaultGroup => std::iter::once(AUTO_GROUP_LABEL.to_string())
+                .chain(
+                    system
+                        .groups()
+                        .iter()
+                        .filter_map(|g| g.coordinator())
+                        .map(|c| c.name.clone()),
+                )
+                .collect(),
+            Self::AlbumArt => ALBUM_ART_OPTIONS.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// The configured value, as it appears in [`Self::options`].
+    pub fn current_value(self, config: &Config) -> String {
+        match self {
+            Self::Theme => config.theme.clone(),
+            Self::DefaultGroup => config
+                .default_group
+                .clone()
+                .unwrap_or_else(|| AUTO_GROUP_LABEL.to_string()),
+            Self::AlbumArt => config.album_art_mode.to_string(),
+        }
+    }
 }
 
 /// A single row in the settings form.
@@ -398,5 +474,52 @@ mod tests {
 
         selection.select_entry(row("gone"));
         assert_eq!(selection.index_in(&entries), 2);
+    }
+
+    #[test]
+    fn group_for_selection_resolves_headers_rows_and_headerless_rows() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Office"]);
+        let entries = build_list_entries(&system, None);
+        for (i, entry) in entries.iter().enumerate() {
+            let group = group_for_selection(&system, &entries, i).expect("every entry has a group");
+            match entry {
+                ListEntry::GroupHeader(gid) => assert_eq!(&group.id, gid),
+                ListEntry::SpeakerRow(sid) => {
+                    assert_eq!(
+                        Some(group.id),
+                        system
+                            .speaker_by_id(sid)
+                            .and_then(|s| s.group())
+                            .map(|g| g.id)
+                    )
+                }
+                _ => unreachable!("no action rows outside pick-up"),
+            }
+        }
+
+        // A speaker row with no header above it falls back to its own group.
+        let headerless = vec![entries[1].clone()];
+        let ListEntry::GroupHeader(gid) = &entries[0] else {
+            panic!("entry 0 should be a header");
+        };
+        assert_eq!(
+            group_for_selection(&system, &headerless, 0).map(|g| g.id),
+            Some(gid.clone())
+        );
+        assert!(group_for_selection(&system, &[ListEntry::CreateNewGroupRow], 0).is_none());
+    }
+
+    #[test]
+    fn settings_rows_offer_their_current_value() {
+        let system = SonosSystem::with_groups(&["Kitchen", "Office"]);
+        let config = Config::default();
+        for row in SettingsRow::ALL {
+            let value = row.current_value(&config);
+            assert!(row.options(&system).contains(&value), "{row:?}: {value}");
+        }
+
+        let groups = SettingsRow::DefaultGroup.options(&system);
+        assert_eq!(groups[0], AUTO_GROUP_LABEL);
+        assert_eq!(groups.len(), 3, "auto + one per coordinator");
     }
 }

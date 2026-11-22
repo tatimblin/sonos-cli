@@ -5,7 +5,7 @@ use crossterm::event::KeyEvent;
 use crate::tui::app::{App, Tab};
 use crate::tui::handlers::{settings, speaker_list};
 use crate::tui::keymap::{lookup, TabBarCommand, TAB_BAR_KEYS};
-use crate::tui::types::{SettingsAction, SpeakerListAction};
+use crate::tui::types::KeyOutcome;
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
     if app.navigation.tab_focused {
@@ -30,26 +30,14 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
-    match app.navigation.tab {
-        Tab::Speakers => handle_speakers_key(app, key),
-        Tab::Settings => handle_settings_key(app, key),
-    }
-}
-
-fn handle_speakers_key(app: &mut App, key: KeyEvent) {
-    match speaker_list::handle_key(app, key) {
-        SpeakerListAction::FocusTabBar => {
+    let outcome = match app.navigation.tab {
+        Tab::Speakers => speaker_list::handle_key(app, key),
+        Tab::Settings => settings::handle_key(app, key),
+    };
+    match outcome {
+        KeyOutcome::FocusTabBar => {
             app.navigation.tab_focused = true;
         }
-        SpeakerListAction::Handled => {}
-    }
-}
-
-fn handle_settings_key(app: &mut App, key: KeyEvent) {
-    match settings::handle_key(app, key) {
-        SettingsAction::FocusTabBar => {
-            app.navigation.tab_focused = true;
-        }
-        SettingsAction::Handled => {}
+        KeyOutcome::Handled => {}
     }
 }

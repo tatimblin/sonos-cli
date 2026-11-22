@@ -6,16 +6,16 @@ use crossterm::event::KeyEvent;
 use crate::tui::app::{App, Toast};
 use crate::tui::keymap::{lookup, PickUpCommand, SpeakerCommand, PICK_UP_KEYS, SPEAKER_KEYS};
 use crate::tui::types::{
-    build_list_entries, group_for_entry, ListEntry, PickUpState, SpeakerListAction,
+    build_list_entries, group_for_selection, KeyOutcome, ListEntry, PickUpState,
 };
 
-/// Handle a key event for the speaker list. Returns an action for the caller.
-pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction {
+/// Handle a key event for the speaker list. Returns an outcome for the caller.
+pub fn handle_key(app: &mut App, key: KeyEvent) -> KeyOutcome {
     let is_pick_up = app.navigation.speakers_state.pick_up.is_some();
     let entries = build_list_entries(&app.system, app.navigation.speakers_state.pick_up.as_ref());
 
     if entries.is_empty() {
-        return SpeakerListAction::Handled;
+        return KeyOutcome::Handled;
     }
 
     if is_pick_up {
@@ -87,9 +87,9 @@ fn home_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
     None
 }
 
-fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
+fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> KeyOutcome {
     let Some(command) = lookup(SPEAKER_KEYS, key.code) else {
-        return SpeakerListAction::Handled;
+        return KeyOutcome::Handled;
     };
     let selected = app.navigation.speakers_state.selection.index_in(entries);
 
@@ -101,9 +101,9 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
                     .selection
                     .select(entries, prev);
             } else {
-                return SpeakerListAction::FocusTabBar;
+                return KeyOutcome::FocusTabBar;
             }
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::Down => {
             if let Some(next) = next_entry(entries, selected) {
@@ -112,19 +112,19 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
                     .selection
                     .select(entries, next);
             }
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::VolumeDown => {
             handle_volume_adjust(app, entries, selected, -2);
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::VolumeUp => {
             handle_volume_adjust(app, entries, selected, 2);
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::PickUp => {
             if selected >= entries.len() {
-                return SpeakerListAction::Handled;
+                return KeyOutcome::Handled;
             }
             if let ListEntry::SpeakerRow(speaker_id) = &entries[selected] {
                 let speaker = app.system.speaker_by_id(speaker_id);
@@ -152,23 +152,23 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Spe
                         .select(&pickup_entries, first);
                 }
             }
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::ToggleMute => {
             handle_mute_toggle(app, entries, selected);
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::PlayPause => {
             handle_play_pause(app, entries, selected);
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::Next => {
             handle_playback_action(app, entries, selected, PlaybackAction::Next);
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         SpeakerCommand::Previous => {
             handle_playback_action(app, entries, selected, PlaybackAction::Previous);
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
     }
 }
@@ -232,20 +232,7 @@ fn resolve_coordinator(
     entries: &[ListEntry],
     selected: usize,
 ) -> Option<sonos_sdk::Speaker> {
-    let group_id = group_for_entry(entries, selected);
-
-    let group = group_id
-        .and_then(|gid| app.system.group_by_id(&gid))
-        .or_else(|| {
-            if selected < entries.len() {
-                if let ListEntry::SpeakerRow(sid) = &entries[selected] {
-                    return app.system.speaker_by_id(sid).and_then(|s| s.group());
-                }
-            }
-            None
-        });
-
-    group.and_then(|g| g.coordinator())
+    group_for_selection(&app.system, entries, selected).and_then(|g| g.coordinator())
 }
 
 fn handle_play_pause(app: &mut App, entries: &[ListEntry], selected: usize) {
@@ -293,14 +280,14 @@ fn handle_playback_action(
 // Pick-up mode handling
 // ---------------------------------------------------------------------------
 
-fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> SpeakerListAction {
+fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> KeyOutcome {
     let pick_up = match app.navigation.speakers_state.pick_up.clone() {
         Some(p) => p,
-        None => return SpeakerListAction::Handled,
+        None => return KeyOutcome::Handled,
     };
 
     let Some(command) = lookup(PICK_UP_KEYS, key.code) else {
-        return SpeakerListAction::Handled;
+        return KeyOutcome::Handled;
     };
     let selected = app.navigation.speakers_state.selection.index_in(entries);
 
@@ -312,7 +299,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                     .selection
                     .select(entries, prev);
             }
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         PickUpCommand::Down => {
             if let Some(next) = next_action_row(entries, selected) {
@@ -321,7 +308,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                     .selection
                     .select(entries, next);
             }
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         PickUpCommand::Drop => {
             match &entries[selected] {
@@ -333,7 +320,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
 
                     if same_group {
                         app.navigation.speakers_state.cancel_pick_up();
-                        return SpeakerListAction::Handled;
+                        return KeyOutcome::Handled;
                     }
 
                     if let Some(speaker) = app.system.speaker_by_id(&pick_up.speaker_id) {
@@ -376,7 +363,7 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
                 }
                 _ => {
                     // Space on a non-action row during pickup — ignore
-                    return SpeakerListAction::Handled;
+                    return KeyOutcome::Handled;
                 }
             }
 
@@ -384,11 +371,11 @@ fn handle_pick_up_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Sp
             // once the topology change lands.
             app.navigation.speakers_state.cancel_pick_up();
 
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
         PickUpCommand::Cancel => {
             app.navigation.speakers_state.cancel_pick_up();
-            SpeakerListAction::Handled
+            KeyOutcome::Handled
         }
     }
 }
@@ -412,7 +399,7 @@ mod tests {
         App::with_system(system, Config::default(), Theme::default_theme(), None)
     }
 
-    fn press(app: &mut App, code: KeyCode) -> SpeakerListAction {
+    fn press(app: &mut App, code: KeyCode) -> KeyOutcome {
         handle_key(app, KeyEvent::from(code))
     }
 
@@ -446,13 +433,10 @@ mod tests {
         let mut app = app();
         assert!(matches!(
             press(&mut app, KeyCode::Up),
-            SpeakerListAction::FocusTabBar
+            KeyOutcome::FocusTabBar
         ));
         press(&mut app, KeyCode::Down);
-        assert!(matches!(
-            press(&mut app, KeyCode::Up),
-            SpeakerListAction::Handled
-        ));
+        assert!(matches!(press(&mut app, KeyCode::Up), KeyOutcome::Handled));
         assert_eq!(selected(&app), 0);
     }
 

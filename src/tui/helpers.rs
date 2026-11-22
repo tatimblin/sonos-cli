@@ -2,13 +2,8 @@
 
 use sonos_sdk::CurrentTrack;
 
-pub fn uri_source_label(uri: &str) -> &str {
-    let _ = uri;
-    ""
-}
-
 /// Extract track title and artist as a "title — artist" string.
-/// Returns `None` if the track is empty or missing.
+/// Returns `None` if the track is empty, missing, or has neither field.
 pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
     track.as_ref().filter(|t| !t.is_empty()).and_then(|t| {
         let title = t.title.as_deref().filter(|s| !s.trim().is_empty());
@@ -17,12 +12,7 @@ pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
             (Some(title), Some(artist)) => Some(format!("{title} \u{2014} {artist}")),
             (Some(title), None) => Some(title.to_string()),
             (None, Some(artist)) => Some(artist.to_string()),
-            (None, None) => t
-                .uri
-                .as_deref()
-                .map(uri_source_label)
-                .filter(|s| !s.is_empty())
-                .map(String::from),
+            (None, None) => None,
         }
     })
 }
@@ -30,26 +20,6 @@ pub fn track_summary(track: &Option<CurrentTrack>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_uri_source_label_rincon() {
-        assert_eq!(uri_source_label("x-rincon:RINCON_123"), "");
-    }
-
-    #[test]
-    fn test_uri_source_label_empty() {
-        assert_eq!(uri_source_label(""), "");
-    }
-
-    #[test]
-    fn test_uri_source_label_spotify() {
-        assert_eq!(uri_source_label("x-sonos-spotify:spotify:track:abc"), "");
-    }
-
-    #[test]
-    fn test_uri_source_label_http() {
-        assert_eq!(uri_source_label("http://stream.example.com/radio"), "");
-    }
 
     #[test]
     fn test_track_summary_both_fields() {
@@ -76,7 +46,7 @@ mod tests {
     }
 
     #[test]
-    fn test_track_summary_uri_fallback() {
+    fn test_track_summary_uri_only_returns_none() {
         let track = Some(CurrentTrack {
             title: None,
             artist: None,
