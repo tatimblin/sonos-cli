@@ -87,6 +87,11 @@ pr-run-mode = "plan"
 allow-dirty = ["ci"]
 install-path = "CARGO_HOME"
 
+# dist 0.31 defaults aarch64-apple-darwin to macos-14, which GitHub no longer
+# offers, so the job was cancelled before it started.
+[workspace.metadata.dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
+
 [[workspace.metadata.dist.extra-artifacts]]
 artifacts = [
     "completions/sonos.bash",
