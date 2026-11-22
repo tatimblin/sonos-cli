@@ -32,6 +32,10 @@ impl CliError {
                 Some(diagnostics::discovery_hint())
             }
             Self::Sdk(e) => {
+                // The text match stays until the SDK exposes a network-error
+                // predicate: network failures arrive as
+                // `SdkError::ApiError(ApiError::NetworkError(_))`, but sonos-sdk
+                // does not re-export `ApiError`, so the variant can't be named.
                 if matches!(e, sonos_sdk::SdkError::DiscoveryFailed(_))
                     || e.to_string().contains("Network error")
                 {
@@ -53,9 +57,69 @@ impl CliError {
     }
 }
 
+/// Whether `err` is, or wraps, the SDK's discovery failure.
+///
+/// The TUI returns `anyhow::Error`, so the `SdkError` can sit anywhere in the
+/// source chain — behind `.context(..)` or inside a `CliError::Sdk`. Matching
+/// the variant replaces a search for "DiscoveryFailed" in the `Debug` text,
+/// which any error that merely mentioned the word would also satisfy.
+pub fn is_discovery_failure(err: &anyhow::Error) -> bool {
+    err.chain().any(|e| {
+        matches!(
+            e.downcast_ref::<sonos_sdk::SdkError>(),
+            Some(sonos_sdk::SdkError::DiscoveryFailed(_))
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sonos_sdk::SdkError;
+
+    fn discovery_failed() -> SdkError {
+        SdkError::DiscoveryFailed("no speakers responded".to_string())
+    }
+
+    #[test]
+    fn discovery_failure_detected_directly() {
+        assert!(is_discovery_failure(&anyhow::Error::from(
+            discovery_failed()
+        )));
+    }
+
+    #[test]
+    fn discovery_failure_detected_behind_context() {
+        let err = anyhow::Error::from(discovery_failed()).context("starting TUI");
+        assert!(is_discovery_failure(&err));
+    }
+
+    #[test]
+    fn discovery_failure_detected_inside_cli_error() {
+        let err = anyhow::Error::from(CliError::from(discovery_failed()));
+        assert!(is_discovery_failure(&err));
+    }
+
+    #[test]
+    fn other_sdk_errors_are_not_discovery_failures() {
+        assert!(!is_discovery_failure(&anyhow::Error::from(
+            SdkError::LockPoisoned
+        )));
+    }
+
+    /// The old check searched the `Debug` text, so a message that merely
+    /// contained the word matched.
+    #[test]
+    fn mentioning_discovery_failed_is_not_enough() {
+        let err = anyhow::anyhow!("DiscoveryFailed appears in this message");
+        assert!(!is_discovery_failure(&err));
+    }
+
+    #[test]
+    fn sdk_discovery_failure_gets_discovery_hint() {
+        let err = CliError::from(discovery_failed());
+        assert_eq!(err.recovery_hint(), Some(diagnostics::discovery_hint()));
+    }
 
     #[test]
     fn speaker_not_found_has_recovery_hint() {
