@@ -30,6 +30,7 @@
 
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use sonos_sdk::property::{GroupFetchable, GroupPropertyHandle, PropertyHandle, WatchHandle};
 use sonos_sdk::SdkError;
@@ -77,54 +78,79 @@ impl HookKey {
 // ProgressState — moved from app.rs to co-locate with hooks
 // ============================================================================
 
+/// Longest wall-clock gap between two updates that counts as playback time.
+///
+/// Frames arrive every ~250ms while playing, so a longer gap means the process
+/// was suspended (system sleep, a stalled terminal). Capping each gap limits
+/// how far the bar can drift before the SDK reports a fresh position.
+const MAX_FRAME_GAP: Duration = Duration::from_secs(10);
+
 /// Client-side progress interpolation state for a single group.
 ///
-/// Stores a snapshot of position + wall-clock timestamp. While playing,
-/// `interpolated_position_ms()` advances the position based on elapsed time,
-/// capped at 10s to limit drift from system sleep/stalls.
+/// The SDK only reports a new position on transport events, so between them
+/// the bar is advanced locally. `update` is called every frame with the SDK's
+/// cached values: it re-anchors only when those values change (a seek, track
+/// change or fresh position report) and otherwise accumulates wall-clock time
+/// while playing. Pausing freezes the accumulated position; resuming continues
+/// from it.
 #[derive(Clone, Debug)]
 pub struct ProgressState {
-    pub last_position_ms: u64,
-    pub last_duration_ms: u64,
-    pub wall_clock_at_last_update: std::time::Instant,
-    pub is_playing: bool,
+    /// SDK position at the last re-anchor.
+    anchor_position_ms: u64,
+    /// Playing time accumulated since the anchor, up to `last_tick`.
+    elapsed_ms: u64,
+    /// Wall-clock time of the last `update`.
+    last_tick: Instant,
+    duration_ms: u64,
+    is_playing: bool,
+    /// Last `(position_ms, duration_ms)` seen from the SDK, to detect changes.
+    sdk_snapshot: Option<(u64, u64)>,
 }
 
 impl Default for ProgressState {
     fn default() -> Self {
         Self {
-            last_position_ms: 0,
-            last_duration_ms: 0,
-            wall_clock_at_last_update: std::time::Instant::now(),
+            anchor_position_ms: 0,
+            elapsed_ms: 0,
+            last_tick: Instant::now(),
+            duration_ms: 0,
             is_playing: false,
+            sdk_snapshot: None,
         }
     }
 }
 
 impl ProgressState {
-    /// Update from SDK position and playback data.
-    pub fn update(&mut self, position_ms: u64, duration_ms: u64, is_playing: bool) {
-        // Freeze at interpolated position on pause transition
-        if self.is_playing && !is_playing {
-            self.last_position_ms = self.interpolated_position_ms();
+    /// Update from the SDK's cached position and playback state as of `now`.
+    pub fn update(&mut self, position_ms: u64, duration_ms: u64, is_playing: bool, now: Instant) {
+        // Credit time since the last update under the *previous* playing state,
+        // so a pause freezes at the position reached by `now`.
+        self.elapsed_ms = self.elapsed_at(now);
+        self.last_tick = now;
+
+        if self.sdk_snapshot != Some((position_ms, duration_ms)) {
+            self.sdk_snapshot = Some((position_ms, duration_ms));
+            self.anchor_position_ms = position_ms;
+            self.elapsed_ms = 0;
         }
 
-        self.last_position_ms = position_ms;
-        self.last_duration_ms = duration_ms;
+        self.duration_ms = duration_ms;
         self.is_playing = is_playing;
-        self.wall_clock_at_last_update = std::time::Instant::now();
     }
 
-    /// Compute interpolated position in milliseconds.
-    ///
-    /// Caps interpolation at 10s ahead to limit drift from system sleep/stalls.
-    pub fn interpolated_position_ms(&self) -> u64 {
+    /// Compute the interpolated position in milliseconds as of `now`.
+    pub fn interpolated_position_ms(&self, now: Instant) -> u64 {
+        (self.anchor_position_ms + self.elapsed_at(now)).min(self.duration_ms)
+    }
+
+    fn elapsed_at(&self, now: Instant) -> u64 {
         if !self.is_playing {
-            return self.last_position_ms;
+            return self.elapsed_ms;
         }
-        let elapsed = self.wall_clock_at_last_update.elapsed().as_millis() as u64;
-        let capped_elapsed = elapsed.min(10_000);
-        (self.last_position_ms + capped_elapsed).min(self.last_duration_ms)
+        let gap = now
+            .saturating_duration_since(self.last_tick)
+            .min(MAX_FRAME_GAP);
+        self.elapsed_ms + gap.as_millis() as u64
     }
 }
 
@@ -529,38 +555,97 @@ mod tests {
         assert!(!hooks.has_active_animations());
     }
 
+    fn ms(n: u64) -> Duration {
+        Duration::from_millis(n)
+    }
+
+    /// Repeating the same SDK position every frame must not reset the clock —
+    /// the bar keeps advancing between position reports.
     #[test]
-    fn progress_state_interpolation() {
-        let mut ps = ProgressState {
-            last_position_ms: 1000,
-            last_duration_ms: 5000,
-            is_playing: false,
-            ..Default::default()
-        };
+    fn progress_advances_while_sdk_position_is_unchanged() {
+        let t0 = Instant::now();
+        let mut ps = ProgressState::default();
 
-        // Not playing → returns last position
-        assert_eq!(ps.interpolated_position_ms(), 1000);
+        ps.update(1_000, 60_000, true, t0);
+        ps.update(1_000, 60_000, true, t0 + ms(250));
+        ps.update(1_000, 60_000, true, t0 + ms(500));
 
-        // Playing → interpolates forward
-        ps.is_playing = true;
-        ps.wall_clock_at_last_update = std::time::Instant::now();
-        // Position should be >= 1000 (at least the base)
-        assert!(ps.interpolated_position_ms() >= 1000);
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(500)), 1_500);
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(750)), 1_750);
     }
 
     #[test]
-    fn progress_state_caps_at_duration() {
-        let ps = ProgressState {
-            last_position_ms: 4900,
-            last_duration_ms: 5000,
-            is_playing: true,
-            // Simulate old timestamp (10+ seconds ago)
-            wall_clock_at_last_update: std::time::Instant::now()
-                - std::time::Duration::from_secs(20),
-        };
+    fn progress_reanchors_when_sdk_position_changes() {
+        let t0 = Instant::now();
+        let mut ps = ProgressState::default();
 
-        // Should cap at duration, not overflow
-        assert_eq!(ps.interpolated_position_ms(), 5000);
+        ps.update(1_000, 60_000, true, t0);
+        ps.update(1_000, 60_000, true, t0 + ms(2_000));
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(2_000)), 3_000);
+
+        // Seek: a new SDK position wins over the interpolated one.
+        ps.update(30_000, 60_000, true, t0 + ms(2_250));
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(2_250)), 30_000);
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(3_250)), 31_000);
+    }
+
+    #[test]
+    fn progress_reanchors_on_track_change_at_the_same_position() {
+        let t0 = Instant::now();
+        let mut ps = ProgressState::default();
+
+        ps.update(0, 60_000, true, t0);
+        ps.update(0, 60_000, true, t0 + ms(5_000));
+        // The next track also reports 0:00, but with a different duration.
+        ps.update(0, 90_000, true, t0 + ms(5_000));
+
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(5_000)), 0);
+    }
+
+    #[test]
+    fn progress_freezes_on_pause_and_resumes_on_play() {
+        let t0 = Instant::now();
+        let mut ps = ProgressState::default();
+
+        ps.update(1_000, 60_000, true, t0);
+        ps.update(1_000, 60_000, false, t0 + ms(2_000));
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(2_000)), 3_000);
+
+        // Stays frozen across paused frames.
+        ps.update(1_000, 60_000, false, t0 + ms(9_000));
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(12_000)), 3_000);
+
+        // Resumes from the frozen position, not from the stale SDK value.
+        ps.update(1_000, 60_000, true, t0 + ms(12_000));
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(13_000)), 4_000);
+    }
+
+    #[test]
+    fn progress_caps_at_duration() {
+        let t0 = Instant::now();
+        let mut ps = ProgressState::default();
+
+        ps.update(4_900, 5_000, true, t0);
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(1_000)), 5_000);
+    }
+
+    /// A long gap between updates (system sleep) counts for at most
+    /// `MAX_FRAME_GAP`, while ordinary frames keep accumulating past it.
+    #[test]
+    fn progress_caps_each_frame_gap() {
+        let t0 = Instant::now();
+        let mut ps = ProgressState::default();
+
+        ps.update(0, 600_000, true, t0);
+        ps.update(0, 600_000, true, t0 + ms(60_000));
+        assert_eq!(ps.interpolated_position_ms(t0 + ms(60_000)), 10_000);
+
+        let mut t = t0 + ms(60_000);
+        for _ in 0..80 {
+            t += ms(250);
+            ps.update(0, 600_000, true, t);
+        }
+        assert_eq!(ps.interpolated_position_ms(t), 30_000);
     }
 
     #[test]

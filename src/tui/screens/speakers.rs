@@ -242,9 +242,10 @@ fn assemble_bottom_bar(
     let progress_state = ctx
         .hooks
         .use_state::<ProgressState>("bottom_bar_progress", ProgressState::default);
-    progress_state.update(pos_ms, dur_ms, is_playing);
+    let now = std::time::Instant::now();
+    progress_state.update(pos_ms, dur_ms, is_playing, now);
 
-    let interpolated_pos = progress_state.interpolated_position_ms();
+    let interpolated_pos = progress_state.interpolated_position_ms(now);
     let progress = if dur_ms > 0 {
         (interpolated_pos as f64 / dur_ms as f64).clamp(0.0, 1.0)
     } else {
