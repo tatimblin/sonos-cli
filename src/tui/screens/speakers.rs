@@ -2,7 +2,7 @@
 
 use ratatui::layout::Rect;
 use ratatui::Frame;
-use sonos_sdk::{GroupId, PlaybackState, SpeakerId};
+use sonos_sdk::{GroupId, SpeakerId};
 
 use crate::tui::helpers;
 use crate::tui::hooks::{ProgressState, RenderContext};
@@ -147,9 +147,6 @@ fn speaker_row_data(
 }
 
 /// Assemble `BottomBarData` from the focused group's coordinator.
-/// What a position fetch is keyed on: coordinator, track URI, playback state.
-type PositionSyncKey = (SpeakerId, Option<String>, Option<PlaybackState>);
-
 fn assemble_bottom_bar(
     entries: &[ListEntry],
     selected_index: usize,
@@ -174,31 +171,11 @@ fn assemble_bottom_bar(
         .as_ref()
         .and_then(|c| ctx.hooks.use_watch(&c.current_track));
 
-    // Sonos never sends the playback position in events, so fetch it when the
-    // group's track or playback state changes (and on first sight, via
-    // `use_watch_or_fetch`). `ProgressState` interpolates between fetches.
-    if let Some(c) = coordinator.as_ref() {
-        let sync_key = (
-            c.id.clone(),
-            current_track.as_ref().and_then(|t| t.uri.clone()),
-            playback_state.clone(),
-        );
-        let last_sync = ctx
-            .hooks
-            .use_state::<Option<PositionSyncKey>>("bottom_bar_position_sync", || None);
-        if last_sync.as_ref() != Some(&sync_key) {
-            let first_sight = last_sync.is_none();
-            *last_sync = Some(sync_key);
-            if !first_sight {
-                if let Err(e) = c.position.fetch() {
-                    tracing::debug!("position fetch failed for {}: {e}", c.name);
-                }
-            }
-        }
-    }
+    // The SDK re-fetches a watched position when the track or playback state
+    // changes; `ProgressState` interpolates between those updates.
     let position = coordinator
         .as_ref()
-        .and_then(|c| ctx.hooks.use_watch_or_fetch(&c.position));
+        .and_then(|c| ctx.hooks.use_watch(&c.position));
 
     // Group volume
     let volume = group

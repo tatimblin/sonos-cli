@@ -32,9 +32,7 @@ use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use sonos_sdk::property::{
-    Fetchable, GroupFetchable, GroupPropertyHandle, PropertyHandle, WatchHandle,
-};
+use sonos_sdk::property::{GroupFetchable, GroupPropertyHandle, PropertyHandle, WatchHandle};
 use sonos_sdk::SdkError;
 use sonos_sdk::SonosProperty;
 
@@ -303,20 +301,6 @@ impl Hooks {
     {
         let key = format!("{}:{}", prop.speaker_id(), P::KEY);
         self.use_watch_cached(key, || prop.watch(), || prop.get())
-    }
-
-    /// Subscribe to a fetchable speaker property, fetching on first access if empty.
-    ///
-    /// Like `use_watch`, but seeds the value with a one-time fetch. Needed for
-    /// properties whose events may never carry a value: Sonos does not send the
-    /// playback position in AVTransport events, so a plain watch on `position`
-    /// stays empty.
-    pub fn use_watch_or_fetch<P>(&mut self, prop: &PropertyHandle<P>) -> Option<P>
-    where
-        P: SonosProperty + Fetchable + Clone + 'static,
-    {
-        let key = format!("{}:{}", prop.speaker_id(), P::KEY);
-        self.use_watch_cached(key, || prop.watch_or_fetch(), || prop.get())
     }
 
     /// Subscribe to a fetchable group property, fetching on first access if empty.
