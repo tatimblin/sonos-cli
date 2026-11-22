@@ -18,7 +18,7 @@ SDK methods are called directly from CLI command handlers and TUI event handlers
 |---------|-------|
 | CLI parsing | `clap` v4 (derive feature) |
 | TUI | `ratatui` + `crossterm` |
-| Sonos SDK | `sonos-sdk` `0.9.0` from crates.io (`test-support` feature in dev-dependencies) |
+| Sonos SDK | `sonos-sdk` `0.10.0` from crates.io (`test-support` feature in dev-dependencies) |
 | Config | `serde` + `toml`, `dirs` |
 | Errors | `thiserror` (`CliError`) on the CLI path; `anyhow` in the TUI and `Config::save` |
 | Logging | `tracing` + `tracing-subscriber` |

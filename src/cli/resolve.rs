@@ -99,22 +99,13 @@ pub fn resolve_speaker(
     // Prefer a group coordinator so we get track/position data
     // (non-coordinator speakers return NOT_IMPLEMENTED for these).
     //
-    // Pick the *largest* group rather than whichever one happens to come first.
-    // `groups()` has no meaningful order, so `.next()` chose arbitrarily: on a
-    // household with a 4-speaker group playing and one idle standalone speaker,
-    // bare `sonos status` reported the idle speaker as often as not.
-    //
-    // Member count is the right tiebreak because it comes from topology and is
-    // free to read. Preferring a *playing* group would be more precise but costs
-    // a SOAP fetch per group — in a fresh process the cache is cold, so it would
-    // turn picking a default into N round-trips. Speakers are grouped in order to
-    // play together, so the biggest group is the one the user means.
-    //
-    // Ties break on group id so repeated invocations agree.
-    if let Some(coordinator) = largest_group_first(system)
-        .into_iter()
-        .find_map(|g| g.coordinator())
-    {
+    // Pick the *largest* group: `groups()` returns largest first, in a stable
+    // order. Member count comes from topology and is free to read. Preferring a
+    // *playing* group would be more precise but costs a SOAP fetch per group —
+    // in a fresh process the cache is cold, so it would turn picking a default
+    // into N round-trips. Speakers are grouped in order to play together, so the
+    // biggest group is the one the user means.
+    if let Some(coordinator) = system.groups().into_iter().find_map(|g| g.coordinator()) {
         return Ok(coordinator);
     }
 
@@ -146,29 +137,14 @@ pub fn resolve_group(
         }
     }
 
-    // Same reasoning as `resolve_speaker`: `groups()` is backed by a HashMap, so
-    // `.next()` picked arbitrarily. This one matters more — `resolve_group` backs
-    // the `volume` and `mute` *write* commands, so a bare `sonos volume 30` could
-    // change the volume of whichever group happened to come out first.
-    largest_group_first(system)
+    // Same choice as `resolve_speaker`, so a bare command and its group-scoped
+    // equivalent agree. It matters more here: `resolve_group` backs the `volume`
+    // and `mute` *write* commands.
+    system
+        .groups()
         .into_iter()
         .next()
         .ok_or_else(|| CliError::GroupNotFound("no groups available".to_string()))
-}
-
-/// Groups ordered by member count descending, ties broken on group id.
-///
-/// Shared by `resolve_speaker` and `resolve_group` so a bare command and its
-/// group-scoped equivalent cannot disagree about which group they mean.
-fn largest_group_first(system: &SonosSystem) -> Vec<Group> {
-    let mut groups = system.groups();
-    groups.sort_by(|a, b| {
-        b.member_ids
-            .len()
-            .cmp(&a.member_ids.len())
-            .then_with(|| a.id.as_str().cmp(b.id.as_str()))
-    });
-    groups
 }
 
 /// Resolve --speaker flag for speaker-only commands (bass, treble, loudness).

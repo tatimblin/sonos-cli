@@ -32,13 +32,7 @@ impl CliError {
                 Some(diagnostics::discovery_hint())
             }
             Self::Sdk(e) => {
-                // The text match stays until the SDK exposes a network-error
-                // predicate: network failures arrive as
-                // `SdkError::ApiError(ApiError::NetworkError(_))`, but sonos-sdk
-                // does not re-export `ApiError`, so the variant can't be named.
-                if matches!(e, sonos_sdk::SdkError::DiscoveryFailed(_))
-                    || e.to_string().contains("Network error")
-                {
+                if matches!(e, sonos_sdk::SdkError::DiscoveryFailed(_)) || e.is_network_error() {
                     Some(diagnostics::discovery_hint())
                 } else {
                     Some("Check network connectivity and speaker power.")

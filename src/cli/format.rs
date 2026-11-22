@@ -26,19 +26,19 @@ pub fn state_display(state: &sonos_sdk::PlaybackState) -> String {
 ///
 /// A track with no title or artist is shown as "Playing (no metadata)" when
 /// something is actually loaded — e.g. a radio stream — rather than the SDK's
-/// "Unknown". An empty URI or an `x-rincon:` URI (a grouped member following
-/// its coordinator) means nothing of its own is loaded, so "Unknown" stays.
+/// "Unknown". An empty URI or a grouped member following its coordinator means
+/// nothing of its own is loaded, so "Unknown" stays.
 pub fn track_display(track: &sonos_sdk::CurrentTrack) -> String {
     let d = track.display();
     if d != "Unknown" {
         return d;
     }
-    track
-        .uri
-        .as_deref()
-        .filter(|u| !u.is_empty() && !u.starts_with("x-rincon:"))
-        .map(|_| "Playing (no metadata)".to_string())
-        .unwrap_or(d)
+    match track.source() {
+        Some(source) if source != sonos_sdk::PlaybackSource::GroupFollower => {
+            "Playing (no metadata)".to_string()
+        }
+        _ => d,
+    }
 }
 
 /// Format milliseconds as M:SS or H:MM:SS.

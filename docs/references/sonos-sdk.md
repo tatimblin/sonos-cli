@@ -160,7 +160,7 @@ hasn't been loaded yet — no need to watch `group_membership` first.
 
 | Method | Signature | Returns |
 |---|---|---|
-| `groups()` | `&self -> Vec<Group>` | All current groups |
+| `groups()` | `&self -> Vec<Group>` | All current groups, largest first (then coordinator name, then id) |
 | `group(name)` | `(&self, name: &str) -> Option<Group>` | By coordinator speaker name (case-insensitive) |
 | `group_by_id(id)` | `(&self, id: &GroupId) -> Option<Group>` | By group ID |
 | `group_for_speaker(id)` | `(&self, id: &SpeakerId) -> Option<Group>` | Group the speaker belongs to |
@@ -730,7 +730,7 @@ directly, note it is published as `sonos-sdk-discovery`:
 
 ```toml
 [dependencies]
-sonos-discovery = { package = "sonos-sdk-discovery", version = "0.9" }
+sonos-discovery = { package = "sonos-sdk-discovery", version = "0.10" }
 ```
 
 ### Free functions
@@ -914,9 +914,10 @@ match speaker.set_volume(150) {
 
 ### `ApiError` (from `sonos_api`)
 
-Wraps SOAP-level failures. `sonos-sdk` 0.9 does **not** re-export `ApiError`, so
-downstream crates cannot name its variants; `sonos-cli` matches on the `Display` text
-(`"Network error: ..."`) instead.
+Wraps SOAP-level failures. `sonos-sdk` does **not** re-export `ApiError`, so
+downstream crates cannot name its variants. To tell an unreachable speaker apart
+from one that answered with an error, use `SdkError::is_network_error()`, which
+checks both the direct and the state-wrapped paths.
 
 ```rust
 pub enum ApiError {
@@ -1087,8 +1088,15 @@ pub struct CurrentTrack {
 impl CurrentTrack {
     pub fn is_empty(&self) -> bool          // true when no title, artist, or uri
     pub fn display(&self) -> String         // "Artist - Title" or best available
+    pub fn source(&self) -> Option<PlaybackSource>          // classified from `uri`
+    pub fn album_art_url(&self, speaker_ip: IpAddr) -> Option<String> // absolute URL
 }
 ```
+
+`PlaybackSource` (`#[non_exhaustive]`): `GroupFollower` (`x-rincon:`, a grouped
+member — read the coordinator instead), `Queue`, `Tv`, `LineIn`, `VirtualLineIn`,
+`Stream`, `Track`, `Other`. `PlaybackSource::from_uri(&str)` classifies any
+transport URI; an empty one gives `None`.
 
 Property key: `"current_track"`. Service: `AVTransport`.
 
