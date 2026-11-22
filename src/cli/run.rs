@@ -4,9 +4,10 @@ use sonos_sdk::{SeekTarget, SonosSystem};
 
 use super::config_cmd::run_config_action;
 use super::{
-    format_duration_human, format_time_ms, parse_duration, playback_icon, playback_label,
-    require_speaker_only, resolve_group, resolve_speaker, validate_seek_time, Commands,
-    GlobalFlags, OnOff, QueueAction,
+    coordinator_name, find_group, find_speaker, format_duration_human, format_time_ms,
+    parse_duration, playback_icon, playback_label, require_speaker_only, required_flag,
+    resolve_speaker, resolve_target, validate_seek_time, Commands, GlobalFlags, OnOff, QueueAction,
+    Target,
 };
 use crate::config::Config;
 use crate::diagnostics;
@@ -120,7 +121,7 @@ fn cmd_speakers(system: &SonosSystem) -> Result<CommandOutput, CliError> {
             // `group()` reads the in-memory topology, not the network — not a probe.
             let group_name = s
                 .group()
-                .and_then(|g| g.coordinator().map(|c| c.name))
+                .and_then(|g| coordinator_name(&g))
                 .unwrap_or_default();
 
             let state_str = state
@@ -214,24 +215,15 @@ fn cmd_volume(
     global: &GlobalFlags,
     level: u8,
 ) -> Result<CommandOutput, CliError> {
-    // Explicit --speaker (without --group) → Speaker.set_volume(u8)
-    if global.speaker.is_some() && global.group.is_none() {
-        let s = resolve_speaker(system, config, global)?;
-        s.set_volume(level)?;
-        return Ok(CommandOutput::live(format!(
-            "Volume set to {} ({})",
-            level, s.name
-        )));
+    let target = resolve_target(system, config, global)?;
+    match &target {
+        Target::Speaker(s) => s.set_volume(level)?,
+        // Group volume goes through GroupRenderingControl, which takes a u16.
+        Target::Group(g) => g.set_volume(u16::from(level))?,
     }
-    // Otherwise → Group.set_volume(u16) via GroupRenderingControl
-    let g = resolve_group(system, config, global)?;
-    let name = g
-        .coordinator()
-        .map(|c| c.name)
-        .unwrap_or_else(|| "unknown".to_string());
-    g.set_volume(level as u16)?;
     Ok(CommandOutput::live(format!(
-        "Volume set to {level} ({name})"
+        "Volume set to {level} ({})",
+        target.display_name()
     )))
 }
 
@@ -242,20 +234,15 @@ fn cmd_mute(
     muted: bool,
 ) -> Result<CommandOutput, CliError> {
     let label = if muted { "Muted" } else { "Unmuted" };
-    // Explicit --speaker (without --group) → Speaker.set_mute(bool)
-    if global.speaker.is_some() && global.group.is_none() {
-        let s = resolve_speaker(system, config, global)?;
-        s.set_mute(muted)?;
-        return Ok(CommandOutput::live(format!("{} ({})", label, s.name)));
+    let target = resolve_target(system, config, global)?;
+    match &target {
+        Target::Speaker(s) => s.set_mute(muted)?,
+        Target::Group(g) => g.set_mute(muted)?,
     }
-    // Otherwise → Group.set_mute(bool) via GroupRenderingControl
-    let g = resolve_group(system, config, global)?;
-    let name = g
-        .coordinator()
-        .map(|c| c.name)
-        .unwrap_or_else(|| "unknown".to_string());
-    g.set_mute(muted)?;
-    Ok(CommandOutput::live(format!("{label} ({name})")))
+    Ok(CommandOutput::live(format!(
+        "{label} ({})",
+        target.display_name()
+    )))
 }
 
 fn cmd_status(
@@ -326,22 +313,14 @@ fn cmd_join(
     config: &Config,
     global: &GlobalFlags,
 ) -> Result<CommandOutput, CliError> {
-    let raw_speaker = global
-        .speaker
-        .as_deref()
-        .ok_or_else(|| CliError::Validation("--speaker is required for join".into()))?;
-    let raw_group = global
-        .group
-        .as_deref()
-        .ok_or_else(|| CliError::Validation("--group is required for join".into()))?;
+    // Both flags are checked before either lookup, so a missing flag is
+    // reported ahead of a name that doesn't resolve.
+    let raw_speaker = required_flag(global.speaker.as_deref(), "--speaker", "join")?;
+    let raw_group = required_flag(global.group.as_deref(), "--group", "join")?;
     let speaker_name = config.resolve_alias(raw_speaker);
     let group_name = config.resolve_alias(raw_group);
-    let spk = system
-        .speaker(speaker_name)
-        .ok_or_else(|| CliError::SpeakerNotFound(speaker_name.into()))?;
-    let grp = system
-        .group(group_name)
-        .ok_or_else(|| CliError::GroupNotFound(group_name.into()))?;
+    let spk = find_speaker(system, speaker_name)?;
+    let grp = find_group(system, group_name)?;
     grp.add_speaker(&spk)?;
     Ok(CommandOutput::live(format!(
         "{speaker_name} joined {group_name}"
@@ -353,17 +332,12 @@ fn cmd_leave(
     config: &Config,
     global: &GlobalFlags,
 ) -> Result<CommandOutput, CliError> {
-    let raw_speaker = global
-        .speaker
-        .as_deref()
-        .ok_or_else(|| CliError::Validation("--speaker is required for leave".into()))?;
+    let raw_speaker = required_flag(global.speaker.as_deref(), "--speaker", "leave")?;
     let speaker_name = config.resolve_alias(raw_speaker);
-    let spk = system
-        .speaker(speaker_name)
-        .ok_or_else(|| CliError::SpeakerNotFound(speaker_name.into()))?;
+    let spk = find_speaker(system, speaker_name)?;
     let group_name = spk
         .group()
-        .and_then(|g| g.coordinator().map(|c| c.name))
+        .and_then(|g| coordinator_name(&g))
         .unwrap_or_else(|| "its group".into());
     spk.leave_group()?;
     Ok(CommandOutput::live(format!(
