@@ -5,8 +5,8 @@ use sonos_sdk::{SeekTarget, SonosSystem};
 use super::config_cmd::run_config_action;
 use super::{
     coordinator_name, find_group, find_speaker, format_duration_human, format_time_ms,
-    parse_duration, playback_icon, playback_label, require_speaker_only, required_flag,
-    resolve_speaker, resolve_target, validate_seek_time, Commands, GlobalFlags, OnOff, QueueAction,
+    parse_duration, require_speaker_only, required_flag, resolve_speaker, resolve_target,
+    state_display, track_display, validate_seek_time, Commands, GlobalFlags, OnOff, QueueAction,
     Target,
 };
 use crate::config::Config;
@@ -124,10 +124,7 @@ fn cmd_speakers(system: &SonosSystem) -> Result<CommandOutput, CliError> {
                 .and_then(|g| coordinator_name(&g))
                 .unwrap_or_default();
 
-            let state_str = state
-                .as_ref()
-                .map(|st| format!("{} {}", playback_icon(st), playback_label(st)))
-                .unwrap_or_default();
+            let state_str = state.as_ref().map(state_display).unwrap_or_default();
             let vol_str = vol.map(|v| format!("vol:{}", v.0)).unwrap_or_default();
 
             let mut parts = vec![s.name.clone()];
@@ -172,25 +169,8 @@ fn cmd_groups(system: &SonosSystem) -> Result<CommandOutput, CliError> {
                 .and_then(|c| probes.record(c.current_track.fetch()));
             let vol = probes.record(g.volume.fetch());
 
-            let state_str = state
-                .as_ref()
-                .map(|st| format!("{} {}", playback_icon(st), playback_label(st)))
-                .unwrap_or_default();
-            let track_str = track
-                .as_ref()
-                .map(|t| {
-                    let d = t.display();
-                    if d == "Unknown" {
-                        t.uri
-                            .as_deref()
-                            .filter(|u| !u.is_empty() && !u.starts_with("x-rincon:"))
-                            .map(|_| "Playing (no metadata)".to_string())
-                            .unwrap_or(d)
-                    } else {
-                        d
-                    }
-                })
-                .unwrap_or_default();
+            let state_str = state.as_ref().map(state_display).unwrap_or_default();
+            let track_str = track.as_ref().map(track_display).unwrap_or_default();
             let vol_str = vol.map(|v| format!("vol:{}", v.0)).unwrap_or_default();
 
             let mut parts = vec![coord_name];
@@ -266,23 +246,9 @@ fn cmd_status(
 
     let state_str = state
         .as_ref()
-        .map(|st| format!("{} {}", playback_icon(st), playback_label(st)))
+        .map(state_display)
         .unwrap_or_else(|| "unknown".to_string());
-    let track_str = track
-        .as_ref()
-        .map(|t| {
-            let d = t.display();
-            if d == "Unknown" {
-                t.uri
-                    .as_deref()
-                    .filter(|u| !u.is_empty() && !u.starts_with("x-rincon:"))
-                    .map(|_| "Playing (no metadata)".to_string())
-                    .unwrap_or(d)
-            } else {
-                d
-            }
-        })
-        .unwrap_or_default();
+    let track_str = track.as_ref().map(track_display).unwrap_or_default();
     let pos_str = pos
         .as_ref()
         .map(|p| {
