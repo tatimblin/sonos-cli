@@ -20,25 +20,23 @@
 //!   `► Create new group`    (standalone target)
 
 use ratatui::layout::Rect;
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 use sonos_sdk::PlaybackState;
 
 use crate::tui::theme::Theme;
-use crate::tui::types::{group_for_entry, ListEntry, SpeakerListData};
+use crate::tui::types::{
+    group_for_entry, GroupHeaderData, ListEntry, RowData, SpeakerListData, SpeakerRowData,
+};
 use crate::tui::widgets::volume_bar;
+
+/// Columns taken by the cursor glyph and the space after it.
+const CURSOR_PREFIX_WIDTH: usize = 2;
 
 /// Render the speaker list from pre-computed data.
 pub fn render(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &Theme) {
-    render_normal(frame, area, data, theme);
-}
-
-// ===========================================================================
-// Normal mode rendering
-// ===========================================================================
-
-fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &Theme) {
     if data.entries.is_empty() {
         let paragraph = Paragraph::new("No speakers found")
             .alignment(ratatui::layout::Alignment::Center)
@@ -54,9 +52,7 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
     let viewport_height = area.height as usize;
     let vol_width = 16.min(area.width.saturating_sub(50));
     let total_width = area.width as usize;
-    let g = &theme.glyphs;
 
-    let cursor_prefix_width = 2;
     let is_pickup = data.picked_up_speaker_id.is_some();
     let focused_group = group_for_entry(&data.entries, selected_index);
 
@@ -64,252 +60,58 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
     let mut entry_visual_starts: Vec<usize> = Vec::new();
     let mut entry_visual_heights: Vec<usize> = Vec::new();
 
-    for (idx, (entry, entry_data)) in data.entries.iter().zip(data.entry_data.iter()).enumerate() {
+    for (idx, (entry, row)) in data.entries.iter().zip(data.rows.iter()).enumerate() {
         let is_selected = idx == selected_index;
 
-        // Insert blank separator + divider between groups (not before the first entry)
-        let is_group_header = matches!(entry, ListEntry::GroupHeader(_));
-        if idx > 0 && is_group_header {
-            lines.push(Line::raw(""));
-            let divider_inner_w = total_width.saturating_sub(cursor_prefix_width + 2 + 2);
-            let left_pad = divider_inner_w / 2;
-            let right_pad = divider_inner_w.saturating_sub(left_pad + 1);
-            let divider = format!(
-                "{}{}{}{}{}",
-                g.divider_left,
-                " ".repeat(left_pad),
-                g.divider_fill,
-                " ".repeat(right_pad),
-                g.divider_right,
-            );
-            lines.push(Line::from(vec![
-                Span::raw(" ".repeat(cursor_prefix_width + 2)),
-                Span::styled(divider, theme.muted),
-            ]));
-            lines.push(Line::raw(""));
+        // Blank separator + divider between groups (not before the first entry)
+        if idx > 0 && matches!(entry, ListEntry::GroupHeader(_)) {
+            lines.extend(divider_lines(total_width, theme));
         }
 
         let start_line = lines.len();
 
-        match entry {
-            ListEntry::GroupHeader(group_id) => {
-                let is_focused_group = focused_group.as_ref().is_some_and(|fg| fg == group_id);
-
-                let (icon, icon_style) = match &entry_data.playback_state {
-                    Some(PlaybackState::Playing) => (g.playing, theme.playing_icon),
-                    Some(PlaybackState::Paused) => (g.paused, theme.paused_icon),
-                    _ => (g.stopped, theme.stopped_icon),
-                };
-
-                let name_style = if is_selected {
-                    theme.speaker_cursor
-                } else {
-                    theme.group_header
-                };
-
-                let leader_style = if is_focused_group {
-                    theme.accent_secondary
-                } else {
-                    theme.leader
-                };
-
-                let cursor_str = if is_selected { g.cursor } else { " " };
-
-                let vol_text = format_volume(entry_data.group_volume);
-                let mute_text = if entry_data.is_muted {
-                    format!(" {}", g.muted)
-                } else {
-                    String::new()
-                };
-                let vol_chars = vol_text.chars().count() + mute_text.chars().count();
-
-                let name_chars = entry_data.name.chars().count();
-                let icon_chars = icon.chars().count();
-
-                let track_text = entry_data.track_info.as_deref().unwrap_or("");
-                let track_chars = track_text.chars().count();
-
-                let fixed_chars =
-                    cursor_prefix_width + icon_chars + 1 + name_chars + 1 + vol_chars + 1;
-                let available = total_width.saturating_sub(fixed_chars);
-
-                let mut spans = vec![
-                    Span::styled(cursor_str, theme.speaker_cursor),
-                    Span::raw(" "),
-                    Span::styled(format!("{icon} "), icon_style),
-                    Span::styled(entry_data.name.clone(), name_style),
-                    Span::raw(" "),
-                ];
-
-                if !track_text.is_empty() && available > track_chars + 4 {
-                    let leaders_total = available.saturating_sub(track_chars + 2);
-                    let leaders_before = 5.min(leaders_total / 2);
-                    let leaders_after = leaders_total.saturating_sub(leaders_before);
-
-                    spans.push(Span::styled(
-                        std::iter::repeat_n(g.leader_char, leaders_before).collect::<String>(),
-                        leader_style,
-                    ));
-                    spans.push(Span::styled(format!(" {track_text} "), theme.track_info));
-                    spans.push(Span::styled(
-                        std::iter::repeat_n(g.leader_char, leaders_after).collect::<String>(),
-                        leader_style,
-                    ));
-                } else {
-                    spans.push(Span::styled(
-                        std::iter::repeat_n(g.leader_char, available).collect::<String>(),
-                        leader_style,
-                    ));
-                }
-
-                if !mute_text.is_empty() {
-                    spans.push(Span::styled(mute_text, theme.error));
-                }
-                spans.push(Span::styled(format!(" {vol_text}"), theme.muted));
-
-                lines.push(Line::from(spans));
-                entry_visual_starts.push(start_line);
-                entry_visual_heights.push(lines.len() - start_line);
-            }
-            ListEntry::SpeakerRow(speaker_id) => {
-                let connector = if entry_data.is_last_in_group {
-                    g.connector_last
-                } else {
-                    g.connector_branch
-                };
-
-                let is_picked_up = data
-                    .picked_up_speaker_id
-                    .as_ref()
-                    .is_some_and(|id| id == speaker_id);
-
-                let name_style = if is_picked_up {
-                    theme.picked_up
-                } else if is_selected {
-                    theme.speaker_cursor
-                } else {
-                    theme.speaker_name
-                };
-
-                let cursor_str = if is_selected { g.cursor } else { " " };
-
-                let mut spans = vec![
-                    Span::styled(cursor_str, theme.speaker_cursor),
-                    Span::raw(" "),
-                    Span::styled(" ".repeat(2), theme.muted),
-                ];
-
-                if is_picked_up {
-                    spans.push(Span::styled(connector, theme.picked_up));
-                    spans.push(Span::styled(entry_data.name.clone(), theme.picked_up));
-                    if let Some(ref model) = entry_data.model_name {
-                        spans.push(Span::styled(g.model_separator.to_string(), theme.picked_up));
-                        spans.push(Span::styled(model.clone(), theme.picked_up));
-                    }
-                    let content_width: usize =
-                        spans.iter().map(|s| s.content.chars().count()).sum();
-                    let remaining = total_width.saturating_sub(content_width);
-                    if remaining > 0 {
-                        spans.push(Span::styled(" ".repeat(remaining), theme.picked_up));
-                    }
-                } else {
-                    spans.push(Span::styled(connector, theme.muted));
-                    spans.push(Span::styled(entry_data.name.clone(), name_style));
-
-                    if let Some(ref model) = entry_data.model_name {
-                        spans.push(Span::styled(g.model_separator.to_string(), theme.muted));
-                        spans.push(Span::styled(model.clone(), theme.muted));
-                    }
-
-                    if let Some(vol) = entry_data.speaker_volume {
-                        append_volume_spans(
-                            &mut spans,
-                            vol,
-                            entry_data.is_muted,
-                            is_selected && !is_pickup,
-                            vol_width,
-                            total_width,
-                            theme,
-                        );
-                    }
-                }
-
-                lines.push(Line::from(spans));
-                entry_visual_starts.push(start_line);
-                entry_visual_heights.push(1);
-            }
-            ListEntry::AddToGroupRow(_) => {
-                let cursor_str = if is_selected { g.cursor } else { " " };
-
-                let style = if entry_data.is_home_group {
-                    theme.muted
-                } else if is_selected {
-                    theme.accent
-                } else {
-                    theme.muted
-                };
-
-                let cursor_style = if is_selected && !entry_data.is_home_group {
-                    theme.speaker_cursor
-                } else {
-                    theme.muted
-                };
-
-                lines.push(Line::from(vec![
-                    Span::styled(cursor_str, cursor_style),
-                    Span::raw(" "),
-                    Span::styled(" ".repeat(2), theme.muted),
-                    Span::styled(g.connector_last, style),
-                    Span::styled(entry_data.name.clone(), style),
-                ]));
-
-                entry_visual_starts.push(start_line);
-                entry_visual_heights.push(1);
-            }
-            ListEntry::CreateNewGroupRow => {
-                // Divider before "Create new group"
-                lines.push(Line::raw(""));
-                let divider_inner_w = total_width.saturating_sub(cursor_prefix_width + 2 + 2);
-                let left_pad = divider_inner_w / 2;
-                let right_pad = divider_inner_w.saturating_sub(left_pad + 1);
-                let divider = format!(
-                    "{}{}{}{}{}",
-                    g.divider_left,
-                    " ".repeat(left_pad),
-                    g.divider_fill,
-                    " ".repeat(right_pad),
-                    g.divider_right,
+        match row {
+            RowData::GroupHeader(header) => {
+                let is_focused_group = matches!(
+                    (entry, &focused_group),
+                    (ListEntry::GroupHeader(gid), Some(fg)) if fg == gid
                 );
-                lines.push(Line::from(vec![
-                    Span::raw(" ".repeat(cursor_prefix_width + 2)),
-                    Span::styled(divider, theme.muted),
-                ]));
-                lines.push(Line::raw(""));
-
-                let cursor_str = if is_selected { g.cursor } else { " " };
-                let style = if is_selected {
-                    theme.accent
-                } else {
-                    theme.muted
-                };
-                let cursor_style = if is_selected {
-                    theme.speaker_cursor
-                } else {
-                    theme.muted
-                };
-
-                lines.push(Line::from(vec![
-                    Span::styled(cursor_str, cursor_style),
-                    Span::raw(" "),
-                    Span::styled(" ".repeat(2), theme.muted),
-                    Span::styled(format!("{} ", g.tab_active_indicator), style),
-                    Span::styled(entry_data.name.clone(), style),
-                ]));
-
-                entry_visual_starts.push(start_line);
-                entry_visual_heights.push(lines.len() - start_line);
+                lines.push(render_group_header(
+                    header,
+                    is_selected,
+                    is_focused_group,
+                    total_width,
+                    theme,
+                ));
+            }
+            RowData::Speaker(speaker) => {
+                let is_picked_up = matches!(
+                    (entry, &data.picked_up_speaker_id),
+                    (ListEntry::SpeakerRow(sid), Some(picked)) if picked == sid
+                );
+                let shows_volume_bar = is_selected && !is_pickup;
+                lines.push(render_speaker_row(
+                    speaker,
+                    is_selected,
+                    is_picked_up,
+                    shows_volume_bar,
+                    vol_width,
+                    total_width,
+                    theme,
+                ));
+            }
+            RowData::AddToGroup { is_home } => {
+                lines.push(render_add_to_group_row(*is_home, is_selected, theme));
+            }
+            RowData::CreateNewGroup => {
+                // "Create new group" sits below its own divider
+                lines.extend(divider_lines(total_width, theme));
+                lines.push(render_create_group_row(is_selected, theme));
             }
         }
+
+        entry_visual_starts.push(start_line);
+        entry_visual_heights.push(lines.len() - start_line);
     }
 
     let scroll_offset = if viewport_height == 0 || entry_visual_starts.is_empty() {
@@ -342,8 +144,231 @@ fn render_normal(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &
 }
 
 // ===========================================================================
+// Row renderers
+// ===========================================================================
+
+/// `❯ ▶ Kitchen ::::: Track — Artist :::::::::  30%`
+fn render_group_header(
+    header: &GroupHeaderData,
+    is_selected: bool,
+    is_focused_group: bool,
+    total_width: usize,
+    theme: &Theme,
+) -> Line<'static> {
+    let g = &theme.glyphs;
+
+    let (icon, icon_style) = match &header.playback_state {
+        Some(PlaybackState::Playing) => (g.playing, theme.playing_icon),
+        Some(PlaybackState::Paused) => (g.paused, theme.paused_icon),
+        _ => (g.stopped, theme.stopped_icon),
+    };
+
+    let name_style = if is_selected {
+        theme.speaker_cursor
+    } else {
+        theme.group_header
+    };
+
+    let leader_style = if is_focused_group {
+        theme.accent_secondary
+    } else {
+        theme.leader
+    };
+
+    let mut spans = cursor_prefix(is_selected, theme.speaker_cursor, theme);
+    spans.push(Span::styled(format!("{icon} "), icon_style));
+    spans.push(Span::styled(header.name.clone(), name_style));
+    spans.push(Span::raw(" "));
+
+    let mut right = Vec::new();
+    if header.is_muted {
+        right.push(Span::styled(format!(" {}", g.muted), theme.error));
+    }
+    right.push(Span::styled(
+        format!(" {}", format_volume(header.volume)),
+        theme.muted,
+    ));
+
+    let available = fill_width(&spans, &right, total_width);
+    let leaders = |count: usize| -> String { std::iter::repeat_n(g.leader_char, count).collect() };
+
+    let track_text = header.track_info.as_deref().unwrap_or("");
+    let track_chars = track_text.chars().count();
+
+    if !track_text.is_empty() && available > track_chars + 4 {
+        let leaders_total = available.saturating_sub(track_chars + 2);
+        let leaders_before = 5.min(leaders_total / 2);
+        let leaders_after = leaders_total.saturating_sub(leaders_before);
+
+        spans.push(Span::styled(leaders(leaders_before), leader_style));
+        spans.push(Span::styled(format!(" {track_text} "), theme.track_info));
+        spans.push(Span::styled(leaders(leaders_after), leader_style));
+    } else {
+        spans.push(Span::styled(leaders(available), leader_style));
+    }
+
+    spans.extend(right);
+    Line::from(spans)
+}
+
+/// `  ├─ Kitchen • Sonos One          46%`, or a volume bar when selected.
+fn render_speaker_row(
+    speaker: &SpeakerRowData,
+    is_selected: bool,
+    is_picked_up: bool,
+    shows_volume_bar: bool,
+    vol_width: u16,
+    total_width: usize,
+    theme: &Theme,
+) -> Line<'static> {
+    let g = &theme.glyphs;
+    let connector = if speaker.is_last_in_group {
+        g.connector_last
+    } else {
+        g.connector_branch
+    };
+
+    let mut spans = cursor_prefix(is_selected, theme.speaker_cursor, theme);
+    spans.push(indent(theme));
+
+    if is_picked_up {
+        // Reverse-highlighted across the full width; the volume is dropped.
+        let style = theme.picked_up;
+        spans.push(Span::styled(connector, style));
+        spans.push(Span::styled(speaker.name.clone(), style));
+        if let Some(ref model) = speaker.model_name {
+            spans.push(Span::styled(g.model_separator.to_string(), style));
+            spans.push(Span::styled(model.clone(), style));
+        }
+        let remaining = fill_width(&spans, &[], total_width);
+        if remaining > 0 {
+            spans.push(Span::styled(" ".repeat(remaining), style));
+        }
+        return Line::from(spans);
+    }
+
+    let name_style = if is_selected {
+        theme.speaker_cursor
+    } else {
+        theme.speaker_name
+    };
+
+    spans.push(Span::styled(connector, theme.muted));
+    spans.push(Span::styled(speaker.name.clone(), name_style));
+    if let Some(ref model) = speaker.model_name {
+        spans.push(Span::styled(g.model_separator.to_string(), theme.muted));
+        spans.push(Span::styled(model.clone(), theme.muted));
+    }
+
+    if let Some(vol) = speaker.volume {
+        let right = volume_spans(vol, speaker.is_muted, shows_volume_bar, vol_width, theme);
+        push_right_aligned(&mut spans, right, total_width);
+    }
+
+    Line::from(spans)
+}
+
+/// `  └─ Add to group`, or dimmed `└─ Already in group` for the home group.
+fn render_add_to_group_row(is_home: bool, is_selected: bool, theme: &Theme) -> Line<'static> {
+    let (label, style, cursor_style) = if is_home {
+        ("Already in group", theme.muted, theme.muted)
+    } else if is_selected {
+        ("Add to group", theme.accent, theme.speaker_cursor)
+    } else {
+        ("Add to group", theme.muted, theme.muted)
+    };
+
+    let mut spans = cursor_prefix(is_selected, cursor_style, theme);
+    spans.push(indent(theme));
+    spans.push(Span::styled(theme.glyphs.connector_last, style));
+    spans.push(Span::styled(label, style));
+    Line::from(spans)
+}
+
+/// `  ▸ Create new group`
+fn render_create_group_row(is_selected: bool, theme: &Theme) -> Line<'static> {
+    let (style, cursor_style) = if is_selected {
+        (theme.accent, theme.speaker_cursor)
+    } else {
+        (theme.muted, theme.muted)
+    };
+
+    let mut spans = cursor_prefix(is_selected, cursor_style, theme);
+    spans.push(indent(theme));
+    spans.push(Span::styled(
+        format!("{} ", theme.glyphs.tab_active_indicator),
+        style,
+    ));
+    spans.push(Span::styled("Create new group", style));
+    Line::from(spans)
+}
+
+// ===========================================================================
 // Shared helpers
 // ===========================================================================
+
+/// The cursor glyph (or a blank when unselected) and the space after it.
+fn cursor_prefix(is_selected: bool, style: Style, theme: &Theme) -> Vec<Span<'static>> {
+    let cursor = if is_selected {
+        theme.glyphs.cursor
+    } else {
+        " "
+    };
+    vec![Span::styled(cursor, style), Span::raw(" ")]
+}
+
+/// Indent that nests speaker and action rows under their group header.
+fn indent(theme: &Theme) -> Span<'static> {
+    Span::styled(" ".repeat(2), theme.muted)
+}
+
+/// A blank line, a centered divider, and another blank line.
+fn divider_lines(total_width: usize, theme: &Theme) -> [Line<'static>; 3] {
+    let g = &theme.glyphs;
+    let indent_width = CURSOR_PREFIX_WIDTH + 2;
+    let divider_inner_w = total_width.saturating_sub(indent_width + 2);
+    let left_pad = divider_inner_w / 2;
+    let right_pad = divider_inner_w.saturating_sub(left_pad + 1);
+    let divider = format!(
+        "{}{}{}{}{}",
+        g.divider_left,
+        " ".repeat(left_pad),
+        g.divider_fill,
+        " ".repeat(right_pad),
+        g.divider_right,
+    );
+    [
+        Line::raw(""),
+        Line::from(vec![
+            Span::raw(" ".repeat(indent_width)),
+            Span::styled(divider, theme.muted),
+        ]),
+        Line::raw(""),
+    ]
+}
+
+fn spans_width(spans: &[Span]) -> usize {
+    spans.iter().map(|s| s.content.chars().count()).sum()
+}
+
+/// Columns left between `left` and `right` when `right` ends flush with
+/// `total_width`.
+fn fill_width(left: &[Span], right: &[Span], total_width: usize) -> usize {
+    total_width.saturating_sub(spans_width(left) + spans_width(right))
+}
+
+/// Pad `spans` with blanks so `right`, appended after, ends flush with `total_width`.
+fn push_right_aligned(
+    spans: &mut Vec<Span<'static>>,
+    right: Vec<Span<'static>>,
+    total_width: usize,
+) {
+    let pad = fill_width(spans, &right, total_width);
+    if pad > 0 {
+        spans.push(Span::raw(" ".repeat(pad)));
+    }
+    spans.extend(right);
+}
 
 /// Format volume as a fixed 4-char right-aligned string: `" 0%"`, `"60%"`, `"100%"`.
 fn format_volume(vol: Option<u16>) -> String {
@@ -353,50 +378,36 @@ fn format_volume(vol: Option<u16>) -> String {
     }
 }
 
-/// Append right-aligned volume bar (when selected) or percentage text to a span list.
+/// A speaker's volume: a bar when `as_bar`, otherwise the percentage.
 ///
 /// When `is_muted`, the mute glyph precedes the volume and the bar renders dimmed.
-fn append_volume_spans(
-    spans: &mut Vec<Span>,
+fn volume_spans(
     vol: u16,
     is_muted: bool,
-    is_selected: bool,
+    as_bar: bool,
     bar_width: u16,
-    total_width: usize,
     theme: &Theme,
-) {
-    // Calculate current content width
-    let content_width: usize = spans.iter().map(|s| s.content.chars().count()).sum();
-
-    let mute_text = if is_muted {
-        format!("{} ", theme.glyphs.muted)
-    } else {
-        String::new()
-    };
-    let mute_chars = mute_text.chars().count();
-
-    let vol_spans = if is_selected {
-        // Right-align the volume bar
+) -> Vec<Span<'static>> {
+    let mut spans = Vec::new();
+    if is_muted {
+        spans.push(Span::styled(
+            format!("{} ", theme.glyphs.muted),
+            theme.error,
+        ));
+    }
+    if as_bar {
         let filled = if is_muted {
             theme.volume_empty
         } else {
             theme.volume_filled
         };
-        volume_bar::render_volume_bar(vol, bar_width, filled, theme.volume_empty).spans
+        spans.extend(
+            volume_bar::render_volume_bar(vol, bar_width, filled, theme.volume_empty).spans,
+        );
     } else {
-        // Right-align the volume percentage
-        vec![Span::styled(format!("{vol:>3}%"), theme.muted)]
-    };
-    let vol_display_width: usize = vol_spans.iter().map(|s| s.content.chars().count()).sum();
-
-    let pad = total_width.saturating_sub(content_width + mute_chars + vol_display_width);
-    if pad > 0 {
-        spans.push(Span::raw(" ".repeat(pad)));
+        spans.push(Span::styled(format!("{vol:>3}%"), theme.muted));
     }
-    if is_muted {
-        spans.push(Span::styled(mute_text, theme.error));
-    }
-    spans.extend(vol_spans);
+    spans
 }
 
 // ===========================================================================
@@ -406,7 +417,6 @@ fn append_volume_spans(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::types::EntryRenderData;
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
     use sonos_sdk::{GroupId, SpeakerId};
@@ -421,52 +431,42 @@ mod tests {
         SpeakerId::new(format!("RINCON_{n:03}"))
     }
 
-    fn header(name: &str, volume: u16) -> EntryRenderData {
-        EntryRenderData {
+    fn group_header(name: &str, volume: u16) -> GroupHeaderData {
+        GroupHeaderData {
             name: name.to_string(),
-            model_name: None,
-            speaker_volume: None,
-            group_volume: Some(volume),
+            volume: Some(volume),
             is_muted: false,
             playback_state: Some(PlaybackState::Stopped),
             track_info: None,
-            is_last_in_group: false,
-            is_home_group: false,
         }
     }
 
-    fn row(name: &str, model: &str, volume: u16, is_last: bool) -> EntryRenderData {
-        EntryRenderData {
+    fn header(name: &str, volume: u16) -> RowData {
+        RowData::GroupHeader(group_header(name, volume))
+    }
+
+    fn row(name: &str, model: &str, volume: u16, is_last: bool) -> RowData {
+        RowData::Speaker(SpeakerRowData {
             name: name.to_string(),
             model_name: Some(model.to_string()),
-            speaker_volume: Some(volume),
-            group_volume: None,
+            volume: Some(volume),
             is_muted: false,
-            playback_state: None,
-            track_info: None,
             is_last_in_group: is_last,
-            is_home_group: false,
-        }
+        })
     }
 
-    fn action(name: &str, is_home: bool) -> EntryRenderData {
-        EntryRenderData {
-            name: name.to_string(),
-            model_name: None,
-            speaker_volume: None,
-            group_volume: None,
-            is_muted: false,
-            playback_state: None,
-            track_info: None,
-            is_last_in_group: true,
-            is_home_group: is_home,
+    fn set_muted(row: &mut RowData) {
+        match row {
+            RowData::GroupHeader(header) => header.is_muted = true,
+            RowData::Speaker(speaker) => speaker.is_muted = true,
+            _ => panic!("only headers and speaker rows can be muted"),
         }
     }
 
     /// One group "Kitchen" (playing, 30%) with members Kitchen (46%) and
     /// Bathroom (28%). The header is selected unless a test changes it.
     fn kitchen_group() -> SpeakerListData {
-        let mut kitchen = header("Kitchen", 30);
+        let mut kitchen = group_header("Kitchen", 30);
         kitchen.playback_state = Some(PlaybackState::Playing);
         kitchen.track_info = Some("Boy In Red \u{2014} Artist".to_string());
         SpeakerListData {
@@ -475,8 +475,8 @@ mod tests {
                 ListEntry::SpeakerRow(sid(0)),
                 ListEntry::SpeakerRow(sid(1)),
             ],
-            entry_data: vec![
-                kitchen,
+            rows: vec![
+                RowData::GroupHeader(kitchen),
                 row("Kitchen", "Sonos One", 46, false),
                 row("Bathroom", "Sonos Amp", 28, true),
             ],
@@ -519,7 +519,7 @@ mod tests {
     fn empty_list_says_no_speakers() {
         let data = SpeakerListData {
             entries: vec![],
-            entry_data: vec![],
+            rows: vec![],
             selected_index: 0,
             picked_up_speaker_id: None,
         };
@@ -547,7 +547,7 @@ mod tests {
     #[test]
     fn stopped_group_header_fills_with_leaders() {
         let mut data = kitchen_group();
-        data.entry_data[0] = header("Kitchen", 5);
+        data.rows[0] = header("Kitchen", 5);
         let header = &render_lines(&data)[0];
         assert!(
             header.starts_with("\u{276f} \u{25a0} Kitchen :"),
@@ -594,8 +594,8 @@ mod tests {
     #[test]
     fn muted_header_and_rows_show_mute_glyph_before_volume() {
         let mut data = kitchen_group();
-        data.entry_data[0].is_muted = true;
-        data.entry_data[2].is_muted = true;
+        set_muted(&mut data.rows[0]);
+        set_muted(&mut data.rows[2]);
         let lines = render_lines(&data);
         assert!(lines[0].ends_with(": \u{d7}  30%"), "{:?}", lines[0]);
         assert_flush_right(&lines[0]);
@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn muted_selected_row_shows_mute_glyph_before_bar() {
         let mut data = kitchen_group();
-        data.entry_data[1].is_muted = true;
+        set_muted(&mut data.rows[1]);
         data.selected_index = 1;
         let line = &render_lines(&data)[1];
         assert!(line.contains(" \u{d7} \u{25a0}"), "{line:?}");
@@ -620,9 +620,8 @@ mod tests {
         let mut data = kitchen_group();
         data.entries.push(ListEntry::GroupHeader(gid(2)));
         data.entries.push(ListEntry::SpeakerRow(sid(2)));
-        data.entry_data.push(header("Office", 10));
-        data.entry_data
-            .push(row("Office", "Sonos Era 100", 10, true));
+        data.rows.push(header("Office", 10));
+        data.rows.push(row("Office", "Sonos Era 100", 10, true));
         let lines = render_lines(&data);
         assert_eq!(lines[3], "");
         assert!(!lines[4].is_empty(), "divider expected");
@@ -653,15 +652,15 @@ mod tests {
                 ListEntry::AddToGroupRow(gid(2)),
                 ListEntry::CreateNewGroupRow,
             ],
-            entry_data: vec![
+            rows: vec![
                 header("Kitchen", 30),
                 row("Kitchen", "Sonos One", 46, false),
                 row("Bathroom", "Sonos Amp", 28, false),
-                action("Already in group", true),
+                RowData::AddToGroup { is_home: true },
                 header("Office", 10),
                 row("Office", "Sonos Era 100", 10, false),
-                action("Add to group", false),
-                action("Create new group", false),
+                RowData::AddToGroup { is_home: false },
+                RowData::CreateNewGroup,
             ],
             selected_index: 6,
             picked_up_speaker_id: Some(sid(1)),

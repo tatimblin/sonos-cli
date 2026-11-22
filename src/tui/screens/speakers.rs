@@ -2,11 +2,13 @@
 
 use ratatui::layout::Rect;
 use ratatui::Frame;
+use sonos_sdk::{GroupId, SpeakerId};
 
 use crate::tui::helpers;
 use crate::tui::hooks::{ProgressState, RenderContext};
 use crate::tui::types::{
-    build_list_entries, group_for_entry, BottomBarData, EntryRenderData, ListEntry, SpeakerListData,
+    build_list_entries, group_for_entry, BottomBarData, GroupHeaderData, ListEntry, RowData,
+    SpeakerListData, SpeakerRowData,
 };
 use crate::tui::widgets::album_art::ArtProtocolState;
 use crate::tui::widgets::{bottom_bar, speaker_list};
@@ -21,133 +23,38 @@ pub fn render(
     bar_area: Option<Rect>,
     ctx: &mut RenderContext,
 ) {
-    let state = &ctx.app.navigation.speakers_state;
-    let pick_up = state.pick_up.as_ref();
+    let app = ctx.app;
+    let pick_up = app.navigation.speakers_state.pick_up.as_ref();
 
-    let entries = build_list_entries(&ctx.app.system, pick_up);
-    let mut entry_data: Vec<EntryRenderData> = Vec::with_capacity(entries.len());
-
-    for (i, entry) in entries.iter().enumerate() {
-        match entry {
+    let entries = build_list_entries(&app.system, pick_up);
+    let rows = entries
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| match entry {
+            ListEntry::GroupHeader(group_id) => {
+                RowData::GroupHeader(group_header_data(group_id, ctx))
+            }
             ListEntry::SpeakerRow(speaker_id) => {
-                let speaker = ctx.app.system.speaker_by_id(speaker_id);
-                let vol = speaker
-                    .as_ref()
-                    .and_then(|s| ctx.hooks.use_watch(&s.volume))
-                    .map(|v| v.value() as u16);
-                let muted = speaker
-                    .as_ref()
-                    .and_then(|s| ctx.hooks.use_watch(&s.mute))
-                    .is_some_and(|m| m.is_muted());
-                if let Some(ref s) = speaker {
-                    ctx.hooks.use_watch(&s.group_membership);
-                }
-                let name = speaker
-                    .as_ref()
-                    .map(|s| s.name.clone())
-                    .unwrap_or_else(|| "Unknown".to_string());
-                let model = speaker.as_ref().map(|s| s.model_name.clone());
-
-                let is_last = !matches!(
+                let is_last_in_group = !matches!(
                     entries.get(i + 1),
                     Some(ListEntry::SpeakerRow(_)) | Some(ListEntry::AddToGroupRow(_))
                 );
-
-                entry_data.push(EntryRenderData {
-                    name,
-                    model_name: model,
-                    speaker_volume: vol,
-                    group_volume: None,
-                    is_muted: muted,
-                    playback_state: None,
-                    track_info: None,
-                    is_last_in_group: is_last,
-                    is_home_group: false,
-                });
+                RowData::Speaker(speaker_row_data(speaker_id, is_last_in_group, ctx))
             }
-            ListEntry::GroupHeader(group_id) => {
-                let group = ctx.app.system.group_by_id(group_id);
-                let coordinator = group.as_ref().and_then(|g| g.coordinator());
-
-                let gvol = group
-                    .as_ref()
-                    .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
-                    .map(|v| v.value());
-                let gmuted = group
-                    .as_ref()
-                    .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.mute))
-                    .is_some_and(|m| m.is_muted());
-
-                let pb = coordinator
-                    .as_ref()
-                    .and_then(|c| ctx.hooks.use_watch(&c.playback_state));
-
-                let current_track = coordinator
-                    .as_ref()
-                    .and_then(|c| ctx.hooks.use_watch(&c.current_track));
-                let track = helpers::track_summary(&current_track);
-
-                let name = coordinator
-                    .map(|c| c.name.clone())
-                    .unwrap_or_else(|| "Unknown Group".to_string());
-
-                entry_data.push(EntryRenderData {
-                    name,
-                    model_name: None,
-                    speaker_volume: None,
-                    group_volume: gvol,
-                    is_muted: gmuted,
-                    playback_state: pb,
-                    track_info: track,
-                    is_last_in_group: false,
-                    is_home_group: false,
-                });
-            }
-            ListEntry::AddToGroupRow(group_id) => {
-                let is_home = pick_up
+            ListEntry::AddToGroupRow(group_id) => RowData::AddToGroup {
+                is_home: pick_up
                     .and_then(|pu| pu.original_group_id.as_ref())
-                    .is_some_and(|og| og == group_id);
+                    .is_some_and(|og| og == group_id),
+            },
+            ListEntry::CreateNewGroupRow => RowData::CreateNewGroup,
+        })
+        .collect();
 
-                let name = if is_home {
-                    "Already in group".to_string()
-                } else {
-                    "Add to group".to_string()
-                };
-
-                entry_data.push(EntryRenderData {
-                    name,
-                    model_name: None,
-                    speaker_volume: None,
-                    group_volume: None,
-                    is_muted: false,
-                    playback_state: None,
-                    track_info: None,
-                    is_last_in_group: true,
-                    is_home_group: is_home,
-                });
-            }
-            ListEntry::CreateNewGroupRow => {
-                entry_data.push(EntryRenderData {
-                    name: "Create new group".to_string(),
-                    model_name: None,
-                    speaker_volume: None,
-                    group_volume: None,
-                    is_muted: false,
-                    playback_state: None,
-                    track_info: None,
-                    is_last_in_group: false,
-                    is_home_group: false,
-                });
-            }
-        }
-    }
-
-    let state = &ctx.app.navigation.speakers_state;
-    let selected_index = state.selection.index_in(&entries);
+    let selected_index = app.navigation.speakers_state.selection.index_in(&entries);
 
     let data = SpeakerListData {
         entries,
-        entry_data,
+        rows,
         selected_index,
         picked_up_speaker_id: pick_up.map(|pu| pu.speaker_id.clone()),
     };
@@ -172,6 +79,70 @@ pub fn render(
                 art_state.protocol = bar_data.album_art_protocol.take();
             }
         }
+    }
+}
+
+/// Watch a group's volume, mute, and its coordinator's playback for the header row.
+fn group_header_data(group_id: &GroupId, ctx: &mut RenderContext) -> GroupHeaderData {
+    let group = ctx.app.system.group_by_id(group_id);
+    let coordinator = group.as_ref().and_then(|g| g.coordinator());
+
+    let volume = group
+        .as_ref()
+        .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.volume))
+        .map(|v| v.value());
+    let is_muted = group
+        .as_ref()
+        .and_then(|g| ctx.hooks.use_watch_group_or_fetch(&g.mute))
+        .is_some_and(|m| m.is_muted());
+
+    let playback_state = coordinator
+        .as_ref()
+        .and_then(|c| ctx.hooks.use_watch(&c.playback_state));
+
+    let current_track = coordinator
+        .as_ref()
+        .and_then(|c| ctx.hooks.use_watch(&c.current_track));
+
+    GroupHeaderData {
+        name: coordinator
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| "Unknown Group".to_string()),
+        volume,
+        is_muted,
+        playback_state,
+        track_info: helpers::track_summary(&current_track),
+    }
+}
+
+/// Watch a speaker's volume, mute, and group membership for its row.
+fn speaker_row_data(
+    speaker_id: &SpeakerId,
+    is_last_in_group: bool,
+    ctx: &mut RenderContext,
+) -> SpeakerRowData {
+    let speaker = ctx.app.system.speaker_by_id(speaker_id);
+    let volume = speaker
+        .as_ref()
+        .and_then(|s| ctx.hooks.use_watch(&s.volume))
+        .map(|v| v.value() as u16);
+    let is_muted = speaker
+        .as_ref()
+        .and_then(|s| ctx.hooks.use_watch(&s.mute))
+        .is_some_and(|m| m.is_muted());
+    if let Some(ref s) = speaker {
+        ctx.hooks.use_watch(&s.group_membership);
+    }
+
+    SpeakerRowData {
+        name: speaker
+            .as_ref()
+            .map(|s| s.name.clone())
+            .unwrap_or_else(|| "Unknown".to_string()),
+        model_name: speaker.as_ref().map(|s| s.model_name.clone()),
+        volume,
+        is_muted,
+        is_last_in_group,
     }
 }
 
