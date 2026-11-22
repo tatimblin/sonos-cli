@@ -1,15 +1,16 @@
 //! Key handlers for the Speakers and Settings tabs.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 
 use crate::tui::app::{App, Tab};
 use crate::tui::handlers::{settings, speaker_list};
+use crate::tui::keymap::{lookup, TabBarCommand, TAB_BAR_KEYS};
 use crate::tui::types::{SettingsAction, SpeakerListAction};
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
     if app.navigation.tab_focused {
-        match key.code {
-            KeyCode::Left | KeyCode::Right => {
+        match lookup(TAB_BAR_KEYS, key.code) {
+            Some(TabBarCommand::SwitchTab) => {
                 let prev_tab = app.navigation.tab.clone();
                 app.navigation.tab = match app.navigation.tab {
                     Tab::Speakers => Tab::Settings,
@@ -21,10 +22,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
                 }
                 app.navigation.tab_focused = false;
             }
-            KeyCode::Down | KeyCode::Enter => {
+            Some(TabBarCommand::Leave) => {
                 app.navigation.tab_focused = false;
             }
-            _ => {}
+            None => {}
         }
         return;
     }

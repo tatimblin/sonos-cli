@@ -57,6 +57,12 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> SpeakerListAction
 
 Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `SpeakerListAction`, `SpeakerListData`, `EntryRenderData`. Also contains list-building functions (`build_list_entries`, `build_display_order`, `group_for_entry`) used by both handlers and screens.
 
+### `tui/keymap.rs`
+
+Key binding tables, one per input mode (speaker list, pick-up, settings rows, settings dropdown, tab bar, global). Each `Binding` pairs keys with a command enum and a legend label. Handlers dispatch with `keymap::lookup(TABLE, key.code)` and match on the command; `ui.rs` builds the key legend from the same tables via `keymap::legend()`. To add a key, add a binding and a command variant — the compiler then points at the handler match to extend.
+
+`Mode::of(app)` picks the active table. The event loop sends keys the mode binds to the handler; other keys fall through to `GLOBAL_KEYS` (quit), except in pick-up mode, which swallows them. Ctrl-C always quits.
+
 ### `tui/helpers.rs`
 
 Shared data transformation functions for screens: `track_summary()` for "title · artist" formatting. Add new helpers here when patterns appear in multiple screens.

@@ -8,6 +8,7 @@ use ratatui::Frame;
 
 use crate::tui::app::{App, Navigation, Tab};
 use crate::tui::hooks::RenderContext;
+use crate::tui::keymap;
 use crate::tui::screens;
 
 /// Top-level render dispatch. Draws header, separators, content, bottom bar, and key legend.
@@ -227,17 +228,6 @@ fn render_tab_labels(
 // ---------------------------------------------------------------------------
 
 fn render_key_legend(frame: &mut Frame, area: Rect, app: &App) {
-    let text = match app.navigation.tab {
-        Tab::Speakers => "\u{2191}\u{2193} Navigate   \u{2190}\u{2192} Volume  m Mute   \u{2423} Pick up/Drop   p Play/Pause  n Next  b Prev   \u{238b} Quit",
-        Tab::Settings => {
-            if app.navigation.settings_state.dropdown_open {
-                "\u{2191}\u{2193} Select  Enter Confirm  \u{238b} Cancel"
-            } else {
-                "\u{2191}\u{2193} Navigate  Enter Open  \u{2190}\u{2192} Tabs  \u{238b} Quit"
-            }
-        }
-    };
-
-    let paragraph = Paragraph::new(text).style(app.theme.legend);
+    let paragraph = Paragraph::new(keymap::legend(app)).style(app.theme.legend);
     frame.render_widget(paragraph, area);
 }

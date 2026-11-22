@@ -1,9 +1,10 @@
 //! Settings screen key handling — row navigation, dropdown open/close, config persistence.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 
 use crate::config::AlbumArtMode;
 use crate::tui::app::{App, Toast};
+use crate::tui::keymap::{lookup, DropdownCommand, SettingsCommand, DROPDOWN_KEYS, SETTINGS_KEYS};
 use crate::tui::theme::Theme;
 use crate::tui::types::SettingsAction;
 
@@ -28,37 +29,34 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> SettingsAction {
     }
 }
 
-/// Returns true when a dropdown is open (for Esc interception).
-pub fn is_dropdown_open(app: &App) -> bool {
-    app.navigation.settings_state.dropdown_open
-}
-
 // ---------------------------------------------------------------------------
 // Row navigation (dropdown closed)
 // ---------------------------------------------------------------------------
 
 fn handle_row_key(app: &mut App, key: KeyEvent) -> SettingsAction {
+    let Some(command) = lookup(SETTINGS_KEYS, key.code) else {
+        return SettingsAction::Handled;
+    };
     let row = app.navigation.settings_state.selected_row;
 
-    match key.code {
-        KeyCode::Up => {
+    match command {
+        SettingsCommand::Up => {
             if row == 0 {
                 return SettingsAction::FocusTabBar;
             }
             app.navigation.settings_state.selected_row = row.saturating_sub(1);
             SettingsAction::Handled
         }
-        KeyCode::Down => {
+        SettingsCommand::Down => {
             if row + 1 < ROW_COUNT {
                 app.navigation.settings_state.selected_row = row + 1;
             }
             SettingsAction::Handled
         }
-        KeyCode::Enter | KeyCode::Right => {
+        SettingsCommand::Open => {
             open_dropdown(app);
             SettingsAction::Handled
         }
-        _ => SettingsAction::Handled,
     }
 }
 
@@ -67,22 +65,25 @@ fn handle_row_key(app: &mut App, key: KeyEvent) -> SettingsAction {
 // ---------------------------------------------------------------------------
 
 fn handle_dropdown_key(app: &mut App, key: KeyEvent) -> SettingsAction {
+    let Some(command) = lookup(DROPDOWN_KEYS, key.code) else {
+        return SettingsAction::Handled;
+    };
     let options = options_for_row(app, app.navigation.settings_state.selected_row);
     let count = options.len();
     let idx = app.navigation.settings_state.dropdown_index;
 
-    match key.code {
-        KeyCode::Up => {
+    match command {
+        DropdownCommand::Up => {
             app.navigation.settings_state.dropdown_index = idx.saturating_sub(1);
             SettingsAction::Handled
         }
-        KeyCode::Down => {
+        DropdownCommand::Down => {
             if idx + 1 < count {
                 app.navigation.settings_state.dropdown_index = idx + 1;
             }
             SettingsAction::Handled
         }
-        KeyCode::Enter | KeyCode::Right => {
+        DropdownCommand::Confirm => {
             let selected = options
                 .get(app.navigation.settings_state.dropdown_index)
                 .cloned()
@@ -91,11 +92,10 @@ fn handle_dropdown_key(app: &mut App, key: KeyEvent) -> SettingsAction {
             app.navigation.settings_state.dropdown_open = false;
             SettingsAction::Handled
         }
-        KeyCode::Esc | KeyCode::Left => {
+        DropdownCommand::Cancel => {
             app.navigation.settings_state.dropdown_open = false;
             SettingsAction::Handled
         }
-        _ => SettingsAction::Handled,
     }
 }
 

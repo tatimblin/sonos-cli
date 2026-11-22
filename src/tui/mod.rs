@@ -8,6 +8,7 @@ mod handlers;
 pub mod helpers;
 pub mod hooks;
 pub mod image_loader;
+mod keymap;
 mod screens;
 mod theme;
 pub mod types;
