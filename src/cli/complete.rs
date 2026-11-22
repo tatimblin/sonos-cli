@@ -5,7 +5,8 @@ use crate::config::Config;
 pub fn speaker_candidates() -> Vec<CompletionCandidate> {
     let mut candidates = Vec::new();
 
-    let config = Config::load();
+    // Quiet: a warning on stderr would garble the shell's completion output.
+    let config = Config::try_load().unwrap_or_default();
     for (name, alias) in &config.aliases {
         candidates.push(CompletionCandidate::new(alias).help(Some(name.into())));
     }
@@ -22,7 +23,8 @@ pub fn speaker_candidates() -> Vec<CompletionCandidate> {
 pub fn group_candidates() -> Vec<CompletionCandidate> {
     let mut candidates = Vec::new();
 
-    let config = Config::load();
+    // Quiet: a warning on stderr would garble the shell's completion output.
+    let config = Config::try_load().unwrap_or_default();
     for (name, alias) in &config.aliases {
         candidates.push(CompletionCandidate::new(alias).help(Some(name.into())));
     }
