@@ -142,7 +142,7 @@ pub fn require_speaker_only(
         .ok_or_else(|| CliError::SpeakerNotFound(resolved.to_string()))
 }
 
-#[cfg(all(test, feature = "test-helpers"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

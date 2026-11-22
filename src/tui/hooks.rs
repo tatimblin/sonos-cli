@@ -348,7 +348,6 @@ mod tests {
     /// TUI would stop updating — a failure with no compiler signal at all, which
     /// is why it is asserted here rather than trusted from the SDK's own suite.
     #[test]
-    #[cfg(feature = "test-helpers")]
     fn use_watch_reports_values_written_after_the_handle_was_acquired() {
         use sonos_sdk::{SonosSystem, Volume};
 
@@ -395,7 +394,6 @@ mod tests {
     /// entry for the property across many frames, and mark-and-sweep must still
     /// evict it once the widget stops rendering.
     #[test]
-    #[cfg(feature = "test-helpers")]
     fn use_watch_reuses_one_handle_across_frames_then_evicts() {
         use sonos_sdk::SonosSystem;
 
