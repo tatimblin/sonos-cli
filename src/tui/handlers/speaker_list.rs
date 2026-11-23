@@ -4,9 +4,17 @@
 use crossterm::event::KeyEvent;
 
 use crate::tui::app::{App, Toast};
-use crate::tui::keymap::{lookup, PickUpCommand, SpeakerCommand, PICK_UP_KEYS, SPEAKER_KEYS};
+use sonos_sdk::property::Fetchable;
+use sonos_sdk::{
+    MusicSurroundLevel, PropertyHandle, SatelliteRole, SdkError, Settable, SpeakerId, SubEnabled,
+    SubLevel, SurroundEnabled, SurroundLevel,
+};
+
+use crate::tui::keymap::{
+    lookup, PickUpCommand, SpeakerCommand, PICK_UP_KEYS, SATELLITE_KEYS, SPEAKER_KEYS,
+};
 use crate::tui::types::{
-    build_list_entries, group_for_selection, KeyOutcome, ListEntry, PickUpState,
+    build_list_entries, group_for_selection, KeyOutcome, LevelFocus, ListEntry, PickUpState,
 };
 
 /// Handle a key event for the speaker list. Returns an outcome for the caller.
@@ -88,11 +96,122 @@ fn home_action_row(app: &App, entries: &[ListEntry]) -> Option<usize> {
 }
 
 fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> KeyOutcome {
+    let selected = app.navigation.speakers_state.selection.index_in(entries);
+    if let Some(ListEntry::SatelliteRow { main, satellite }) = entries.get(selected) {
+        let Some(command) = lookup(SATELLITE_KEYS, key.code) else {
+            return KeyOutcome::Handled;
+        };
+        if let Some(outcome) = handle_satellite_command(app, command, main, satellite) {
+            return outcome;
+        }
+        return handle_speaker_command(app, command, entries, selected);
+    }
     let Some(command) = lookup(SPEAKER_KEYS, key.code) else {
         return KeyOutcome::Handled;
     };
-    let selected = app.navigation.speakers_state.selection.index_in(entries);
+    handle_speaker_command(app, command, entries, selected)
+}
 
+/// The commands a satellite row handles itself; `None` falls back to the
+/// speaker list's handling (navigation, playback).
+fn handle_satellite_command(
+    app: &mut App,
+    command: SpeakerCommand,
+    main_id: &SpeakerId,
+    satellite_id: &SpeakerId,
+) -> Option<KeyOutcome> {
+    let main = app.system.speaker_by_id(main_id)?;
+    let role = main
+        .satellites()
+        .into_iter()
+        .find(|s| &s.id == satellite_id)
+        .map(|s| s.role);
+
+    let result = match command {
+        SpeakerCommand::VolumeDown | SpeakerCommand::VolumeUp => {
+            let delta = if command == SpeakerCommand::VolumeUp {
+                1
+            } else {
+                -1
+            };
+            match role {
+                Some(r) if r.is_surround() => match app.navigation.speakers_state.level_focus {
+                    LevelFocus::Music => adjust(
+                        &main.music_surround_level,
+                        delta,
+                        MusicSurroundLevel::new,
+                        |v| v.0,
+                    ),
+                    LevelFocus::Tv => {
+                        adjust(&main.surround_level, delta, SurroundLevel::new, |v| v.0)
+                    }
+                },
+                Some(SatelliteRole::Sub) => adjust(&main.sub_level, delta, SubLevel::new, |v| v.0),
+                _ => Ok(()),
+            }
+        }
+        SpeakerCommand::ToggleMute => match role {
+            Some(r) if r.is_surround() => toggle(&main.surround_enabled, |v| SurroundEnabled(!v.0)),
+            Some(SatelliteRole::Sub) => toggle(&main.sub_enabled, |v| SubEnabled(!v.0)),
+            _ => Ok(()),
+        },
+        SpeakerCommand::SwitchLevel => {
+            let state = &mut app.navigation.speakers_state;
+            state.level_focus = state.level_focus.toggled();
+            Ok(())
+        }
+        SpeakerCommand::PickUp => {
+            app.toast = Some(Toast::info(format!("Satellites move with {}", main.name)));
+            Ok(())
+        }
+        _ => return None,
+    };
+    if let Err(e) = result {
+        app.toast = Some(Toast::error(format!("{e}")));
+    }
+    Some(KeyOutcome::Handled)
+}
+
+/// Step a level setting by `delta` from its current value. The value is read
+/// from the cache the row's watch keeps, or fetched when nothing has landed.
+fn adjust<P>(
+    handle: &PropertyHandle<P>,
+    delta: i8,
+    make: fn(i8) -> P,
+    value: fn(&P) -> i8,
+) -> Result<(), SdkError>
+where
+    P: Fetchable + Settable,
+{
+    let current = match handle.get() {
+        Some(v) => v,
+        None => handle.fetch()?,
+    };
+    let next = make(value(&current).saturating_add(delta));
+    if next == current {
+        return Ok(()); // already at the end of the range
+    }
+    handle.set(next)
+}
+
+/// Flip an on/off setting, fetching it first when nothing is cached.
+fn toggle<P>(handle: &PropertyHandle<P>, flip: fn(&P) -> P) -> Result<(), SdkError>
+where
+    P: Fetchable + Settable,
+{
+    let current = match handle.get() {
+        Some(v) => v,
+        None => handle.fetch()?,
+    };
+    handle.set(flip(&current))
+}
+
+fn handle_speaker_command(
+    app: &mut App,
+    command: SpeakerCommand,
+    entries: &[ListEntry],
+    selected: usize,
+) -> KeyOutcome {
     match command {
         SpeakerCommand::Up => {
             if let Some(prev) = prev_entry(selected) {
@@ -170,6 +289,8 @@ fn handle_normal_key(app: &mut App, key: KeyEvent, entries: &[ListEntry]) -> Key
             handle_playback_action(app, entries, selected, PlaybackAction::Previous);
             KeyOutcome::Handled
         }
+        // Only bound on satellite rows, which handle it themselves.
+        SpeakerCommand::SwitchLevel => KeyOutcome::Handled,
     }
 }
 
@@ -412,6 +533,190 @@ mod tests {
             .speakers_state
             .selection
             .index_in(&entries(app))
+    }
+
+    /// Basement (a Playbar bonded to two Sonos One surrounds) and Kitchen.
+    fn home_theater_app() -> App {
+        use sonos_sdk::sonos_discovery::Device;
+        use sonos_sdk::GroupId;
+
+        let device = |id: &str, room: &str, ip: &str, model: &str| Device {
+            id: id.to_string(),
+            name: room.to_string(),
+            room_name: room.to_string(),
+            ip_address: ip.to_string(),
+            port: 1400,
+            model_name: model.to_string(),
+        };
+        let playbar = SpeakerId::new("RINCON_PLAYBAR");
+        let kitchen = SpeakerId::new("RINCON_KITCHEN");
+        let system = SonosSystem::from_devices_offline_with_home_theaters(
+            vec![
+                device("RINCON_PLAYBAR", "Basement", "192.0.2.10", "Sonos Playbar"),
+                device("RINCON_LEFT", "Basement", "192.0.2.11", "Sonos One"),
+                device("RINCON_RIGHT", "Basement", "192.0.2.12", "Sonos One"),
+                device("RINCON_KITCHEN", "Kitchen", "192.0.2.20", "Sonos One"),
+            ],
+            vec![
+                (
+                    GroupId::new("RINCON_PLAYBAR:1"),
+                    playbar.clone(),
+                    vec![playbar.clone()],
+                ),
+                (
+                    GroupId::new("RINCON_KITCHEN:1"),
+                    kitchen.clone(),
+                    vec![kitchen],
+                ),
+            ],
+            vec![(
+                playbar,
+                vec![
+                    (SpeakerId::new("RINCON_LEFT"), SatelliteRole::LeftSurround),
+                    (SpeakerId::new("RINCON_RIGHT"), SatelliteRole::RightSurround),
+                ],
+            )],
+        )
+        .unwrap();
+        App::with_system(system, Config::default(), Theme::default_theme(), None)
+    }
+
+    fn select(app: &mut App, entry: &ListEntry) {
+        let entries = entries(app);
+        let index = entries.iter().position(|e| e == entry).unwrap();
+        app.navigation
+            .speakers_state
+            .selection
+            .select(&entries, index);
+    }
+
+    fn left_surround() -> ListEntry {
+        ListEntry::SatelliteRow {
+            main: SpeakerId::new("RINCON_PLAYBAR"),
+            satellite: SpeakerId::new("RINCON_LEFT"),
+        }
+    }
+
+    #[test]
+    fn satellites_follow_their_speaker_in_role_order() {
+        let app = home_theater_app();
+        let entries = entries(&app);
+        let playbar = entries
+            .iter()
+            .position(|e| e == &ListEntry::SpeakerRow(SpeakerId::new("RINCON_PLAYBAR")))
+            .unwrap();
+        assert_eq!(
+            entries[playbar + 1..playbar + 3],
+            [
+                left_surround(),
+                ListEntry::SatelliteRow {
+                    main: SpeakerId::new("RINCON_PLAYBAR"),
+                    satellite: SpeakerId::new("RINCON_RIGHT"),
+                },
+            ]
+        );
+        // Satellites are not speakers of their own.
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|e| matches!(e, ListEntry::SpeakerRow(_)))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn space_on_a_satellite_explains_instead_of_picking_up() {
+        let mut app = home_theater_app();
+        select(&mut app, &left_surround());
+
+        press(&mut app, KeyCode::Char(' '));
+
+        assert!(app.navigation.speakers_state.pick_up.is_none());
+        let toast = app.toast.as_ref().map(|t| t.message.clone());
+        assert_eq!(toast.as_deref(), Some("Satellites move with Basement"));
+        assert_eq!(entries(&app)[selected(&app)], left_surround());
+    }
+
+    #[test]
+    fn picking_up_a_home_theater_hides_its_satellites() {
+        let mut app = home_theater_app();
+        select(
+            &mut app,
+            &ListEntry::SpeakerRow(SpeakerId::new("RINCON_PLAYBAR")),
+        );
+
+        press(&mut app, KeyCode::Char(' '));
+
+        assert!(app.navigation.speakers_state.pick_up.is_some());
+        assert!(!entries(&app)
+            .iter()
+            .any(|e| matches!(e, ListEntry::SatelliteRow { .. })));
+    }
+
+    #[test]
+    fn tab_switches_the_surround_level_and_the_choice_carries_across_rows() {
+        let mut app = home_theater_app();
+        select(&mut app, &left_surround());
+        assert_eq!(app.navigation.speakers_state.level_focus, LevelFocus::Music);
+
+        press(&mut app, KeyCode::Tab);
+        assert_eq!(app.navigation.speakers_state.level_focus, LevelFocus::Tv);
+
+        press(&mut app, KeyCode::Down); // the right surround
+        assert!(matches!(
+            entries(&app)[selected(&app)],
+            ListEntry::SatelliteRow { .. }
+        ));
+        assert_eq!(app.navigation.speakers_state.level_focus, LevelFocus::Tv);
+
+        press(&mut app, KeyCode::Tab);
+        assert_eq!(app.navigation.speakers_state.level_focus, LevelFocus::Music);
+    }
+
+    #[test]
+    fn satellite_rows_get_their_own_legend() {
+        use crate::tui::keymap::{legend, Mode};
+
+        let mut app = home_theater_app();
+        select(&mut app, &left_surround());
+        assert_eq!(Mode::of(&app), Mode::Satellite);
+        let text = legend(&app);
+        assert!(text.contains("Level"), "{text}");
+        assert!(text.contains("\u{266a}/TV"), "{text}");
+        assert!(!text.contains("Pick up"), "{text}");
+
+        select(
+            &mut app,
+            &ListEntry::SpeakerRow(SpeakerId::new("RINCON_PLAYBAR")),
+        );
+        assert_eq!(Mode::of(&app), Mode::Speakers);
+        assert!(legend(&app).contains("Volume"));
+    }
+
+    #[test]
+    fn a_group_header_remembers_members_past_satellite_rows() {
+        let mut app = home_theater_app();
+        let entries = entries(&app);
+        let header = entries
+            .iter()
+            .rposition(|e| matches!(e, ListEntry::GroupHeader(_)))
+            .unwrap();
+        // Whichever group is listed last, its header resolves back to itself.
+        app.navigation
+            .speakers_state
+            .selection
+            .select(&entries, header);
+        assert_eq!(selected(&app), header);
+        assert_eq!(
+            group_for_selection(
+                &app.system,
+                &entries,
+                entries.iter().position(|e| e == &left_surround()).unwrap()
+            )
+            .map(|g| g.coordinator_id),
+            Some(SpeakerId::new("RINCON_PLAYBAR"))
+        );
     }
 
     #[test]

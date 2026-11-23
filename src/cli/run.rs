@@ -1,13 +1,16 @@
 use std::io::IsTerminal;
 
-use sonos_sdk::{SeekTarget, SonosSystem};
+use sonos_sdk::{
+    MusicSurroundLevel, NightMode, SatelliteRole, SeekTarget, SonosSystem, Speaker,
+    SpeechEnhancement, SubEnabled, SubLevel, SurroundEnabled, SurroundLevel,
+};
 
 use super::config_cmd::run_config_action;
 use super::{
     coordinator_name, find_group, find_speaker, format_duration_human, format_time_ms,
     parse_duration, require_speaker_only, required_flag, resolve_speaker, resolve_target,
-    state_display, track_display, validate_seek_time, Commands, GlobalFlags, OnOff, QueueAction,
-    Target,
+    state_display, track_display, validate_seek_time, Commands, GlobalFlags, LevelOrSwitch, OnOff,
+    QueueAction, Target,
 };
 use crate::config::Config;
 use crate::diagnostics;
@@ -39,6 +42,10 @@ pub fn run_command(
         Commands::Bass { level } => cmd_bass(system, config, global, level),
         Commands::Treble { level } => cmd_treble(system, config, global, level),
         Commands::Loudness { state } => cmd_loudness(system, config, global, state),
+        Commands::Sub { value } => cmd_sub(system, config, global, value),
+        Commands::Surround { value, tv } => cmd_surround(system, config, global, value, tv),
+        Commands::Night { state } => cmd_night(system, config, global, state),
+        Commands::Speech { state } => cmd_speech(system, config, global, state),
         Commands::Sleep { duration } => cmd_sleep(system, config, global, &duration),
         Commands::Queue { action } => cmd_queue(system, config, global, action),
         // `main` runs these before discovery via `run_config_command`; this arm
@@ -271,7 +278,21 @@ fn cmd_status(
     if !vol_str.is_empty() {
         parts.push(vol_str);
     }
-    Ok(CommandOutput::new(parts.join("  "), probes.verdict()))
+    let mut output = parts.join("  ");
+    output.push_str(&satellite_lines(&spk));
+    Ok(CommandOutput::new(output, probes.verdict()))
+}
+
+/// One indented line per satellite (`  Left surround • Sonos One`), each
+/// preceded by a newline; empty for a speaker without satellites.
+fn satellite_lines(spk: &Speaker) -> String {
+    spk.satellites()
+        .iter()
+        .map(|sat| match &sat.model_name {
+            Some(model) => format!("\n  {} \u{2022} {model}", sat.role.label()),
+            None => format!("\n  {}", sat.role.label()),
+        })
+        .collect()
 }
 
 fn cmd_join(
@@ -361,6 +382,132 @@ fn cmd_loudness(
     }
 }
 
+/// The home theater speaker for a satellite setting, or an error naming the
+/// missing hardware: a soundbar accepts sub and surround settings even with
+/// none bonded, so without this check the command would silently do nothing.
+fn require_satellite(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    command_name: &str,
+    has: fn(&SatelliteRole) -> bool,
+    missing: &str,
+) -> Result<Speaker, CliError> {
+    let spk = require_speaker_only(system, config, global, command_name)?;
+    if !spk.satellites().iter().any(|s| has(&s.role)) {
+        return Err(CliError::Unsupported(format!(
+            "{} has no {missing}",
+            spk.name
+        )));
+    }
+    Ok(spk)
+}
+
+fn on_off(enabled: bool) -> &'static str {
+    if enabled {
+        "on"
+    } else {
+        "off"
+    }
+}
+
+fn cmd_sub(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    value: LevelOrSwitch,
+) -> Result<CommandOutput, CliError> {
+    let spk = require_satellite(
+        system,
+        config,
+        global,
+        "sub",
+        |r| *r == SatelliteRole::Sub,
+        "sub",
+    )?;
+    let message = match value {
+        LevelOrSwitch::Level(level) => {
+            spk.sub_level.set(SubLevel::new(level))?;
+            format!("Sub level set to {level:+} ({})", spk.name)
+        }
+        LevelOrSwitch::Switch(enabled) => {
+            spk.sub_enabled.set(SubEnabled(enabled))?;
+            format!("Sub {} ({})", on_off(enabled), spk.name)
+        }
+    };
+    Ok(CommandOutput::live(message))
+}
+
+fn cmd_surround(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    value: LevelOrSwitch,
+    tv: bool,
+) -> Result<CommandOutput, CliError> {
+    let spk = require_satellite(
+        system,
+        config,
+        global,
+        "surround",
+        SatelliteRole::is_surround,
+        "surrounds",
+    )?;
+    let message =
+        match value {
+            LevelOrSwitch::Level(level) if tv => {
+                spk.surround_level.set(SurroundLevel::new(level))?;
+                format!("TV surround level set to {level:+} ({})", spk.name)
+            }
+            LevelOrSwitch::Level(level) => {
+                spk.music_surround_level
+                    .set(MusicSurroundLevel::new(level))?;
+                format!("Music surround level set to {level:+} ({})", spk.name)
+            }
+            LevelOrSwitch::Switch(_) if tv => return Err(CliError::Validation(
+                "--tv applies to a level; surrounds switch on and off for TV and music together"
+                    .to_string(),
+            )),
+            LevelOrSwitch::Switch(enabled) => {
+                spk.surround_enabled.set(SurroundEnabled(enabled))?;
+                format!("Surrounds {} ({})", on_off(enabled), spk.name)
+            }
+        };
+    Ok(CommandOutput::live(message))
+}
+
+fn cmd_night(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    state: OnOff,
+) -> Result<CommandOutput, CliError> {
+    let spk = require_speaker_only(system, config, global, "night")?;
+    let enabled = matches!(state, OnOff::On);
+    spk.night_mode.set(NightMode(enabled))?;
+    Ok(CommandOutput::live(format!(
+        "Night mode {} ({})",
+        on_off(enabled),
+        spk.name
+    )))
+}
+
+fn cmd_speech(
+    system: &SonosSystem,
+    config: &Config,
+    global: &GlobalFlags,
+    state: OnOff,
+) -> Result<CommandOutput, CliError> {
+    let spk = require_speaker_only(system, config, global, "speech")?;
+    let enabled = matches!(state, OnOff::On);
+    spk.speech_enhancement.set(SpeechEnhancement(enabled))?;
+    Ok(CommandOutput::live(format!(
+        "Speech enhancement {} ({})",
+        on_off(enabled),
+        spk.name
+    )))
+}
+
 fn cmd_sleep(
     system: &SonosSystem,
     config: &Config,
@@ -427,5 +574,111 @@ fn cmd_queue(
             spk.remove_all_tracks_from_queue()?;
             Ok(CommandOutput::live(format!("Queue cleared ({})", spk.name)))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sonos_sdk::sonos_discovery::Device;
+    use sonos_sdk::{GroupId, SpeakerId};
+
+    /// Basement: a Playbar bonded to two Sonos One surrounds, no sub.
+    fn basement() -> SonosSystem {
+        let device = |id: &str, ip: &str, model: &str| Device {
+            id: id.to_string(),
+            name: "Basement".to_string(),
+            room_name: "Basement".to_string(),
+            ip_address: ip.to_string(),
+            port: 1400,
+            model_name: model.to_string(),
+        };
+        let playbar = SpeakerId::new("RINCON_PLAYBAR");
+        SonosSystem::from_devices_offline_with_home_theaters(
+            vec![
+                device("RINCON_PLAYBAR", "192.0.2.10", "Sonos Playbar"),
+                device("RINCON_LEFT", "192.0.2.11", "Sonos One"),
+                device("RINCON_RIGHT", "192.0.2.12", "Sonos One"),
+            ],
+            vec![(
+                GroupId::new("RINCON_PLAYBAR:1"),
+                playbar.clone(),
+                vec![playbar.clone()],
+            )],
+            vec![(
+                playbar,
+                vec![
+                    (SpeakerId::new("RINCON_LEFT"), SatelliteRole::LeftSurround),
+                    (SpeakerId::new("RINCON_RIGHT"), SatelliteRole::RightSurround),
+                ],
+            )],
+        )
+        .unwrap()
+    }
+
+    fn basement_flags() -> GlobalFlags {
+        GlobalFlags {
+            speaker: Some("Basement".into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn sub_settings_need_a_bonded_sub() {
+        let system = basement();
+        let result = require_satellite(
+            &system,
+            &Config::default(),
+            &basement_flags(),
+            "sub",
+            |r| *r == SatelliteRole::Sub,
+            "sub",
+        );
+        match result {
+            Err(e @ CliError::Unsupported(_)) => {
+                assert_eq!(e.to_string(), "Basement has no sub");
+                assert_eq!(e.exit_code(), std::process::ExitCode::from(1));
+            }
+            other => panic!("expected Unsupported, got {:?}", other.map(|s| s.name)),
+        }
+    }
+
+    #[test]
+    fn surround_settings_find_the_surrounds() {
+        let system = basement();
+        let spk = require_satellite(
+            &system,
+            &Config::default(),
+            &basement_flags(),
+            "surround",
+            SatelliteRole::is_surround,
+            "surrounds",
+        )
+        .unwrap();
+        assert_eq!(spk.name, "Basement");
+    }
+
+    #[test]
+    fn surround_on_off_rejects_tv() {
+        let result = cmd_surround(
+            &basement(),
+            &Config::default(),
+            &basement_flags(),
+            LevelOrSwitch::Switch(false),
+            true,
+        );
+        assert!(matches!(result, Err(CliError::Validation(ref m)) if m.contains("--tv")));
+    }
+
+    #[test]
+    fn status_lists_each_satellite() {
+        let system = basement();
+        let spk = system.speaker("Basement").unwrap();
+        assert_eq!(
+            satellite_lines(&spk),
+            "\n  Left surround \u{2022} Sonos One\n  Right surround \u{2022} Sonos One"
+        );
+        let kitchen = SonosSystem::with_speakers(&["Kitchen"]);
+        assert_eq!(satellite_lines(&kitchen.speaker("Kitchen").unwrap()), "");
     }
 }

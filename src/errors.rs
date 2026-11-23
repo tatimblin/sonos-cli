@@ -22,6 +22,11 @@ pub enum CliError {
 
     #[error("validation error: {0}")]
     Validation(String),
+
+    /// The target can't do this, such as setting the sub level on a speaker
+    /// with no sub bonded.
+    #[error("{0}")]
+    Unsupported(String),
 }
 
 impl CliError {
@@ -38,7 +43,7 @@ impl CliError {
                     Some("Check network connectivity and speaker power.")
                 }
             }
-            Self::Config(_) | Self::Validation(_) => None,
+            Self::Config(_) | Self::Validation(_) | Self::Unsupported(_) => None,
         }
     }
 

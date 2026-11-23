@@ -41,7 +41,7 @@ If both flags are given, `--group` wins. If neither is given, the default group 
 
 Names given to `--speaker` / `--group` may be aliases (see [config alias](#config-alias)).
 
-EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers only. Passing `--group` to them is a usage error (exit 2):
+EQ and home theater commands (`bass`, `treble`, `loudness`, `sub`, `surround`, `night`, `speech`) operate on individual speakers only. Passing `--group` to them is a usage error (exit 2):
 
 ```
 error: validation error: bass applies to a single speaker; use --speaker instead of --group
@@ -123,6 +123,16 @@ Living Room  ▶ Playing  Bohemian Rhapsody — Queen  2:31/5:55  vol:80
 
 $ sonos status --group "Kitchen"
 Kitchen  ⏸ Paused  Hotel California — Eagles  4:12/6:30  vol:50
+```
+
+A home theater speaker lists its satellites below, in the order left surround,
+right surround, sub:
+
+```bash
+$ sonos status --speaker Basement
+Basement  ▶ Playing  Wildflowers — Tom Petty  1:02/3:30  vol:25
+  Left surround • Sonos One
+  Right surround • Sonos One
 ```
 
 **Errors:**
@@ -596,6 +606,117 @@ error: validation error: --speaker is required for loudness
 
 error: validation error: loudness applies to a single speaker; use --speaker instead of --group
 [exits 2]
+```
+
+---
+
+## Home Theater
+
+Settings on a soundbar with bonded surrounds or a sub. Like the EQ commands they
+target one speaker (`--speaker`, the soundbar's room name) and reject `--group`.
+`sub` and `surround` check the topology first: a soundbar accepts these settings
+even with no such hardware bonded, so without the check the command would
+silently do nothing.
+
+### sub
+
+Set the sub level, or turn the sub on or off.
+
+```
+sonos sub <-15..15|on|off> --speaker NAME
+```
+
+**Example:**
+
+```bash
+$ sonos sub 3 --speaker "Living Room"
+Sub level set to +3 (Living Room)
+
+$ sonos sub off --speaker "Living Room"
+Sub off (Living Room)
+```
+
+**Errors:**
+
+```
+error: Basement has no sub
+[exits 1]
+
+error: invalid value '16' for '<VALUE>': expected a level from -15 to 15, on, or off
+[exits 2]
+```
+
+---
+
+### surround
+
+Set the surround level, or turn the surrounds on or off. Sonos keeps separate
+levels for music and TV; the music level is set unless `--tv` is given. `on`
+and `off` switch the surrounds for both.
+
+```
+sonos surround <-15..15|on|off> [--tv] --speaker NAME
+```
+
+**Flags:**
+
+| Flag | Type | Required | Description |
+|------|------|----------|-------------|
+| `--speaker NAME` | string | yes | The soundbar's room name |
+| `--tv` | bool | no | Set the level used while playing TV |
+
+**Example:**
+
+```bash
+$ sonos surround 3 --speaker Basement
+Music surround level set to +3 (Basement)
+
+$ sonos surround 8 --tv --speaker Basement
+TV surround level set to +8 (Basement)
+
+$ sonos surround off --speaker Basement
+Surrounds off (Basement)
+```
+
+**Errors:**
+
+```
+error: Kitchen has no surrounds
+[exits 1]
+
+error: validation error: --tv applies to a level; surrounds switch on and off for TV and music together
+[exits 2]
+```
+
+---
+
+### night
+
+Turn night mode on or off: loud passages get quieter and quiet ones louder, for
+late-night TV.
+
+```
+sonos night <on|off> --speaker NAME
+```
+
+```bash
+$ sonos night on --speaker Basement
+Night mode on (Basement)
+```
+
+---
+
+### speech
+
+Turn speech enhancement on or off, for clearer dialogue.
+
+```
+sonos speech <on|off> --speaker NAME
+```
+
+```bash
+$ sonos speech on --speaker Basement
+Speech enhancement on (Basement)
 ```
 
 ---

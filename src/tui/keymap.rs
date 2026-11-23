@@ -9,6 +9,7 @@
 use crossterm::event::KeyCode;
 
 use crate::tui::app::{App, Tab};
+use crate::tui::types::ListEntry;
 
 /// One legend entry and the keys behind it.
 pub struct Binding<C: 'static> {
@@ -61,6 +62,8 @@ pub enum SpeakerCommand {
     PlayPause,
     Next,
     Previous,
+    /// Satellite rows: switch the surround level `←→` edits (music or TV).
+    SwitchLevel,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,6 +96,7 @@ pub enum DropdownCommand {
 const UP_DOWN: &str = "\u{2191}\u{2193}";
 const LEFT_RIGHT: &str = "\u{2190}\u{2192}";
 const SPACE: &str = "\u{2423}";
+const TAB: &str = "\u{21e5}";
 const ESC: &str = "\u{238b}";
 
 /// Keys that apply in every mode except pick-up, after the mode's own table.
@@ -153,6 +157,62 @@ pub const SPEAKER_KEYS: Keymap<SpeakerCommand> = &[
         label: "Pick up/Drop",
         keys: &[(KeyCode::Char(' '), SpeakerCommand::PickUp)],
     }],
+    &[
+        Binding {
+            keys_label: "p",
+            label: "Play/Pause",
+            keys: &[(KeyCode::Char('p'), SpeakerCommand::PlayPause)],
+        },
+        Binding {
+            keys_label: "n",
+            label: "Next",
+            keys: &[(KeyCode::Char('n'), SpeakerCommand::Next)],
+        },
+        Binding {
+            keys_label: "b",
+            label: "Prev",
+            keys: &[(KeyCode::Char('b'), SpeakerCommand::Previous)],
+        },
+    ],
+];
+
+/// A selected satellite row: `←→` and `m` act on the main speaker's surround
+/// or sub settings instead of a volume. Space stays bound so it can explain
+/// that satellites can't be picked up, but has no legend entry.
+pub const SATELLITE_KEYS: Keymap<SpeakerCommand> = &[
+    &[Binding {
+        keys_label: UP_DOWN,
+        label: "Navigate",
+        keys: &[
+            (KeyCode::Up, SpeakerCommand::Up),
+            (KeyCode::Down, SpeakerCommand::Down),
+        ],
+    }],
+    &[
+        Binding {
+            keys_label: LEFT_RIGHT,
+            label: "Level",
+            keys: &[
+                (KeyCode::Left, SpeakerCommand::VolumeDown),
+                (KeyCode::Right, SpeakerCommand::VolumeUp),
+            ],
+        },
+        Binding {
+            keys_label: TAB,
+            label: "\u{266a}/TV",
+            keys: &[(KeyCode::Tab, SpeakerCommand::SwitchLevel)],
+        },
+        Binding {
+            keys_label: "m",
+            label: "On/Off",
+            keys: &[(KeyCode::Char('m'), SpeakerCommand::ToggleMute)],
+        },
+        Binding {
+            keys_label: "",
+            label: "",
+            keys: &[(KeyCode::Char(' '), SpeakerCommand::PickUp)],
+        },
+    ],
     &[
         Binding {
             keys_label: "p",
@@ -249,6 +309,8 @@ pub const DROPDOWN_KEYS: Keymap<DropdownCommand> = &[&[
 pub enum Mode {
     TabBar,
     Speakers,
+    /// The speaker list with a satellite row selected.
+    Satellite,
     PickUp,
     Settings,
     Dropdown,
@@ -263,6 +325,14 @@ impl Mode {
             Mode::TabBar
         } else {
             match nav.tab {
+                Tab::Speakers
+                    if matches!(
+                        nav.speakers_state.selection.entry(),
+                        Some(ListEntry::SatelliteRow { .. })
+                    ) =>
+                {
+                    Mode::Satellite
+                }
                 Tab::Speakers => Mode::Speakers,
                 Tab::Settings if nav.settings_state.dropdown_open => Mode::Dropdown,
                 Tab::Settings => Mode::Settings,
@@ -275,6 +345,7 @@ impl Mode {
         match self {
             Mode::TabBar => lookup(TAB_BAR_KEYS, code).is_some(),
             Mode::Speakers => lookup(SPEAKER_KEYS, code).is_some(),
+            Mode::Satellite => lookup(SATELLITE_KEYS, code).is_some(),
             Mode::PickUp => lookup(PICK_UP_KEYS, code).is_some(),
             Mode::Settings => lookup(SETTINGS_KEYS, code).is_some(),
             Mode::Dropdown => lookup(DROPDOWN_KEYS, code).is_some(),
@@ -298,6 +369,11 @@ impl Mode {
 /// focused tab bar keep their tab's legend.
 pub fn legend(app: &App) -> String {
     let sections = match app.navigation.tab {
+        Tab::Speakers if Mode::of(app) == Mode::Satellite => [
+            legend_sections(SATELLITE_KEYS),
+            legend_sections(GLOBAL_KEYS),
+        ]
+        .concat(),
         Tab::Speakers => [legend_sections(SPEAKER_KEYS), legend_sections(GLOBAL_KEYS)].concat(),
         Tab::Settings if app.navigation.settings_state.dropdown_open => {
             legend_sections(DROPDOWN_KEYS)
@@ -357,6 +433,7 @@ mod tests {
         assert_each_binding_dispatches(GLOBAL_KEYS);
         assert_each_binding_dispatches(TAB_BAR_KEYS);
         assert_each_binding_dispatches(SPEAKER_KEYS);
+        assert_each_binding_dispatches(SATELLITE_KEYS);
         assert_each_binding_dispatches(PICK_UP_KEYS);
         assert_each_binding_dispatches(SETTINGS_KEYS);
         assert_each_binding_dispatches(DROPDOWN_KEYS);

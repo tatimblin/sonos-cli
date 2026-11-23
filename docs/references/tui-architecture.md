@@ -55,13 +55,13 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> KeyOutcome
 
 ### `tui/types.rs`
 
-Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `KeyOutcome`, `SpeakerListData`, `RowData` (per-variant row data: `GroupHeaderData`, `SpeakerRowData`, action rows), and `SettingsRow` (settings rows with their labels, options and current values). Also contains functions used by both handlers and screens: `build_list_entries`, `group_for_entry`, and `group_for_selection` (the group the bottom bar shows and playback keys control).
+Cross-layer types that prevent circular imports: `ListEntry`, `PickUpState`, `KeyOutcome`, `SpeakerListData`, `LevelFocus`, `RowData` (per-variant row data: `GroupHeaderData`, `SpeakerRowData`, `SatelliteRowData` for surrounds and subs nested under their speaker, action rows), and `SettingsRow` (settings rows with their labels, options and current values). Also contains functions used by both handlers and screens: `build_list_entries`, `group_for_entry`, and `group_for_selection` (the group the bottom bar shows and playback keys control).
 
 ### `tui/keymap.rs`
 
-Key binding tables, one per input mode (speaker list, pick-up, settings rows, settings dropdown, tab bar, global). Each `Binding` pairs keys with a command enum and a legend label. Handlers dispatch with `keymap::lookup(TABLE, key.code)` and match on the command; `ui.rs` builds the key legend from the same tables via `keymap::legend()`. To add a key, add a binding and a command variant — the compiler then points at the handler match to extend.
+Key binding tables, one per input mode (speaker list, satellite row, pick-up, settings rows, settings dropdown, tab bar, global). Each `Binding` pairs keys with a command enum and a legend label. Handlers dispatch with `keymap::lookup(TABLE, key.code)` and match on the command; `ui.rs` builds the key legend from the same tables via `keymap::legend()`. To add a key, add a binding and a command variant — the compiler then points at the handler match to extend.
 
-`Mode::of(app)` picks the active table. The event loop sends keys the mode binds to the handler; other keys fall through to `GLOBAL_KEYS` (quit), except in pick-up mode, which swallows them. Ctrl-C always quits.
+`Mode::of(app)` picks the active table; a selected satellite row is its own mode (`SATELLITE_KEYS`), so `←→`, `⇥` and `m` act on the soundbar's surround or sub settings and the legend says so. The event loop sends keys the mode binds to the handler; other keys fall through to `GLOBAL_KEYS` (quit), except in pick-up mode, which swallows them. Ctrl-C always quits.
 
 ### `tui/helpers.rs`
 

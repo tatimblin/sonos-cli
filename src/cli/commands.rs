@@ -62,6 +62,33 @@ pub enum Commands {
         #[arg(value_enum)]
         state: OnOff,
     },
+    /// Set the sub level (-15 to 15) or turn the sub on/off, speaker-only
+    Sub {
+        /// Level (-15 to 15), on, or off
+        #[arg(value_parser = parse_level_or_switch, allow_negative_numbers = true)]
+        value: LevelOrSwitch,
+    },
+    /// Set the surround level (-15 to 15) or turn the surrounds on/off, speaker-only
+    Surround {
+        /// Level (-15 to 15), on, or off
+        #[arg(value_parser = parse_level_or_switch, allow_negative_numbers = true)]
+        value: LevelOrSwitch,
+        /// Set the level used while playing TV instead of music
+        #[arg(long)]
+        tv: bool,
+    },
+    /// Set night mode (on/off) on a home theater speaker
+    Night {
+        /// on or off
+        #[arg(value_enum)]
+        state: OnOff,
+    },
+    /// Set speech enhancement (on/off) on a home theater speaker
+    Speech {
+        /// on or off
+        #[arg(value_enum)]
+        state: OnOff,
+    },
     /// Add a speaker to a group
     Join,
     /// Remove a speaker from its group
@@ -111,6 +138,27 @@ pub enum QueueAction {
 pub enum OnOff {
     On,
     Off,
+}
+
+/// A home theater level (-15 to 15), or switching the hardware on or off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LevelOrSwitch {
+    Level(i8),
+    Switch(bool),
+}
+
+/// Parse `on`, `off`, or a level from -15 to 15. Out of range is a usage
+/// error, matching the SDK's own validation.
+fn parse_level_or_switch(value: &str) -> Result<LevelOrSwitch, String> {
+    match value.to_ascii_lowercase().as_str() {
+        "on" => return Ok(LevelOrSwitch::Switch(true)),
+        "off" => return Ok(LevelOrSwitch::Switch(false)),
+        _ => {}
+    }
+    match value.parse::<i8>() {
+        Ok(level) if (-15..=15).contains(&level) => Ok(LevelOrSwitch::Level(level)),
+        _ => Err("expected a level from -15 to 15, on, or off".to_string()),
+    }
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -172,6 +220,50 @@ mod tests {
             let err = parse_err(&["sonos", "volume", level]);
             assert_eq!(err.kind(), ErrorKind::ValueValidation);
             // clap usage errors exit 2, the same as `CliError::Validation`.
+            assert_eq!(err.exit_code(), 2);
+        }
+    }
+
+    #[test]
+    fn sub_and_surround_take_a_level_or_a_switch() {
+        use super::LevelOrSwitch;
+        assert!(matches!(
+            command(&["sonos", "sub", "-15", "--speaker", "Basement"]),
+            Commands::Sub {
+                value: LevelOrSwitch::Level(-15)
+            }
+        ));
+        assert!(matches!(
+            command(&["sonos", "sub", "off"]),
+            Commands::Sub {
+                value: LevelOrSwitch::Switch(false)
+            }
+        ));
+        assert!(matches!(
+            command(&["sonos", "surround", "8", "--tv"]),
+            Commands::Surround {
+                value: LevelOrSwitch::Level(8),
+                tv: true
+            }
+        ));
+        assert!(matches!(
+            command(&["sonos", "surround", "ON"]),
+            Commands::Surround {
+                value: LevelOrSwitch::Switch(true),
+                tv: false
+            }
+        ));
+    }
+
+    #[test]
+    fn sub_and_surround_reject_out_of_range_levels() {
+        for args in [
+            &["sonos", "sub", "16"][..],
+            &["sonos", "surround", "-16"],
+            &["sonos", "surround", "loud"],
+        ] {
+            let err = parse_err(args);
+            assert_eq!(err.kind(), ErrorKind::ValueValidation, "{args:?}");
             assert_eq!(err.exit_code(), 2);
         }
     }

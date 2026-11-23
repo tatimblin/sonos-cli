@@ -83,7 +83,7 @@ $ sonos volume 50 --group "Kitchen"      # specific group
 $ sonos bass 3 --speaker "Kitchen One"   # speaker-level EQ (group flag not applicable)
 ```
 
-**Speaker-only flags** — EQ commands (`bass`, `treble`, `loudness`) operate on individual speakers, not groups. Passing `--group` to them is a usage error (`bass applies to a single speaker; use --speaker instead of --group`, exit 2) rather than being silently ignored.
+**Speaker-only flags** — EQ and home theater commands (`bass`, `treble`, `loudness`, `sub`, `surround`, `night`, `speech`) operate on individual speakers, not groups. Passing `--group` to them is a usage error (`bass applies to a single speaker; use --speaker instead of --group`, exit 2) rather than being silently ignored.
 
 ---
 

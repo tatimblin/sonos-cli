@@ -2,14 +2,14 @@
 
 use ratatui::layout::Rect;
 use ratatui::Frame;
-use sonos_sdk::{GroupId, SpeakerId};
+use sonos_sdk::{GroupId, SatelliteRole, SpeakerId};
 
 use crate::tui::helpers;
 use crate::tui::hooks::{ProgressState, RenderContext};
 use crate::tui::image_loader::ArtProtocolState;
 use crate::tui::types::{
     build_list_entries, group_for_selection, BottomBarData, GroupHeaderData, ListEntry, RowData,
-    SpeakerListData, SpeakerRowData,
+    SatelliteLevels, SatelliteRowData, SpeakerListData, SpeakerRowData,
 };
 use crate::tui::widgets::{bottom_bar, speaker_list};
 
@@ -35,11 +35,31 @@ pub fn render(
                 RowData::GroupHeader(group_header_data(group_id, ctx))
             }
             ListEntry::SpeakerRow(speaker_id) => {
+                // Skip this speaker's own satellites to see what follows it.
+                let next = entries[i + 1..]
+                    .iter()
+                    .find(|e| !matches!(e, ListEntry::SatelliteRow { .. }));
                 let is_last_in_group = !matches!(
-                    entries.get(i + 1),
+                    next,
                     Some(ListEntry::SpeakerRow(_)) | Some(ListEntry::AddToGroupRow(_))
                 );
                 RowData::Speaker(speaker_row_data(speaker_id, is_last_in_group, ctx))
+            }
+            ListEntry::SatelliteRow { main, satellite } => {
+                let is_last = !matches!(entries.get(i + 1), Some(ListEntry::SatelliteRow { .. }));
+                let main_is_last_in_group = !entries[i + 1..]
+                    .iter()
+                    .find(|e| !matches!(e, ListEntry::SatelliteRow { .. }))
+                    .is_some_and(|e| {
+                        matches!(e, ListEntry::SpeakerRow(_) | ListEntry::AddToGroupRow(_))
+                    });
+                RowData::Satellite(satellite_row_data(
+                    main,
+                    satellite,
+                    is_last,
+                    main_is_last_in_group,
+                    ctx,
+                ))
             }
             ListEntry::AddToGroupRow(group_id) => RowData::AddToGroup {
                 is_home: pick_up
@@ -57,6 +77,7 @@ pub fn render(
         rows,
         selected_index,
         picked_up_speaker_id: pick_up.map(|pu| pu.speaker_id.clone()),
+        level_focus: app.navigation.speakers_state.level_focus,
     };
 
     speaker_list::render(frame, content_area, &data, &ctx.app.theme);
@@ -143,6 +164,63 @@ fn speaker_row_data(
         volume,
         is_muted,
         is_last_in_group,
+    }
+}
+
+/// Watch the main speaker's surround or sub settings for a satellite row.
+///
+/// The levels are settings on the main speaker, not the satellite, so every
+/// surround row under one soundbar watches the same properties.
+fn satellite_row_data(
+    main_id: &SpeakerId,
+    satellite_id: &SpeakerId,
+    is_last: bool,
+    main_is_last_in_group: bool,
+    ctx: &mut RenderContext,
+) -> SatelliteRowData {
+    let main = ctx.app.system.speaker_by_id(main_id);
+    let satellite = main
+        .as_ref()
+        .and_then(|m| m.satellites().into_iter().find(|s| &s.id == satellite_id));
+
+    let levels = match (&main, satellite.as_ref().map(|s| &s.role)) {
+        (Some(m), Some(role)) if role.is_surround() => SatelliteLevels::Surround {
+            enabled: ctx
+                .hooks
+                .use_watch(&m.surround_enabled)
+                .map(|v| v.is_enabled()),
+            music: ctx
+                .hooks
+                .use_watch(&m.music_surround_level)
+                .map(|v| v.value()),
+            tv: ctx.hooks.use_watch(&m.surround_level).map(|v| v.value()),
+        },
+        (Some(m), Some(SatelliteRole::Sub)) => SatelliteLevels::Sub {
+            enabled: ctx.hooks.use_watch(&m.sub_enabled).map(|v| v.is_enabled()),
+            level: ctx.hooks.use_watch(&m.sub_level).map(|v| v.value()),
+        },
+        _ => SatelliteLevels::Unknown,
+    };
+
+    SatelliteRowData {
+        label: satellite
+            .as_ref()
+            .map(|s| row_label(&s.role).to_string())
+            .unwrap_or_else(|| "Satellite".to_string()),
+        model_name: satellite.and_then(|s| s.model_name),
+        levels,
+        is_last,
+        main_is_last_in_group,
+    }
+}
+
+/// A satellite's row label. Nested under its soundbar, the surrounds need only
+/// their side.
+fn row_label(role: &SatelliteRole) -> &str {
+    match role {
+        SatelliteRole::LeftSurround => "Left",
+        SatelliteRole::RightSurround => "Right",
+        other => other.label(),
     }
 }
 
