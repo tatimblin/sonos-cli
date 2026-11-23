@@ -18,13 +18,9 @@ const LABEL_WIDTH: usize = 16;
 pub fn render(frame: &mut Frame, area: Rect, data: &SettingsData, theme: &Theme) {
     let mut lines: Vec<Line> = Vec::new();
 
-    // Title
-    lines.push(Line::from(vec![Span::styled("  Settings", theme.accent)]));
-    lines.push(Line::raw(""));
-
     // Render each settings row
     for (i, item) in data.items.iter().enumerate() {
-        let is_selected = i == data.selected_row;
+        let is_selected = data.has_focus && i == data.selected_row;
         let is_dropdown_row = is_selected && data.dropdown_open;
 
         // Build label (right-aligned to LABEL_WIDTH)

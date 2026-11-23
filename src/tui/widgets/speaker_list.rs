@@ -15,8 +15,9 @@
 //!   `├─ Bathroom • Sonos Connect:AMP                × 46%`
 //!
 //! Satellites nest under their speaker and show its surround or sub levels;
-//! the selected row shows a bar for the level `←→` edits:
-//!   `│  ├─ Left • Sonos One             ♪ +3  TV +8`
+//! surround levels read `music/tv` until selected, when they are labelled and
+//! the level `←→` edits gets a bar:
+//!   `│  ├─ Left • Sonos One                   +3/+8`
 //!   `│  └─ Right • Sonos One   ■■■■■··· ♪ +3  TV +8`
 //!
 //! During pickup mode, inline action rows appear:
@@ -60,14 +61,18 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &The
     let total_width = area.width as usize;
 
     let is_pickup = data.picked_up_speaker_id.is_some();
-    let focused_group = group_for_entry(&data.entries, selected_index);
+    let focused_group = if data.has_focus {
+        group_for_entry(&data.entries, selected_index)
+    } else {
+        None
+    };
 
     let mut lines: Vec<Line> = Vec::new();
     let mut entry_visual_starts: Vec<usize> = Vec::new();
     let mut entry_visual_heights: Vec<usize> = Vec::new();
 
     for (idx, (entry, row)) in data.entries.iter().zip(data.rows.iter()).enumerate() {
-        let is_selected = idx == selected_index;
+        let is_selected = data.has_focus && idx == selected_index;
 
         // Blank separator + divider between groups (not before the first entry)
         if idx > 0 && matches!(entry, ListEntry::GroupHeader(_)) {
@@ -199,9 +204,14 @@ fn render_group_header(
     if header.is_muted {
         right.push(Span::styled(format!(" {}", g.muted), theme.error));
     }
+    let volume_style = if is_selected {
+        theme.volume_filled
+    } else {
+        theme.muted
+    };
     right.push(Span::styled(
         format!(" {}", format_volume(header.volume)),
-        theme.muted,
+        volume_style,
     ));
 
     let available = fill_width(&spans, &right, total_width);
@@ -286,10 +296,10 @@ fn render_speaker_row(
 /// Columns of the bar on a selected satellite row.
 const LEVEL_BAR_WIDTH: usize = 8;
 
-/// `     │  ├─ Left • Sonos One          ♪ +3  TV +8`
+/// `     │  ├─ Left • Sonos One          +3/+8`
 ///
-/// Selected, the level `←→` edits gets a bar and the accent colour; the other
-/// stays a muted number.
+/// Selected, surround levels get their `♪`/`TV` labels, and the level `←→`
+/// edits gets a bar and the accent colour; the other stays a muted number.
 fn render_satellite_row(
     satellite: &SatelliteRowData,
     is_selected: bool,
@@ -333,22 +343,16 @@ fn render_satellite_row(
             enabled: Some(false),
             ..
         } => vec![Span::styled("off", theme.muted)],
+        SatelliteLevels::Surround { music, tv, .. } if !is_selected => vec![Span::styled(
+            format!("{}/{}", format_level(music), format_level(tv)),
+            theme.muted,
+        )],
         SatelliteLevels::Surround { music, tv, .. } => {
             let music_label = format!("{} {}", g.music_note, format_level(music));
             let tv_label = format!("TV {}", format_level(tv));
-            let mut right = level_spans(
-                music,
-                music_label,
-                is_selected && focus == LevelFocus::Music,
-                theme,
-            );
+            let mut right = level_spans(music, music_label, focus == LevelFocus::Music, theme);
             right.push(Span::raw("  "));
-            right.extend(level_spans(
-                tv,
-                tv_label,
-                is_selected && focus == LevelFocus::Tv,
-                theme,
-            ));
+            right.extend(level_spans(tv, tv_label, focus == LevelFocus::Tv, theme));
             right
         }
         SatelliteLevels::Sub { level, .. } => {
@@ -612,6 +616,7 @@ mod tests {
             selected_index: 0,
             picked_up_speaker_id: None,
             level_focus: LevelFocus::Music,
+            has_focus: true,
         }
     }
 
@@ -682,11 +687,12 @@ mod tests {
             selected_index: 0,
             picked_up_speaker_id: None,
             level_focus: LevelFocus::Music,
+            has_focus: true,
         }
     }
 
     #[test]
-    fn satellite_rows_nest_under_their_speaker_with_both_levels() {
+    fn satellite_rows_nest_under_their_speaker_with_compact_levels() {
         let lines = render_lines(&basement());
         assert!(
             lines[1].starts_with("    \u{2514}\u{2500} Basement \u{2022} Sonos Playbar"),
@@ -698,7 +704,7 @@ mod tests {
             "{:?}",
             lines[2]
         );
-        assert!(lines[2].ends_with(" \u{266a} +3  TV +8"), "{:?}", lines[2]);
+        assert!(lines[2].ends_with(" +3/+8"), "{:?}", lines[2]);
         assert!(
             lines[3].starts_with("       \u{2514}\u{2500} Right \u{2022}"),
             "{:?}",
@@ -777,6 +783,7 @@ mod tests {
             selected_index: 0,
             picked_up_speaker_id: None,
             level_focus: LevelFocus::Music,
+            has_focus: true,
         };
         assert!(render_lines(&data)
             .iter()
@@ -797,6 +804,32 @@ mod tests {
         );
         assert!(header.ends_with(":  30%"), "{header:?}");
         assert_flush_right(header);
+    }
+
+    #[test]
+    fn selected_group_header_volume_uses_the_highlight_colour() {
+        let theme = Theme::default_theme();
+        let volume_style = |is_selected: bool| {
+            let line =
+                render_group_header(&group_header("Kitchen", 30), is_selected, true, 80, &theme);
+            line.spans.last().unwrap().style
+        };
+        assert_eq!(volume_style(true), theme.volume_filled);
+        assert_eq!(volume_style(false), theme.muted);
+    }
+
+    #[test]
+    fn unfocused_list_highlights_nothing() {
+        let mut data = kitchen_group();
+        data.selected_index = 1;
+        data.has_focus = false;
+        let lines = render_lines(&data);
+        assert!(
+            lines.iter().all(|l| !l.starts_with('\u{276f}')),
+            "{lines:?}"
+        );
+        assert!(lines[1].ends_with(" 46%"), "{:?}", lines[1]);
+        assert!(!lines[1].contains('\u{25a0}'), "{:?}", lines[1]);
     }
 
     #[test]
@@ -920,6 +953,7 @@ mod tests {
             selected_index: 6,
             picked_up_speaker_id: Some(sid(1)),
             level_focus: LevelFocus::Music,
+            has_focus: true,
         };
         let lines = render_lines(&data);
 

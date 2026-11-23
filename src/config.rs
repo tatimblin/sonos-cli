@@ -7,7 +7,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 /// Album art rendering mode.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AlbumArtMode {
     #[default]

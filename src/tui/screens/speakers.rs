@@ -78,6 +78,7 @@ pub fn render(
         selected_index,
         picked_up_speaker_id: pick_up.map(|pu| pu.speaker_id.clone()),
         level_focus: app.navigation.speakers_state.level_focus,
+        has_focus: !app.navigation.tab_focused,
     };
 
     speaker_list::render(frame, content_area, &data, &ctx.app.theme);
@@ -291,7 +292,8 @@ fn assemble_bottom_bar(
         .zip(coordinator.as_ref())
         .and_then(|(t, coord)| t.album_art_url(coord.ip));
 
-    if let Some(ref url) = album_art_url {
+    let art_mode = ctx.app.config.album_art_mode;
+    if let Some(url) = album_art_url.as_deref().filter(|_| !art_mode.is_off()) {
         ctx.app.image_loader.request(url);
     }
 
@@ -301,10 +303,16 @@ fn assemble_bottom_bar(
     let art_state = ctx
         .hooks
         .use_state::<ArtProtocolState>("bottom_bar_art", ArtProtocolState::default);
-    art_state.ensure_protocol(&album_art_url, &ctx.app.image_loader, &ctx.app.picker);
+    art_state.ensure_protocol(
+        &album_art_url,
+        art_mode,
+        &ctx.app.image_loader,
+        &ctx.app.picker,
+    );
     let protocol = art_state.protocol.take();
 
-    let group_volume_active = selected_index < entries.len()
+    let group_volume_active = !ctx.app.navigation.tab_focused
+        && selected_index < entries.len()
         && matches!(&entries[selected_index], ListEntry::GroupHeader(_));
 
     BottomBarData {

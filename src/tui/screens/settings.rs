@@ -25,6 +25,7 @@ pub fn render(frame: &mut Frame, area: Rect, ctx: &mut RenderContext) {
         selected_row: state.selected_row,
         dropdown_open: state.dropdown_open,
         dropdown_index: state.dropdown_index,
+        has_focus: !ctx.app.navigation.tab_focused,
     };
 
     settings::render(frame, area, &data, &ctx.app.theme);

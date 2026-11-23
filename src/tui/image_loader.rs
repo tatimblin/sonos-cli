@@ -15,8 +15,10 @@ use std::time::Duration;
 
 use image::imageops::FilterType;
 use image::DynamicImage;
-use ratatui_image::picker::Picker;
+use ratatui_image::picker::{Picker, ProtocolType};
 use ratatui_image::protocol::StatefulProtocol;
+
+use crate::config::AlbumArtMode;
 
 /// Maximum number of cached images before evicting oldest entries.
 const MAX_CACHE_SIZE: usize = 20;
@@ -200,46 +202,63 @@ const ART_ROWS: u16 = 3;
 
 /// Hook-friendly state for album art protocol lifecycle.
 ///
-/// Tracks the current album art URI and holds the `StatefulProtocol` used for
-/// rendering. Detects URI changes, invalidates stale protocols, and lazily
-/// creates new ones from the image cache.
+/// Tracks the current album art URI and mode and holds the `StatefulProtocol`
+/// used for rendering. Detects URI or mode changes, invalidates stale
+/// protocols, and lazily creates new ones from the image cache.
 #[derive(Default)]
 pub struct ArtProtocolState {
     url: Option<String>,
+    mode: AlbumArtMode,
     pub protocol: Option<StatefulProtocol>,
 }
 
 impl ArtProtocolState {
-    /// Update protocol when URI changes. Creates protocol from cached image.
+    /// Update protocol when the URI or mode changes. Creates protocol from cached image.
     ///
-    /// Call this each render frame with the current `art_url`. Handles:
-    /// - URI change detection (invalidates old protocol)
+    /// Call this each render frame with the current `art_url` and `mode`. Handles:
+    /// - URI or mode change detection (invalidates old protocol)
     /// - Lazy protocol creation from `ImageLoader` cache + `Picker`
+    ///
+    /// `picker` is the terminal-detected picker; halfblock mode renders with
+    /// a halfblocks copy of it, and off mode renders nothing.
     pub fn ensure_protocol(
         &mut self,
         art_url: &Option<String>,
+        mode: AlbumArtMode,
         image_loader: &ImageLoader,
         picker: &RefCell<Option<Picker>>,
     ) {
-        let url_changed = self.url.as_deref() != art_url.as_deref();
-        if url_changed {
+        if self.url.as_deref() != art_url.as_deref() || self.mode != mode {
             self.url = art_url.clone();
+            self.mode = mode;
             self.protocol = None;
         }
 
-        if self.protocol.is_none() {
-            if let Some(ref url) = art_url {
-                if let Some(img) = image_loader.get(url) {
-                    if let Some(ref mut p) = *picker.borrow_mut() {
-                        let (fw, fh) = p.font_size();
-                        let target_w = (ART_COLS * fw) as u32;
-                        let target_h = (ART_ROWS * fh) as u32;
-                        let resized = img.resize_exact(target_w, target_h, FilterType::Lanczos3);
-                        self.protocol = Some(p.new_resize_protocol(resized));
-                    }
-                }
-            }
+        if self.protocol.is_some() || mode.is_off() {
+            return;
         }
+        let Some(img) = art_url.as_deref().and_then(|url| image_loader.get(url)) else {
+            return;
+        };
+
+        let mut detected = picker.borrow_mut();
+        let mut halfblocks;
+        let p = if mode == AlbumArtMode::Halfblock {
+            halfblocks = detected.unwrap_or_else(|| Picker::from_fontsize((8, 16)));
+            halfblocks.set_protocol_type(ProtocolType::Halfblocks);
+            &mut halfblocks
+        } else {
+            match detected.as_mut() {
+                Some(p) => p,
+                None => return,
+            }
+        };
+
+        let (fw, fh) = p.font_size();
+        let target_w = (ART_COLS * fw) as u32;
+        let target_h = (ART_ROWS * fh) as u32;
+        let resized = img.resize_exact(target_w, target_h, FilterType::Lanczos3);
+        self.protocol = Some(p.new_resize_protocol(resized));
     }
 }
 
