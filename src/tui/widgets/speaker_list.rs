@@ -16,8 +16,8 @@
 //!
 //! Satellites nest under their speaker and show its surround or sub levels;
 //! the selected row shows a bar for the level `←→` edits:
-//!   `│  ├─ Left surround • Sonos One             ♪ +3  TV +8`
-//!   `│  └─ Right surround • Sonos One   ■■■■■··· ♪ +3  TV +8`
+//!   `│  ├─ Left • Sonos One             ♪ +3  TV +8`
+//!   `│  └─ Right • Sonos One   ■■■■■··· ♪ +3  TV +8`
 //!
 //! During pickup mode, inline action rows appear:
 //!   `└─ Add to group`       (selectable drop target)
@@ -286,7 +286,7 @@ fn render_speaker_row(
 /// Columns of the bar on a selected satellite row.
 const LEVEL_BAR_WIDTH: usize = 8;
 
-/// `     │  ├─ Left surround • Sonos One          ♪ +3  TV +8`
+/// `     │  ├─ Left • Sonos One          ♪ +3  TV +8`
 ///
 /// Selected, the level `←→` edits gets a bar and the accent colour; the other
 /// stays a muted number.
@@ -676,8 +676,8 @@ mod tests {
             rows: vec![
                 header("Basement", 25),
                 row("Basement", "Sonos Playbar", 25, true),
-                surround("Left surround", 3, 8, false),
-                surround("Right surround", 3, 8, true),
+                surround("Left", 3, 8, false),
+                surround("Right", 3, 8, true),
             ],
             selected_index: 0,
             picked_up_speaker_id: None,
@@ -694,13 +694,13 @@ mod tests {
             lines[1]
         );
         assert!(
-            lines[2].starts_with("       \u{251c}\u{2500} Left surround \u{2022} Sonos One "),
+            lines[2].starts_with("       \u{251c}\u{2500} Left \u{2022} Sonos One "),
             "{:?}",
             lines[2]
         );
         assert!(lines[2].ends_with(" \u{266a} +3  TV +8"), "{:?}", lines[2]);
         assert!(
-            lines[3].starts_with("       \u{2514}\u{2500} Right surround"),
+            lines[3].starts_with("       \u{2514}\u{2500} Right \u{2022}"),
             "{:?}",
             lines[3]
         );
@@ -764,7 +764,7 @@ mod tests {
         }
         let line = &render_lines(&data)[2];
         assert!(
-            line.starts_with("    \u{2502}  \u{251c}\u{2500} Left surround"),
+            line.starts_with("    \u{2502}  \u{251c}\u{2500} Left \u{2022}"),
             "{line:?}"
         );
     }

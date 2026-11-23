@@ -205,12 +205,22 @@ fn satellite_row_data(
     SatelliteRowData {
         label: satellite
             .as_ref()
-            .map(|s| s.role.label().to_string())
+            .map(|s| row_label(&s.role).to_string())
             .unwrap_or_else(|| "Satellite".to_string()),
         model_name: satellite.and_then(|s| s.model_name),
         levels,
         is_last,
         main_is_last_in_group,
+    }
+}
+
+/// A satellite's row label. Nested under its soundbar, the surrounds need only
+/// their side.
+fn row_label(role: &SatelliteRole) -> &str {
+    match role {
+        SatelliteRole::LeftSurround => "Left",
+        SatelliteRole::RightSurround => "Right",
+        other => other.label(),
     }
 }
 

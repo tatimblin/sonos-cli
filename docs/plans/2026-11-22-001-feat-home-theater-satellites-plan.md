@@ -23,8 +23,8 @@ left for later.
 ```
 ▶ Basement ::::: Wildflowers — Tom Petty ::::::::::::::::::: 25%
   └─ Basement • Sonos Playbar                                25%
-     ├─ Left surround • Sonos One              ■■■■■··· ♪ +3  TV +8
-     └─ Right surround • Sonos One                      ♪ +3  TV +8
+     ├─ Left • Sonos One              ■■■■■··· ♪ +3  TV +8
+     └─ Right • Sonos One                      ♪ +3  TV +8
 ```
 
 Satellites can't be picked up: they move with their soundbar, as they do in
@@ -154,7 +154,7 @@ revised from the first draft after a mockup review:
 
 - **Entry:** `ListEntry::SatelliteRow { main, satellite }`, after its
   speaker's row, in role order. Hidden during pick-up.
-- **Row:** `Left surround • Sonos One`, nested one level under the speaker,
+- **Row:** `Left • Sonos One` (the sub is `Sub`), nested one level under the speaker,
   with a `│` continuation when the speaker isn't last in its group (new
   `connector_pipe` glyph).
 - **Values:** a surround row shows both levels, `♪ +3  TV +8`. When selected,
