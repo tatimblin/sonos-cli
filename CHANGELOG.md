@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1](https://github.com/tatimblin/sonos-cli/compare/v0.11.0...v0.11.1) - 2026-11-23
+
+### Fixed
+
+- pick up sonos-sdk 0.11.2 polling and firewall fixes ([#124](https://github.com/tatimblin/sonos-cli/pull/124))
+
 ## [0.11.0](https://github.com/tatimblin/sonos-cli/compare/v0.10.0...v0.11.0) - 2026-11-23
 
 ### Added
