@@ -44,7 +44,7 @@ The scaffolding that everything else builds on. No user-visible features yet, bu
 ### Cargo.toml & Dependencies
 
 - [x] `Cargo.toml` with all dependencies:
-  - `sonos-sdk` from crates.io (`"0.10.1"`); local development overrides it with a gitignored `.cargo/config.toml` `[patch.crates-io]` pointing at `../sonos-sdk`
+  - `sonos-sdk` from crates.io (`"0.11.0"`); local development overrides it with a gitignored `.cargo/config.toml` `[patch.crates-io]` pointing at `../sonos-sdk`
   - `clap` v4 with `derive` feature (+ `clap_complete` for dynamic completions)
   - `ratatui` + `crossterm`
   - `serde` + `toml` (for config)
@@ -307,6 +307,14 @@ Gives users precise per-speaker and per-group control.
 - [x] `sonos loudness <on|off> --speaker NAME`
   - SDK: `speaker.set_loudness(enabled)` — map `"on"` → `true`, `"off"` → `false`
 
+### Home Theater Commands
+
+- [x] `sonos sub <-15..15|on|off> --speaker NAME` — `speaker.sub_level` / `sub_enabled`; errors when no sub is bonded
+- [x] `sonos surround <-15..15|on|off> [--tv] --speaker NAME` — `music_surround_level` (or `surround_level` with `--tv`) / `surround_enabled`
+- [x] `sonos night <on|off> --speaker NAME` — `speaker.night_mode`
+- [x] `sonos speech <on|off> --speaker NAME` — `speaker.speech_enhancement`
+- [x] `sonos status` lists a home theater's satellites
+
 ### Grouping Commands
 
 - [x] `sonos join --speaker NAME --group NAME`
@@ -544,6 +552,9 @@ The landing experience. Must feel live and scannable.
   - *Implemented as pick-up/drop: `Space` picks up the speaker, `↑↓` chooses a group, `Space` drops it (`Esc` cancels).*
 - [ ] `d` — ungroup selected speaker *(no `d` key; see the "create group" drop target above)*
   - SDK: `speaker.leave_group()`
+- [x] Home theater satellites nested under their soundbar (`speaker.satellites()`), hidden during pick-up and not pick-up-able
+- [x] Surround rows show both levels (`♪ +3  TV +8`); `⇥` picks which one `←→` edits; `m` turns the surrounds (or sub) on/off
+- [ ] `Enter` on a satellite row opens a home theater settings page (night mode, speech enhancement, surround mode, audio delay)
 
 **Exit criteria:** Home screen renders live data. Progress bars animate. State changes from the Sonos app (volume, track change, play/pause) appear on screen within 1 second.
 

@@ -18,7 +18,7 @@ SDK methods are called directly from CLI command handlers and TUI event handlers
 |---------|-------|
 | CLI parsing | `clap` v4 (derive feature) |
 | TUI | `ratatui` + `crossterm` |
-| Sonos SDK | `sonos-sdk` `0.10.1` from crates.io (`test-support` feature in dev-dependencies) |
+| Sonos SDK | `sonos-sdk` `0.11.0` from crates.io (`test-support` feature in dev-dependencies) |
 | Config | `serde` + `toml`, `dirs` |
 | Errors | `thiserror` (`CliError`) on the CLI path; `anyhow` in the TUI and `Config::save` |
 | Logging | `tracing` + `tracing-subscriber` |
@@ -75,7 +75,7 @@ tests/              ← integration tests (liveness)
 1. **Direct SDK calls.** CLI command handlers and TUI event handlers call SDK methods directly. The SDK (`sonos-sdk`) is the shared API layer — no intermediate Action enum or executor dispatch.
 2. **Errors to stderr.** `stdout` is for command output only. CLI handlers return `Result<_, CliError>`; `main` prints `error: {e}` plus `recovery_hint()` to stderr and exits with `exit_code()`. The TUI propagates `anyhow::Result`.
 3. **Discovery is cached by the SDK.** `SonosSystem::new()` handles caching transparently — `cache.json` in the platform cache dir (`~/.cache/sonos/` on Linux, `~/Library/Caches/sonos/` on macOS, or `$SONOS_CACHE_DIR`) with 24h TTL, falls back to SSDP on miss or expiry. `system.speaker(name)` re-runs SSDP on a miss, at most once per 30 s.
-4. **`--group` wins over `--speaker`.** If both flags are given, target the group. With neither, use the configured default group, then the largest group's coordinator. Speaker-only commands (`bass`, `treble`, `loudness`) reject `--group` as a usage error.
+4. **`--group` wins over `--speaker`.** If both flags are given, target the group. With neither, use the configured default group, then the largest group's coordinator. Speaker-only commands (`bass`, `treble`, `loudness`, `sub`, `surround`, `night`, `speech`) reject `--group` as a usage error.
 
 ## CLI Conventions
 

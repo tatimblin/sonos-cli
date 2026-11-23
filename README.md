@@ -62,6 +62,10 @@ sonos next
 | `bass <-10..10>` | Set bass level (speaker only) |
 | `treble <-10..10>` | Set treble level (speaker only) |
 | `loudness <on\|off>` | Set loudness compensation (speaker only) |
+| `sub <-15..15\|on\|off>` | Set the sub level or turn the sub on/off (home theater) |
+| `surround <-15..15\|on\|off> [--tv]` | Set the music (or TV) surround level, or turn the surrounds on/off (home theater) |
+| `night <on\|off>` | Set night mode (home theater) |
+| `speech <on\|off>` | Set speech enhancement (home theater) |
 | `join` | Add a speaker to a group |
 | `leave` | Remove a speaker from its group |
 | `sleep <duration>` | Set sleep timer (e.g., 30m, 1h) or "cancel" |

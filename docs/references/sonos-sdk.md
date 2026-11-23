@@ -106,6 +106,7 @@ rediscovery. Use them when tests need real `Device` values without network cost.
 | `from_devices_offline(devices: Vec<Device>) -> Result<Self, SdkError>` | None |
 | `from_devices_offline_with_topology(devices, seed: impl FnOnce(&Self))` | Seeded by the closure (crate-internal state, so of limited use downstream) |
 | `from_devices_offline_with_groups(devices, groups: Vec<(GroupId, SpeakerId, Vec<SpeakerId>)>)` | Explicit `(group id, coordinator, members)` list — the way to build multi-member groups from outside the SDK |
+| `from_devices_offline_with_home_theaters(devices, groups, home_theaters: Vec<(SpeakerId, Vec<(SpeakerId, SatelliteRole)>)>)` | Groups as above, plus each main speaker's satellites. Satellite devices belong in `devices` too; they are excluded from the speaker map as in production. List satellites in display order |
 
 ```rust
 // Only available with `test-support` feature
@@ -230,6 +231,16 @@ pub struct Speaker {
     pub bass:             BassHandle,
     pub treble:           TrebleHandle,
     pub loudness:         LoudnessHandle,
+    // Home theater settings (soundbar or bonded sub; see §10)
+    pub sub_enabled:          SubEnabledHandle,
+    pub sub_level:            SubLevelHandle,
+    pub surround_enabled:     SurroundEnabledHandle,
+    pub surround_level:       SurroundLevelHandle,      // TV
+    pub music_surround_level: MusicSurroundLevelHandle,
+    pub surround_mode:        SurroundModeHandle,
+    pub night_mode:           NightModeHandle,
+    pub speech_enhancement:   SpeechEnhancementHandle,
+    pub audio_delay:          AudioDelayHandle,
     pub playback_state:   PlaybackStateHandle,
     pub position:         PositionHandle,
     pub current_track:    CurrentTrackHandle,
@@ -471,6 +482,7 @@ Out-of-range values are caught before the network call and return
 | Method | Return | Description |
 |---|---|---|
 | `group()` | `Option<Group>` | The group this speaker belongs to (no network call) |
+| `satellites()` | `Vec<Satellite>` | Bonded surrounds and subs: left surround, right surround, then sub (no network call) |
 
 ```rust
 let kitchen = system.speaker("Kitchen").unwrap();
@@ -481,6 +493,25 @@ if let Some(group) = kitchen.group() {
 
 Returns `None` only if topology hasn't been loaded yet (e.g. no group methods or
 `watch(group_membership)` have been called).
+
+Satellites are not in `speakers()`: they play as part of their main speaker and
+take no commands. Their levels are settings on the main speaker.
+
+```rust
+pub struct Satellite {
+    pub id:         SpeakerId,
+    pub role:       SatelliteRole,     // LeftSurround, RightSurround, Sub, Other(code)
+    pub model_name: Option<String>,    // None if discovery never heard from the device
+    pub ip:         Option<IpAddr>,
+}
+
+for sat in basement.satellites() {
+    println!("{} • {}", sat.role.label(), sat.model_name.unwrap_or_default());
+}
+```
+
+`SatelliteRole::label()` gives "Left surround", "Right surround", "Sub" (or
+"Satellite"); `is_surround()` is true for either surround.
 
 ### 3.11 Group membership (speaker-level)
 
@@ -693,6 +724,7 @@ These properties support `fetch()`:
 | `BassHandle` | `Bass(i8)` | RenderingControl |
 | `TrebleHandle` | `Treble(i8)` | RenderingControl |
 | `LoudnessHandle` | `Loudness(bool)` | RenderingControl |
+| `SubEnabledHandle`, `SubLevelHandle`, `SurroundEnabledHandle`, `SurroundLevelHandle`, `MusicSurroundLevelHandle`, `SurroundModeHandle`, `NightModeHandle`, `SpeechEnhancementHandle`, `AudioDelayHandle` | home theater settings (§10) | RenderingControl (`GetEQ`) |
 | `PlaybackStateHandle` | `PlaybackState` | AVTransport |
 | `PositionHandle` | `Position` | AVTransport |
 | `CurrentTrackHandle` | `CurrentTrack` | AVTransport |
@@ -711,6 +743,15 @@ pub type MuteHandle                = PropertyHandle<Mute>;
 pub type BassHandle                = PropertyHandle<Bass>;
 pub type TrebleHandle              = PropertyHandle<Treble>;
 pub type LoudnessHandle            = PropertyHandle<Loudness>;
+pub type SubEnabledHandle          = PropertyHandle<SubEnabled>;
+pub type SubLevelHandle            = PropertyHandle<SubLevel>;
+pub type SurroundEnabledHandle     = PropertyHandle<SurroundEnabled>;
+pub type SurroundLevelHandle       = PropertyHandle<SurroundLevel>;
+pub type MusicSurroundLevelHandle  = PropertyHandle<MusicSurroundLevel>;
+pub type SurroundModeHandle        = PropertyHandle<SurroundMode>;
+pub type NightModeHandle           = PropertyHandle<NightMode>;
+pub type SpeechEnhancementHandle   = PropertyHandle<SpeechEnhancement>;
+pub type AudioDelayHandle          = PropertyHandle<AudioDelay>;
 pub type PlaybackStateHandle       = PropertyHandle<PlaybackState>;
 pub type PositionHandle            = PropertyHandle<Position>;
 pub type CurrentTrackHandle        = PropertyHandle<CurrentTrack>;
@@ -1056,6 +1097,28 @@ impl Loudness {
 ```
 
 Property key: `"loudness"`. Service: `RenderingControl`.
+
+### Home theater settings
+
+Settings on a soundbar, or a speaker with a bonded sub. Each is fetched with
+RenderingControl `GetEQ`, written with `SetEQ` through `set()`, and evented in
+`LastChange`, so it can be watched. A soundbar reports all of them, sub settings
+included, even with no sub bonded: check `satellites()` before offering one.
+
+| Property | Key | Value | Range |
+|---|---|---|---|
+| `SubEnabled` | `"sub_enabled"` | `bool` (`is_enabled()`) | |
+| `SubLevel` | `"sub_level"` | `i8` (`value()`) | -15..=15 |
+| `SurroundEnabled` | `"surround_enabled"` | `bool` | |
+| `SurroundLevel` | `"surround_level"` | `i8`, while playing TV | -15..=15 |
+| `MusicSurroundLevel` | `"music_surround_level"` | `i8`, while playing music | -15..=15 |
+| `SurroundMode` | `"surround_mode"` | `Ambient` / `Full` (music) | |
+| `NightMode` | `"night_mode"` | `bool` | |
+| `SpeechEnhancement` | `"speech_enhancement"` | `bool` (`DialogLevel`) | |
+| `AudioDelay` | `"audio_delay"` | `u8` | 0..=5 |
+
+Level types have `new()` (clamps), `value()`, and `MIN`/`MAX` constants.
+Out-of-range values passed to `set()` fail with `SdkError::ValidationFailed`.
 
 ### `Position`
 

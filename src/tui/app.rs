@@ -8,7 +8,7 @@ use ratatui_image::picker::Picker;
 use crate::config::Config;
 use crate::tui::image_loader::ImageLoader;
 use crate::tui::theme::Theme;
-use crate::tui::types::{ListEntry, ListSelection, PickUpState};
+use crate::tui::types::{LevelFocus, ListEntry, ListSelection, PickUpState};
 use sonos_sdk::SonosSystem;
 
 const TOAST_DURATION: Duration = Duration::from_secs(3);
@@ -122,6 +122,9 @@ impl Navigation {
 pub struct SpeakerListScreenState {
     pub selection: ListSelection,
     pub pick_up: Option<PickUpState>,
+    /// Which surround level surround rows edit. Kept across rows, so moving
+    /// to the other surround edits the same level.
+    pub level_focus: LevelFocus,
 }
 
 impl SpeakerListScreenState {

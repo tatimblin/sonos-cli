@@ -14,6 +14,11 @@
 //! Muted speakers and groups show the mute glyph before the volume:
 //!   `├─ Bathroom • Sonos Connect:AMP                × 46%`
 //!
+//! Satellites nest under their speaker and show its surround or sub levels;
+//! the selected row shows a bar for the level `←→` edits:
+//!   `│  ├─ Left surround • Sonos One             ♪ +3  TV +8`
+//!   `│  └─ Right surround • Sonos One   ■■■■■··· ♪ +3  TV +8`
+//!
 //! During pickup mode, inline action rows appear:
 //!   `└─ Add to group`       (selectable drop target)
 //!   `└─ Already in group`   (dimmed, home group)
@@ -28,7 +33,8 @@ use sonos_sdk::PlaybackState;
 
 use crate::tui::theme::Theme;
 use crate::tui::types::{
-    group_for_entry, GroupHeaderData, ListEntry, RowData, SpeakerListData, SpeakerRowData,
+    group_for_entry, GroupHeaderData, LevelFocus, ListEntry, RowData, SatelliteLevels,
+    SatelliteRowData, SpeakerListData, SpeakerRowData,
 };
 use crate::tui::widgets::volume_bar;
 
@@ -96,6 +102,15 @@ pub fn render(frame: &mut Frame, area: Rect, data: &SpeakerListData, theme: &The
                     is_picked_up,
                     shows_volume_bar,
                     vol_width,
+                    total_width,
+                    theme,
+                ));
+            }
+            RowData::Satellite(satellite) => {
+                lines.push(render_satellite_row(
+                    satellite,
+                    is_selected,
+                    data.level_focus,
                     total_width,
                     theme,
                 ));
@@ -266,6 +281,120 @@ fn render_speaker_row(
     }
 
     Line::from(spans)
+}
+
+/// Columns of the bar on a selected satellite row.
+const LEVEL_BAR_WIDTH: usize = 8;
+
+/// `     │  ├─ Left surround • Sonos One          ♪ +3  TV +8`
+///
+/// Selected, the level `←→` edits gets a bar and the accent colour; the other
+/// stays a muted number.
+fn render_satellite_row(
+    satellite: &SatelliteRowData,
+    is_selected: bool,
+    focus: LevelFocus,
+    total_width: usize,
+    theme: &Theme,
+) -> Line<'static> {
+    let g = &theme.glyphs;
+    let continuation = if satellite.main_is_last_in_group {
+        "   "
+    } else {
+        g.connector_pipe
+    };
+    let connector = if satellite.is_last {
+        g.connector_last
+    } else {
+        g.connector_branch
+    };
+    let name_style = if is_selected {
+        theme.speaker_cursor
+    } else {
+        theme.muted
+    };
+
+    let mut spans = cursor_prefix(is_selected, theme.speaker_cursor, theme);
+    spans.push(indent(theme));
+    spans.push(Span::styled(continuation, theme.muted));
+    spans.push(Span::styled(connector, theme.muted));
+    spans.push(Span::styled(satellite.label.clone(), name_style));
+    if let Some(ref model) = satellite.model_name {
+        spans.push(Span::styled(g.model_separator.to_string(), theme.muted));
+        spans.push(Span::styled(model.clone(), theme.muted));
+    }
+
+    let right = match satellite.levels {
+        SatelliteLevels::Surround {
+            enabled: Some(false),
+            ..
+        }
+        | SatelliteLevels::Sub {
+            enabled: Some(false),
+            ..
+        } => vec![Span::styled("off", theme.muted)],
+        SatelliteLevels::Surround { music, tv, .. } => {
+            let music_label = format!("{} {}", g.music_note, format_level(music));
+            let tv_label = format!("TV {}", format_level(tv));
+            let mut right = level_spans(
+                music,
+                music_label,
+                is_selected && focus == LevelFocus::Music,
+                theme,
+            );
+            right.push(Span::raw("  "));
+            right.extend(level_spans(
+                tv,
+                tv_label,
+                is_selected && focus == LevelFocus::Tv,
+                theme,
+            ));
+            right
+        }
+        SatelliteLevels::Sub { level, .. } => {
+            level_spans(level, format_level(level), is_selected, theme)
+        }
+        SatelliteLevels::Unknown => Vec::new(),
+    };
+    push_right_aligned(&mut spans, right, total_width);
+
+    Line::from(spans)
+}
+
+/// One level: `■■■■■··· ♪ +3` in the accent colour when it is being edited,
+/// otherwise just the muted label.
+fn level_spans(
+    level: Option<i8>,
+    label: String,
+    is_editing: bool,
+    theme: &Theme,
+) -> Vec<Span<'static>> {
+    if !is_editing {
+        return vec![Span::styled(label, theme.muted)];
+    }
+    let mut spans = Vec::new();
+    if let Some(level) = level {
+        let (filled, empty) = level_bar(level, LEVEL_BAR_WIDTH);
+        spans.push(Span::styled(filled, theme.volume_filled));
+        spans.push(Span::styled(empty, theme.volume_empty));
+        spans.push(Span::raw(" "));
+    }
+    spans.push(Span::styled(label, theme.accent));
+    spans
+}
+
+/// A level from -15 to +15 as a bar `width` columns wide: 0 fills half.
+fn level_bar(level: i8, width: usize) -> (String, String) {
+    let filled = ((i32::from(level.clamp(-15, 15)) + 15) as usize * width + 15) / 30;
+    ("\u{25a0}".repeat(filled), "\u{00b7}".repeat(width - filled))
+}
+
+/// `+3`, `-2`, `+0`; `-` when not known yet.
+fn format_level(level: Option<i8>) -> String {
+    match level {
+        Some(v) => format!("{v:+}"),
+        None => "-".to_string(),
+    }
 }
 
 /// `  └─ Add to group`, or dimmed `└─ Already in group` for the home group.
@@ -482,6 +611,7 @@ mod tests {
             ],
             selected_index: 0,
             picked_up_speaker_id: None,
+            level_focus: LevelFocus::Music,
         }
     }
 
@@ -515,6 +645,130 @@ mod tests {
         );
     }
 
+    fn surround(label: &str, music: i8, tv: i8, is_last: bool) -> RowData {
+        RowData::Satellite(SatelliteRowData {
+            label: label.to_string(),
+            model_name: Some("Sonos One".to_string()),
+            levels: SatelliteLevels::Surround {
+                enabled: Some(true),
+                music: Some(music),
+                tv: Some(tv),
+            },
+            is_last,
+            main_is_last_in_group: true,
+        })
+    }
+
+    /// Basement: a Playbar with two surrounds. Nothing is selected under the
+    /// header unless a test changes it.
+    fn basement() -> SpeakerListData {
+        let satellite = |n: u8| ListEntry::SatelliteRow {
+            main: sid(0),
+            satellite: sid(n),
+        };
+        SpeakerListData {
+            entries: vec![
+                ListEntry::GroupHeader(gid(0)),
+                ListEntry::SpeakerRow(sid(0)),
+                satellite(1),
+                satellite(2),
+            ],
+            rows: vec![
+                header("Basement", 25),
+                row("Basement", "Sonos Playbar", 25, true),
+                surround("Left surround", 3, 8, false),
+                surround("Right surround", 3, 8, true),
+            ],
+            selected_index: 0,
+            picked_up_speaker_id: None,
+            level_focus: LevelFocus::Music,
+        }
+    }
+
+    #[test]
+    fn satellite_rows_nest_under_their_speaker_with_both_levels() {
+        let lines = render_lines(&basement());
+        assert!(
+            lines[1].starts_with("    \u{2514}\u{2500} Basement \u{2022} Sonos Playbar"),
+            "{:?}",
+            lines[1]
+        );
+        assert!(
+            lines[2].starts_with("       \u{251c}\u{2500} Left surround \u{2022} Sonos One "),
+            "{:?}",
+            lines[2]
+        );
+        assert!(lines[2].ends_with(" \u{266a} +3  TV +8"), "{:?}", lines[2]);
+        assert!(
+            lines[3].starts_with("       \u{2514}\u{2500} Right surround"),
+            "{:?}",
+            lines[3]
+        );
+        assert_flush_right(&lines[2]);
+    }
+
+    #[test]
+    fn selected_surround_row_shows_a_bar_for_the_level_being_edited() {
+        let mut data = basement();
+        data.selected_index = 2;
+        let music = &render_lines(&data)[2];
+        assert!(music.starts_with("\u{276f}"), "{music:?}");
+        // +3 of -15..+15 in 8 columns: 5 filled.
+        assert!(
+            music.ends_with(" \u{25a0}\u{25a0}\u{25a0}\u{25a0}\u{25a0}\u{00b7}\u{00b7}\u{00b7} \u{266a} +3  TV +8"),
+            "{music:?}"
+        );
+
+        data.level_focus = LevelFocus::Tv;
+        let tv = &render_lines(&data)[2];
+        // +8: 6 filled, and the music level is a bare number.
+        assert!(
+            tv.ends_with(" \u{266a} +3  \u{25a0}\u{25a0}\u{25a0}\u{25a0}\u{25a0}\u{25a0}\u{00b7}\u{00b7} TV +8"),
+            "{tv:?}"
+        );
+        assert_flush_right(tv);
+    }
+
+    #[test]
+    fn switched_off_satellites_say_off() {
+        let mut data = basement();
+        if let RowData::Satellite(sat) = &mut data.rows[2] {
+            sat.levels = SatelliteLevels::Surround {
+                enabled: Some(false),
+                music: Some(3),
+                tv: Some(8),
+            };
+        }
+        data.rows[3] = RowData::Satellite(SatelliteRowData {
+            label: "Sub".to_string(),
+            model_name: Some("Sonos Sub Mini".to_string()),
+            levels: SatelliteLevels::Sub {
+                enabled: Some(true),
+                level: Some(2),
+            },
+            is_last: true,
+            main_is_last_in_group: true,
+        });
+        let lines = render_lines(&data);
+        assert!(lines[2].ends_with(" off"), "{:?}", lines[2]);
+        assert!(lines[3].ends_with(" +2"), "{:?}", lines[3]);
+    }
+
+    #[test]
+    fn satellites_of_a_middle_speaker_continue_the_branch() {
+        let mut data = basement();
+        for row in &mut data.rows[2..] {
+            if let RowData::Satellite(sat) = row {
+                sat.main_is_last_in_group = false;
+            }
+        }
+        let line = &render_lines(&data)[2];
+        assert!(
+            line.starts_with("    \u{2502}  \u{251c}\u{2500} Left surround"),
+            "{line:?}"
+        );
+    }
+
     #[test]
     fn empty_list_says_no_speakers() {
         let data = SpeakerListData {
@@ -522,6 +776,7 @@ mod tests {
             rows: vec![],
             selected_index: 0,
             picked_up_speaker_id: None,
+            level_focus: LevelFocus::Music,
         };
         assert!(render_lines(&data)
             .iter()
@@ -664,6 +919,7 @@ mod tests {
             ],
             selected_index: 6,
             picked_up_speaker_id: Some(sid(1)),
+            level_focus: LevelFocus::Music,
         };
         let lines = render_lines(&data);
 

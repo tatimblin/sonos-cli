@@ -1,7 +1,7 @@
 //! Shared types used across TUI layers (widgets, screens, handlers).
 
 use ratatui_image::protocol::StatefulProtocol;
-use sonos_sdk::{Group, GroupId, PlaybackState, SonosSystem, SpeakerId};
+use sonos_sdk::{Group, GroupId, PlaybackState, SonosSystem, Speaker, SpeakerId};
 
 use crate::config::Config;
 
@@ -10,6 +10,12 @@ use crate::config::Config;
 pub enum ListEntry {
     GroupHeader(GroupId),
     SpeakerRow(SpeakerId),
+    /// A surround or sub, nested under the speaker it is bonded to (`main`).
+    /// Hidden during pick-up: satellites move with their main speaker.
+    SatelliteRow {
+        main: SpeakerId,
+        satellite: SpeakerId,
+    },
     /// Inline drop target shown during pickup mode — "Add to group" or "Already in group".
     AddToGroupRow(GroupId),
     /// "Create new group" action row at the bottom during pickup mode.
@@ -36,11 +42,24 @@ pub enum KeyOutcome {
 /// speaker as belonging to a group). Multi-member groups are listed first,
 /// then standalone groups.
 ///
+/// Each speaker's satellites follow its row, except during pick-up.
+///
 /// When `pick_up` is `Some`, each group gets an `AddToGroupRow` after its
 /// speakers, and a `CreateNewGroupRow` appears at the end.
 pub fn build_list_entries(system: &SonosSystem, pick_up: Option<&PickUpState>) -> Vec<ListEntry> {
     let groups = system.groups();
     let mut entries = Vec::new();
+    let push_speaker = |entries: &mut Vec<ListEntry>, speaker: &Speaker| {
+        entries.push(ListEntry::SpeakerRow(speaker.id.clone()));
+        if pick_up.is_none() {
+            for sat in speaker.satellites() {
+                entries.push(ListEntry::SatelliteRow {
+                    main: speaker.id.clone(),
+                    satellite: sat.id,
+                });
+            }
+        }
+    };
 
     // Multi-member groups first
     for group in &groups {
@@ -49,7 +68,7 @@ pub fn build_list_entries(system: &SonosSystem, pick_up: Option<&PickUpState>) -
         }
         entries.push(ListEntry::GroupHeader(group.id.clone()));
         for member in group.members() {
-            entries.push(ListEntry::SpeakerRow(member.id.clone()));
+            push_speaker(&mut entries, &member);
         }
         if pick_up.is_some() {
             entries.push(ListEntry::AddToGroupRow(group.id.clone()));
@@ -63,7 +82,7 @@ pub fn build_list_entries(system: &SonosSystem, pick_up: Option<&PickUpState>) -
         }
         entries.push(ListEntry::GroupHeader(group.id.clone()));
         if let Some(coord) = group.coordinator() {
-            entries.push(ListEntry::SpeakerRow(coord.id.clone()));
+            push_speaker(&mut entries, &coord);
         }
         if pick_up.is_some() {
             entries.push(ListEntry::AddToGroupRow(group.id.clone()));
@@ -107,7 +126,9 @@ pub fn group_for_selection(
     group_for_entry(entries, index)
         .and_then(|gid| system.group_by_id(&gid))
         .or_else(|| match entries.get(index) {
-            Some(ListEntry::SpeakerRow(sid)) => system.speaker_by_id(sid).and_then(|s| s.group()),
+            Some(ListEntry::SpeakerRow(sid)) | Some(ListEntry::SatelliteRow { main: sid, .. }) => {
+                system.speaker_by_id(sid).and_then(|s| s.group())
+            }
             _ => None,
         })
 }
@@ -133,9 +154,14 @@ impl ListSelection {
     pub fn select(&mut self, entries: &[ListEntry], index: usize) {
         self.entry = entries.get(index).cloned();
         self.group_members = match self.entry {
+            // The header's block runs to the next header or action row;
+            // satellite rows inside it are skipped, not a stop.
             Some(ListEntry::GroupHeader(_)) => entries[index + 1..]
                 .iter()
-                .map_while(|e| match e {
+                .take_while(|e| {
+                    matches!(e, ListEntry::SpeakerRow(_) | ListEntry::SatelliteRow { .. })
+                })
+                .filter_map(|e| match e {
                     ListEntry::SpeakerRow(sid) => Some(sid.clone()),
                     _ => None,
                 })
@@ -143,6 +169,12 @@ impl ListSelection {
             _ => Vec::new(),
         };
         self.index = index;
+    }
+
+    /// The selected entry, as of the last selection. It may no longer be in
+    /// the list; [`Self::index_in`] resolves that.
+    pub fn entry(&self) -> Option<&ListEntry> {
+        self.entry.as_ref()
     }
 
     /// Select `entry` by identity, keeping the current index as the fallback.
@@ -178,6 +210,11 @@ impl ListSelection {
                         .iter()
                         .rposition(|e| matches!(e, ListEntry::GroupHeader(_)))
                 })
+                .unwrap_or(nearest),
+            // A hidden or unbonded satellite falls back to its main speaker.
+            ListEntry::SatelliteRow { main, .. } => entries
+                .iter()
+                .position(|e| matches!(e, ListEntry::SpeakerRow(s) if s == main))
                 .unwrap_or(nearest),
             ListEntry::AddToGroupRow(gid) => entries
                 .iter()
@@ -227,6 +264,25 @@ pub struct SpeakerListData {
     pub selected_index: usize,
     /// ID of the picked-up speaker (for reverse-highlight matching).
     pub picked_up_speaker_id: Option<SpeakerId>,
+    /// Which surround level a selected surround row edits.
+    pub level_focus: LevelFocus,
+}
+
+/// The surround level that `←→` edits on a surround row; `Tab` switches it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LevelFocus {
+    #[default]
+    Music,
+    Tv,
+}
+
+impl LevelFocus {
+    pub fn toggled(self) -> Self {
+        match self {
+            Self::Music => Self::Tv,
+            Self::Tv => Self::Music,
+        }
+    }
 }
 
 /// Per-entry display data, pre-resolved by the screen layer. One variant per
@@ -240,6 +296,7 @@ pub enum RowData {
         is_home: bool,
     },
     CreateNewGroup,
+    Satellite(SatelliteRowData),
 }
 
 pub struct GroupHeaderData {
@@ -258,6 +315,35 @@ pub struct SpeakerRowData {
     pub is_muted: bool,
     /// True when this is the last member of its group block (renders `└` connector).
     pub is_last_in_group: bool,
+}
+
+/// A satellite row: `Left surround • Sonos One          ♪ +3  TV +8`.
+pub struct SatelliteRowData {
+    /// Role label, e.g. "Left surround".
+    pub label: String,
+    pub model_name: Option<String>,
+    pub levels: SatelliteLevels,
+    /// Last satellite under its main speaker (renders `└`).
+    pub is_last: bool,
+    /// Its main speaker is the last row in the group, so no `│` continues
+    /// past it.
+    pub main_is_last_in_group: bool,
+}
+
+/// The main speaker's settings a satellite row shows. `None` values are not
+/// known yet (no event or fetch has landed).
+pub enum SatelliteLevels {
+    Surround {
+        enabled: Option<bool>,
+        music: Option<i8>,
+        tv: Option<i8>,
+    },
+    Sub {
+        enabled: Option<bool>,
+        level: Option<i8>,
+    },
+    /// A role this version doesn't know: no controls.
+    Unknown,
 }
 
 /// Available theme names.

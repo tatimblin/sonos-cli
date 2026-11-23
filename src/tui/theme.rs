@@ -26,6 +26,8 @@ pub struct Glyphs {
     // Speaker list tree connectors
     pub connector_branch: &'static str,
     pub connector_last: &'static str,
+    /// Continues a branch past nested rows (satellites under a speaker).
+    pub connector_pipe: &'static str,
 
     // Cursor / selection indicator
     pub cursor: &'static str,
@@ -81,6 +83,7 @@ impl Glyphs {
 
             connector_branch: "\u{251c}\u{2500} ", // ├─
             connector_last: "\u{2514}\u{2500} ",   // └─
+            connector_pipe: "\u{2502}  ",          // │
 
             cursor: "\u{276f}", // ❯
 
@@ -298,6 +301,7 @@ impl Theme {
             glyphs: Glyphs {
                 connector_branch: "   ",
                 connector_last: "   ",
+                connector_pipe: "   ",
                 leader_char: ' ',
                 divider_left: "",
                 divider_fill: " ",
