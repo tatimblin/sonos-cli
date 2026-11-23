@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/tatimblin/sonos-cli/compare/v0.11.1...v0.12.0) - 2026-11-23
+
+### Fixed
+
+- polish TUI highlights, surround levels, album art, and player bar ([#126](https://github.com/tatimblin/sonos-cli/pull/126))
+
 ## [0.11.1](https://github.com/tatimblin/sonos-cli/compare/v0.11.0...v0.11.1) - 2026-11-23
 
 ### Fixed
