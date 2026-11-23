@@ -55,7 +55,7 @@ pub struct App {
     /// Toast notification shown in the header. Auto-expires after 3 seconds.
     pub toast: Option<Toast>,
     /// Terminal image protocol picker, detected before entering raw mode.
-    /// `None` when album art is disabled or terminal detection failed.
+    /// `None` when terminal detection failed.
     /// `RefCell` because `new_resize_protocol()` requires `&mut Picker`.
     pub picker: RefCell<Option<Picker>>,
     /// Background image fetcher and cache for album art.

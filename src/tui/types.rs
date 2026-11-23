@@ -266,6 +266,8 @@ pub struct SpeakerListData {
     pub picked_up_speaker_id: Option<SpeakerId>,
     /// Which surround level a selected surround row edits.
     pub level_focus: LevelFocus,
+    /// False while the tab bar has focus: no row is highlighted.
+    pub has_focus: bool,
 }
 
 /// The surround level that `←→` edits on a surround row; `Tab` switches it.
@@ -317,7 +319,7 @@ pub struct SpeakerRowData {
     pub is_last_in_group: bool,
 }
 
-/// A satellite row: `Left surround • Sonos One          ♪ +3  TV +8`.
+/// A satellite row: `Left surround • Sonos One          +3/+8`.
 pub struct SatelliteRowData {
     /// Role label, e.g. "Left surround".
     pub label: String,
@@ -422,6 +424,8 @@ pub struct SettingsData {
     pub selected_row: usize,
     pub dropdown_open: bool,
     pub dropdown_index: usize,
+    /// False while the tab bar has focus: no row is highlighted.
+    pub has_focus: bool,
 }
 
 #[cfg(test)]

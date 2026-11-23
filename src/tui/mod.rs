@@ -26,15 +26,12 @@ pub fn run(config: Config) -> Result<()> {
     // Detect terminal image protocol BEFORE entering raw mode.
     // from_query_stdio() sends escape sequences to discover font size and
     // graphics protocol support — must happen before ratatui::init().
-    let picker = if config.album_art_mode.is_off() {
-        None
-    } else {
-        match Picker::from_query_stdio() {
-            Ok(p) => Some(p),
-            Err(e) => {
-                tracing::debug!("Terminal image protocol detection failed: {e}");
-                None
-            }
+    // Detected even when album art is off, so it can be turned on live.
+    let picker = match Picker::from_query_stdio() {
+        Ok(p) => Some(p),
+        Err(e) => {
+            tracing::debug!("Terminal image protocol detection failed: {e}");
+            None
         }
     };
 

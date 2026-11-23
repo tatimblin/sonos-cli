@@ -75,30 +75,42 @@ fn render_wide(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme: &
     let right_x = center_x + center_w;
 
     // -- Left column: Title (row 0), Artist (row 1), Album (row 2) --
+    // With no track, a "No track" skeleton sits on row 1 instead.
 
-    let title = data.track_title.as_deref().unwrap_or("No track");
-    let title_display = truncate_str(title, left_w.saturating_sub(1) as usize);
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(title_display, theme.header))),
-        Rect::new(left_x, area.y, left_w, 1),
-    );
+    let text_w = left_w.saturating_sub(1) as usize;
+    if let Some(title) = data.track_title.as_deref() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                truncate_str(title, text_w),
+                theme.header,
+            ))),
+            Rect::new(left_x, area.y, left_w, 1),
+        );
 
-    let artist = data.track_artist.as_deref().unwrap_or("");
-    let artist_display = truncate_str(artist, left_w.saturating_sub(1) as usize);
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(artist_display, theme.muted))),
-        Rect::new(left_x, area.y + 1, left_w, 1),
-    );
+        let artist = data.track_artist.as_deref().unwrap_or("");
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                truncate_str(artist, text_w),
+                theme.muted,
+            ))),
+            Rect::new(left_x, area.y + 1, left_w, 1),
+        );
 
-    if area.height >= 3 {
         let album = data.track_album.as_deref().unwrap_or("");
         if !album.is_empty() {
-            let album_display = truncate_str(album, left_w.saturating_sub(1) as usize);
             frame.render_widget(
-                Paragraph::new(Line::from(Span::styled(album_display, theme.muted))),
+                Paragraph::new(Line::from(Span::styled(
+                    truncate_str(album, text_w),
+                    theme.muted,
+                ))),
                 Rect::new(left_x, area.y + 2, left_w, 1),
             );
         }
+    } else {
+        frame.render_widget(
+            Paragraph::new(Line::from(no_track_span(theme))),
+            Rect::new(left_x, area.y + 1, left_w, 1),
+        );
     }
 
     // -- Center column: Controls (row 0), Progress bar (row 1) --
@@ -196,8 +208,8 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
 
     let vol_width: u16 = 18.min(text_w / 3);
 
-    // Row 0: Title + group name
-    let title = data.track_title.as_deref().unwrap_or("No track");
+    // Row 0: Title + group name (with no track, the title row is empty)
+    let title = data.track_title.as_deref().unwrap_or("");
     let group = &data.group_name;
 
     let group_width = group.chars().count() as u16;
@@ -213,11 +225,15 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
     ]);
     frame.render_widget(Paragraph::new(row0), Rect::new(text_x, area.y, text_w, 1));
 
-    // Row 1: Artist + volume bar
-    let artist = data.track_artist.as_deref().unwrap_or("");
+    // Row 1: Artist + volume bar, or the "No track" skeleton with no track
     let artist_max = text_w.saturating_sub(vol_width + 2);
-    let artist_display = truncate_str(artist, artist_max as usize);
-    let artist_chars = artist_display.chars().count() as u16;
+    let artist_span = if data.track_title.is_some() {
+        let artist = data.track_artist.as_deref().unwrap_or("");
+        Span::styled(truncate_str(artist, artist_max as usize), theme.muted)
+    } else {
+        no_track_span(theme)
+    };
+    let artist_chars = artist_span.content.chars().count() as u16;
     let pad = text_w.saturating_sub(artist_chars + vol_width);
 
     let vol_filled = if data.group_volume_active {
@@ -228,10 +244,7 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
     let vol_line =
         volume_bar::render_volume_bar(data.volume, vol_width, vol_filled, theme.volume_empty);
 
-    let mut row1_spans = vec![
-        Span::styled(artist_display, theme.muted),
-        Span::raw(" ".repeat(pad as usize)),
-    ];
+    let mut row1_spans = vec![artist_span, Span::raw(" ".repeat(pad as usize))];
     row1_spans.extend(vol_line.spans);
 
     frame.render_widget(
@@ -288,14 +301,23 @@ fn render_narrow(frame: &mut Frame, area: Rect, data: &mut BottomBarData, theme:
 
 fn render_minimal(frame: &mut Frame, area: Rect, data: &BottomBarData, theme: &Theme) {
     let icon = playback_icon(data.playback_state.as_ref(), theme);
-    let title = data.track_title.as_deref().unwrap_or("No track");
     let group = &data.group_name;
 
-    let text = format!("{icon} {title} \u{2014} {group}");
-    let display = truncate_str(&text, area.width as usize);
-
-    let paragraph = Paragraph::new(Line::from(vec![Span::styled(display, theme.track_info)]));
-    frame.render_widget(paragraph, area);
+    let line = match data.track_title.as_deref() {
+        Some(title) => {
+            let text = format!("{icon} {title} \u{2014} {group}");
+            Line::from(Span::styled(
+                truncate_str(&text, area.width as usize),
+                theme.track_info,
+            ))
+        }
+        None => Line::from(vec![
+            Span::styled(format!("{icon} "), theme.track_info),
+            no_track_span(theme),
+            Span::styled(format!(" \u{2014} {group}"), theme.track_info),
+        ]),
+    };
+    frame.render_widget(Paragraph::new(line), area);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,10 +333,20 @@ fn playback_icon<'a>(state: Option<&PlaybackState>, theme: &'a Theme) -> &'a str
     }
 }
 
+/// Transport controls. The middle button shows the action it takes: pause
+/// while playing, play otherwise.
 fn build_controls_str(state: Option<&PlaybackState>, theme: &Theme) -> String {
     let g = &theme.glyphs;
-    let play_pause = playback_icon(state, theme);
+    let play_pause = match state {
+        Some(PlaybackState::Playing) => g.paused,
+        _ => g.playing,
+    };
     format!(" {}  {play_pause}  {} ", g.control_prev, g.control_next)
+}
+
+/// "No track" on a gray background, like a loading skeleton.
+fn no_track_span(theme: &Theme) -> Span<'static> {
+    Span::styled(" No track ", theme.picked_up)
 }
 
 /// Truncate a string to fit within `max_chars` characters, appending ellipsis if needed.
@@ -393,6 +425,60 @@ mod tests {
         let controls = build_controls_str(Some(&PlaybackState::Playing), &theme);
         assert!(controls.contains(theme.glyphs.control_prev));
         assert!(controls.contains(theme.glyphs.control_next));
-        assert!(controls.contains(theme.glyphs.playing));
+    }
+
+    #[test]
+    fn controls_show_pause_while_playing_and_play_otherwise() {
+        let theme = Theme::default_theme();
+        let g = &theme.glyphs;
+        let playing = build_controls_str(Some(&PlaybackState::Playing), &theme);
+        assert!(playing.contains(g.paused) && !playing.contains(g.playing));
+        for state in [
+            Some(PlaybackState::Paused),
+            Some(PlaybackState::Stopped),
+            None,
+        ] {
+            let controls = build_controls_str(state.as_ref(), &theme);
+            assert!(controls.contains(g.playing), "{state:?}: {controls:?}");
+        }
+    }
+
+    fn no_track_data(is_wide: bool) -> BottomBarData {
+        BottomBarData {
+            group_name: "Kitchen".to_string(),
+            track_title: None,
+            track_artist: None,
+            track_album: None,
+            album_art_protocol: None,
+            playback_state: None,
+            progress: 0.0,
+            position_ms: 0,
+            duration_ms: 0,
+            volume: 30,
+            is_wide,
+            group_volume_active: false,
+        }
+    }
+
+    #[test]
+    fn no_track_is_a_skeleton_on_the_second_row() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+
+        let theme = Theme::default_theme();
+        for (width, is_wide) in [(120, true), (80, false)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, 3)).unwrap();
+            let mut data = no_track_data(is_wide);
+            terminal
+                .draw(|frame| render(frame, frame.area(), &mut data, &theme))
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            let row = |y: u16| -> String { (0..width).map(|x| buffer[(x, y)].symbol()).collect() };
+            assert!(!row(0).contains("No track"), "{:?}", row(0));
+            let x = row(1).find("No track").expect("No track on row 1") as u16;
+            // Skeleton background spans the text (art is 6 cols, all ASCII after).
+            let cell = &buffer[(x, 1)];
+            assert_eq!(cell.bg, theme.picked_up.bg.unwrap(), "width {width}");
+        }
     }
 }
