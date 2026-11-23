@@ -44,7 +44,7 @@ The scaffolding that everything else builds on. No user-visible features yet, bu
 ### Cargo.toml & Dependencies
 
 - [x] `Cargo.toml` with all dependencies:
-  - `sonos-sdk` from crates.io (`"0.11.0"`); local development overrides it with a gitignored `.cargo/config.toml` `[patch.crates-io]` pointing at `../sonos-sdk`
+  - `sonos-sdk` from crates.io (`"0.11.1"`); local development overrides it with a gitignored `.cargo/config.toml` `[patch.crates-io]` pointing at `../sonos-sdk`
   - `clap` v4 with `derive` feature (+ `clap_complete` for dynamic completions)
   - `ratatui` + `crossterm`
   - `serde` + `toml` (for config)
